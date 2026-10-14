@@ -1,20 +1,25 @@
 import { useState } from 'react';
 import type { AvatarSlot, Child } from '../types';
-import { optionsFor, isUnlocked } from '../avatar';
-import { updateAvatar } from '../actions';
+import { optionsFor, isUnlocked, type AvatarOption } from '../avatar';
+import { updateAvatar, exchangeStarShards } from '../actions';
 import { sound } from '../sound';
+import { burst } from '../effects';
+import { toast } from './ui';
 import { GameAvatar2D } from './Avatar';
-import { Lock, Check, Sparkles } from 'lucide-react';
+import { Lock, Check, Sparkles, Star, ShoppingBag } from 'lucide-react';
 
 export function AvatarMaker({
   child,
   onClose,
+  onOpenGacha,
 }: {
   child: Child;
   onClose: () => void;
+  onOpenGacha?: () => void;
 }) {
   const [currentSlot, setCurrentSlot] = useState<AvatarSlot>('hairStyle');
   const [sparkleCount, setSparkleCount] = useState(0);
+  const [previewLockedItem, setPreviewLockedItem] = useState<AvatarOption | null>(null);
 
   const slots: { slot: AvatarSlot; label: string; icon: string }[] = [
     { slot: 'hairStyle', label: 'かみがた', icon: '💇' },
@@ -30,35 +35,78 @@ export function AvatarMaker({
 
   const currentOptions = optionsFor(currentSlot);
 
-  const handleSelect = (id: string, locked: boolean) => {
+  // アイテム選択ハンドラー
+  const handleSelect = (opt: AvatarOption, locked: boolean) => {
     if (locked) {
-      sound.error();
+      sound.tap();
+      setPreviewLockedItem(opt);
       return;
     }
+    // 解放済みのアイテムを選択
+    setPreviewLockedItem(null);
     sound.pop();
     setSparkleCount((c) => c + 1);
-    updateAvatar(child.id, currentSlot, id);
+    updateAvatar(child.id, currentSlot, opt.id);
   };
+
+  // ほしのかけらで即時アンロック＆装備
+  const handleUnlockWithShards = (opt: AvatarOption) => {
+    const cost = opt.rarity === 3 ? 10 : opt.rarity === 2 ? 5 : 2;
+    if ((child.starShards ?? 0) < cost) {
+      sound.error();
+      toast('ほしのかけらが たりないよ！', '🌟');
+      return;
+    }
+
+    sound.fanfare();
+    burst();
+    const res = exchangeStarShards(child.id, opt.id);
+    if (res === 'ok') {
+      toast(`「${opt.name}」を アンロックしたよ！🎉`, '✨');
+      setSparkleCount((c) => c + 1);
+      updateAvatar(child.id, currentSlot, opt.id);
+      setPreviewLockedItem(null);
+    }
+  };
+
+  // 試着中アバター構成（ロックアイテムの試着対応）
+  const displayAvatar = previewLockedItem
+    ? {
+        ...child.avatar,
+        [previewLockedItem.slot]: previewLockedItem.id,
+      }
+    : child.avatar;
 
   return (
     <div className="flex flex-col gap-3">
       {/* ヘッダー */}
       <div className="flex items-center justify-between border-b pb-2">
-        <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600 shadow-sm">
             <Sparkles size={18} />
           </span>
-          <span>アバター きせかえ</span>
-        </h3>
-        <button
-          onClick={() => {
-            sound.tap();
-            onClose();
-          }}
-          className="btn-pop rounded-xl bg-amber-400 px-5 py-2 text-sm font-black text-amber-950 shadow-[0_3px_0_#d97706] hover:bg-amber-300"
-        >
-          かんりょう！
-        </button>
+          <h3 className="text-xl font-black text-slate-800">
+            アバター きせかえ
+          </h3>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* ほしのかけら所持数バッジ */}
+          <div className="flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-900 border border-amber-300 shadow-sm">
+            <span className="text-amber-500">🌟</span>
+            <span>{child.starShards ?? 0} こ</span>
+          </div>
+
+          <button
+            onClick={() => {
+              sound.tap();
+              onClose();
+            }}
+            className="btn-pop rounded-xl bg-amber-400 px-4 py-1.5 text-sm font-black text-amber-950 shadow-[0_3px_0_#d97706] hover:bg-amber-300"
+          >
+            かんりょう！
+          </button>
+        </div>
       </div>
 
       {/* 1. モバゲー風 上部アバターステージ */}
@@ -67,7 +115,7 @@ export function AvatarMaker({
 
         <div className="relative flex flex-col items-center">
           <GameAvatar2D
-            config={child.avatar}
+            config={displayAvatar}
             width={200}
             sparkleTrigger={sparkleCount}
             rounded="rounded-3xl shadow-2xl border-4 border-white"
@@ -75,11 +123,82 @@ export function AvatarMaker({
           <div className="w-40 h-4 bg-slate-800/15 rounded-full blur-[2px] -mt-2 mb-1" />
         </div>
 
-        <div className="mt-1 flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-xs font-black text-indigo-900 shadow-sm backdrop-blur-sm">
-          <span>✨</span>
-          <span>タップするとジャンプ！ パーツをえらぶとキラッとへんしん！</span>
-        </div>
+        {/* 試着中インジケーター */}
+        {previewLockedItem ? (
+          <div className="mt-1 flex items-center gap-1.5 rounded-full bg-amber-400 px-3 py-1 text-xs font-black text-amber-950 shadow-md animate-pulse">
+            <span>👕</span>
+            <span>「{previewLockedItem.name}」をおためし試着中！</span>
+          </div>
+        ) : (
+          <div className="mt-1 flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1 text-xs font-black text-indigo-900 shadow-sm backdrop-blur-sm">
+            <span>✨</span>
+            <span>タップするとジャンプ！ パーツをえらぶとキラッとへんしん！</span>
+          </div>
+        )}
       </div>
+
+      {/* ロックアイテム試着時のアンロック案内バー（🌟ほしのかけらで解放） */}
+      {previewLockedItem && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 rounded-2xl bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 p-3 border-2 border-amber-300 shadow-md animate-popin">
+          <div className="flex items-center gap-2 text-left">
+            <span className="text-3xl drop-shadow-sm">{previewLockedItem.icon}</span>
+            <div>
+              <div className="text-xs font-black text-amber-950 flex items-center gap-1">
+                <span>{previewLockedItem.name}</span>
+                <span className="rounded bg-amber-200 px-1.5 py-0.2 text-[9px] font-bold text-amber-900">
+                  {previewLockedItem.rarity ? `★${previewLockedItem.rarity}` : '★1'}
+                </span>
+              </div>
+              <div className="text-[11px] font-bold text-amber-800">
+                必要: <span className="font-black text-amber-600">🌟 {previewLockedItem.rarity === 3 ? 10 : previewLockedItem.rarity === 2 ? 5 : 2}こ</span>
+                （いま持っている: {child.starShards ?? 0}こ）
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* かけら足りている場合 */}
+            {(child.starShards ?? 0) >= (previewLockedItem.rarity === 3 ? 10 : previewLockedItem.rarity === 2 ? 5 : 2) ? (
+              <button
+                type="button"
+                onClick={() => handleUnlockWithShards(previewLockedItem)}
+                className="btn-pop flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-400 px-4 py-2 text-xs font-black text-amber-950 shadow-[0_3px_0_#d97706] hover:bg-amber-300"
+              >
+                <span>🌟</span>
+                <span>ほしのかけらで 解放する！</span>
+              </button>
+            ) : (
+              /* かけら足りない場合：ガチャへ誘導 */
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xs font-bold text-rose-600">
+                  あと {(previewLockedItem.rarity === 3 ? 10 : previewLockedItem.rarity === 2 ? 5 : 2) - (child.starShards ?? 0)}こ！
+                </span>
+                {onOpenGacha && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sound.tap();
+                      onClose();
+                      onOpenGacha();
+                    }}
+                    className="btn-pop flex items-center gap-1 rounded-xl bg-yellow-400 px-3 py-1.5 text-xs font-black text-amber-950 shadow-[0_2px_0_#d97706]"
+                  >
+                    <span>🎰</span>
+                    <span>ガチャで集める</span>
+                  </button>
+                )}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setPreviewLockedItem(null)}
+              className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1"
+            >
+              もどす
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 2. スロット切り替えタブ */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
@@ -89,6 +208,7 @@ export function AvatarMaker({
             onClick={() => {
               sound.tap();
               setCurrentSlot(s.slot);
+              setPreviewLockedItem(null);
             }}
             className={`btn-pop flex items-center gap-1.5 shrink-0 rounded-2xl px-3.5 py-2 text-xs font-black transition-all ${
               currentSlot === s.slot
@@ -102,22 +222,26 @@ export function AvatarMaker({
         ))}
       </div>
 
-      {/* 3. アイテム選択グリッド：dangerouslySetInnerHTMLを完全廃止し、GameAvatar2Dによる試着ライブプレビューを描画 */}
+      {/* 3. アイテム選択グリッド */}
       <div className="grid grid-cols-3 gap-2.5 max-h-64 overflow-y-auto p-1 pr-1.5">
         {currentOptions.map((opt) => {
           const unlocked = isUnlocked(opt, child);
           const isSelected = child.avatar[currentSlot] === opt.id;
+          const isPreviewing = previewLockedItem?.id === opt.id;
+          const cost = opt.rarity === 3 ? 10 : opt.rarity === 2 ? 5 : 2;
 
           return (
             <button
               key={opt.id}
-              onClick={() => handleSelect(opt.id, !unlocked)}
+              onClick={() => handleSelect(opt, !unlocked)}
               className={`btn-pop relative flex flex-col items-center justify-between rounded-2xl p-2 border-2 transition-all min-h-[110px] ${
                 isSelected
                   ? 'border-indigo-500 bg-indigo-50/90 shadow-[0_4px_0_#6366f1] ring-2 ring-indigo-300'
+                  : isPreviewing
+                  ? 'border-amber-400 bg-amber-50/90 ring-2 ring-amber-300 shadow-[0_4px_0_#d97706]'
                   : unlocked
-                    ? 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 shadow-sm'
-                    : 'border-slate-200 bg-slate-100 opacity-60'
+                  ? 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 shadow-sm'
+                  : 'border-slate-200 bg-slate-100'
               }`}
             >
               {/* 選択中チェックマーク */}
@@ -127,7 +251,14 @@ export function AvatarMaker({
                 </div>
               )}
 
-              {/* レア度バッジ (タイポ py-0.2 を py-0.5 に修正) */}
+              {/* 試着中マーク */}
+              {isPreviewing && !isSelected && (
+                <div className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white shadow-sm z-10 animate-bounce">
+                  <Sparkles size={12} strokeWidth={3} />
+                </div>
+              )}
+
+              {/* レア度バッジ */}
               {opt.rarity && opt.rarity > 1 && (
                 <div
                   className={`absolute top-1.5 left-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-black z-10 ${
@@ -138,7 +269,7 @@ export function AvatarMaker({
                 </div>
               )}
 
-              {/* 試着ライブプレビュー（顔ズーム／全体自動切り替え） */}
+              {/* 試着ライブプレビュー */}
               <div className="flex items-center justify-center my-0.5 w-16 h-16 shrink-0 overflow-hidden rounded-xl bg-slate-50 border border-slate-200/60 shadow-inner">
                 <GameAvatar2D
                   avatar={{
@@ -153,17 +284,21 @@ export function AvatarMaker({
                 />
               </div>
 
-              {/* アイテム名 (truncateを廃止し、line-clamp-2で長いひらがなも綺麗に改行表示) */}
+              {/* アイテム名 */}
               <span className="mt-1 text-[11px] font-black text-slate-700 text-center leading-tight line-clamp-2 w-full">
                 {opt.name}
               </span>
 
-              {/* 未解放時のロック表示 (z-index を z-20 にしてバッジやチェックマークの上に被せる) */}
+              {/* 未解放時のロック・星のかけら解放バッジ */}
               {!unlocked && (
-                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-slate-900/55 text-white p-1 backdrop-blur-[1px]">
-                  <Lock size={18} className="mb-0.5 text-amber-300" />
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-slate-900/60 text-white p-1 backdrop-blur-[1px]">
+                  <Lock size={16} className="mb-0.5 text-amber-300" />
                   <span className="text-[10px] font-bold text-center leading-tight">
-                    {opt.gachaOnly ? 'ガチャげんてい' : 'ショップでゲット'}
+                    {opt.gachaOnly ? 'ガチャ' : 'ショップ'}
+                  </span>
+                  <span className="mt-1 rounded-full bg-amber-400/90 text-amber-950 px-2 py-0.5 text-[9px] font-black shadow-sm flex items-center gap-0.5">
+                    <span>🌟</span>
+                    <span>{cost}こ</span>
                   </span>
                 </div>
               )}
