@@ -1,0 +1,18 @@
+{
+  "name": "おてつだいクエスト＆ごほうびタウン",
+  "short_name": "おてつだいクエスト",
+  "description": "おてつだいを楽しく習慣化するRPG風おてつだいアプリ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF8EC",
+  "theme_color": "#7CCBFF",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

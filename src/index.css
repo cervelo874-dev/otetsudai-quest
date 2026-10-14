@@ -1,0 +1,146 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'Yu Gothic', sans-serif;
+  background: #fff8ec;
+  color: #334155;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+button {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@layer components {
+  .btn-pop {
+    @apply select-none transition-all duration-100 active:translate-y-[3px] active:scale-95 disabled:cursor-not-allowed;
+  }
+  .card {
+    @apply rounded-3xl bg-white shadow-[0_8px_0_rgba(0,0,0,0.06)];
+  }
+  .input {
+    @apply w-full rounded-2xl border-2 border-slate-200 bg-white px-4 py-3 text-base outline-none transition focus:border-violet-400;
+  }
+  .label {
+    @apply mb-1 block text-sm font-bold text-slate-500;
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  10% { transform: rotate(-9deg) scale(1.06); }
+  20% { transform: rotate(9deg) scale(1.06); }
+  30% { transform: rotate(-7deg) scale(1.04); }
+  40% { transform: rotate(7deg) scale(1.04); }
+  50% { transform: rotate(0deg) scale(1); }
+}
+.animate-shake { animation: shake 1.2s ease-in-out infinite; }
+
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.animate-floaty { animation: floaty 2.4s ease-in-out infinite; }
+
+@keyframes popin {
+  0% { transform: scale(0.3); opacity: 0; }
+  60% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.animate-popin { animation: popin 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) both; }
+
+@keyframes spinslow { to { transform: rotate(360deg); } }
+.animate-spinslow { animation: spinslow 14s linear infinite; }
+
+@keyframes wobble {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  15% { transform: translateX(-8px) rotate(-4deg); }
+  30% { transform: translateX(7px) rotate(3deg); }
+  45% { transform: translateX(-6px) rotate(-3deg); }
+  60% { transform: translateX(5px) rotate(2deg); }
+  75% { transform: translateX(-3px) rotate(-1deg); }
+}
+.animate-wobble { animation: wobble 0.45s ease-in-out infinite; }
+
+@keyframes drop {
+  0% { transform: translateY(-140px) scale(0.5); opacity: 0; }
+  55% { transform: translateY(12px) scale(1.06); opacity: 1; }
+  75% { transform: translateY(-8px) scale(0.98); }
+  100% { transform: translateY(0) scale(1); }
+}
+.animate-drop { animation: drop 0.7s ease-out both; }
+
+@keyframes errshake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  75% { transform: translateX(10px); }
+}
+.animate-errshake { animation: errshake 0.15s linear 3; }
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 196, 0, 0.75); }
+  50% { box-shadow: 0 0 0 16px rgba(255, 196, 0, 0); }
+}
+.animate-glow { animation: glow 1.4s ease-in-out infinite; }
+
+@keyframes capsuleTop {
+  to { transform: translateY(-70px) rotate(-35deg); opacity: 0; }
+}
+@keyframes capsuleBottom {
+  to { transform: translateY(70px) rotate(25deg); opacity: 0; }
+}
+.animate-capsule-top { animation: capsuleTop 0.6s ease-in forwards; }
+.animate-capsule-bottom { animation: capsuleBottom 0.6s ease-in forwards; }
+
+.rays {
+  background: repeating-conic-gradient(from 0deg, rgba(255, 230, 120, 0.35) 0deg 10deg, transparent 10deg 20deg);
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+/* 2D RPG アバター アニメーション */
+@keyframes rpgIdle {
+  0%, 100% { transform: translateY(0px) scale(1, 1); }
+  50% { transform: translateY(-4px) scale(1.01, 0.99); }
+}
+.animate-rpg-idle { animation: rpgIdle 2.5s ease-in-out infinite; }
+
+@keyframes rpgJump {
+  0% { transform: translateY(0) scale(1, 1); }
+  25% { transform: translateY(-26px) scale(0.95, 1.05) rotate(-3deg); }
+  50% { transform: translateY(-16px) scale(1.05, 0.95) rotate(3deg); }
+  75% { transform: translateY(-4px) scale(0.98, 1.02); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+.animate-rpg-jump { animation: rpgJump 0.6s cubic-bezier(0.25, 1.4, 0.5, 1); }
+
+@keyframes rainbowGlow {
+  0% { filter: drop-shadow(0 0 10px rgba(255, 90, 95, 0.8)); }
+  25% { filter: drop-shadow(0 0 16px rgba(255, 210, 63, 0.9)); }
+  50% { filter: drop-shadow(0 0 16px rgba(105, 219, 124, 0.9)); }
+  75% { filter: drop-shadow(0 0 16px rgba(77, 171, 247, 0.9)); }
+  100% { filter: drop-shadow(0 0 10px rgba(255, 90, 95, 0.8)); }
+}
+.animate-legend-glow { animation: rainbowGlow 2.5s linear infinite; }
+
+@keyframes dressupPop {
+  0% { transform: scale(1); filter: brightness(1); }
+  25% { transform: translateY(-10px) scale(1.05); filter: brightness(1.25) drop-shadow(0 0 14px rgba(255, 230, 80, 0.9)); }
+  60% { transform: translateY(-3px) scale(1.02); filter: brightness(1.1); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+.animate-dressup-pop { animation: dressupPop 0.45s ease-out; }
+

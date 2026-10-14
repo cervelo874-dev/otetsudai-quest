@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7CCBFF"/>
+      <stop offset="100%" stop-color="#38BDF8"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FDE047"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <!-- 背景角丸 -->
+  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="190" fill="#FFFFFF" opacity="0.25"/>
+  <!-- 王冠＆お城 -->
+  <g transform="translate(106, 110) scale(1.2)">
+    <!-- お城の塔 -->
+    <rect x="50" y="90" width="150" height="110" rx="16" fill="#FFFFFF"/>
+    <rect x="70" y="60" width="35" height="40" fill="#FFFFFF"/>
+    <rect x="145" y="60" width="35" height="40" fill="#FFFFFF"/>
+    <rect x="105" y="40" width="40" height="60" fill="#FFFFFF"/>
+    <polygon points="125,10 95,45 155,45" fill="url(#gold)"/>
+    <!-- 扉 -->
+    <path d="M 110 200 L 110 145 C 110 135 140 135 140 145 L 140 200 Z" fill="#F97316"/>
+    <!-- 窓 -->
+    <circle cx="87" cy="80" r="8" fill="#38BDF8"/>
+    <circle cx="162" cy="80" r="8" fill="#38BDF8"/>
+    <!-- 星 -->
+    <polygon points="210,40 216,52 230,54 220,64 222,78 210,70 198,78 200,64 190,54 204,52" fill="url(#gold)"/>
+    <polygon points="40,50 45,60 56,62 48,70 50,81 40,75 30,81 32,70 24,62 35,60" fill="url(#gold)"/>
+  </g>
+</svg>
