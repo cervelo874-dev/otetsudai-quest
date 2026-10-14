@@ -246,6 +246,7 @@ export function ParentView({ state }: { state: AppState }) {
       lastFreeGacha: null,
       color: 'sky',
       allowQuickLogin: true,
+      starShards: 0,
     };
     setEditingChild(newChild);
   };

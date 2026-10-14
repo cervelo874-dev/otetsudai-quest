@@ -130,6 +130,14 @@ export function KidView({
                 <span className="text-xs text-amber-900">コイン</span>
               </div>
 
+              <div className="flex items-center gap-1.5 rounded-2xl bg-white/95 px-3 py-1.5 font-black text-amber-800 shadow-sm">
+                <span className="text-xl">🌟</span>
+                <span className="text-base sm:text-lg text-amber-600">
+                  {currentChild.starShards ?? 0}
+                </span>
+                <span className="text-xs text-amber-900">こ</span>
+              </div>
+
               <div className="flex items-center gap-1 rounded-2xl bg-white/95 px-3 py-1.5 font-black text-rose-600 shadow-sm">
                 <Flame size={18} className="text-rose-500" />
                 <span className="text-base sm:text-lg">{streak}日</span>

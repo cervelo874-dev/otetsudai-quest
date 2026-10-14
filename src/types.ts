@@ -40,6 +40,8 @@ export interface Child {
   lastDailyLoginDate?: string | null;
   /** 最後にデイリー1時間チケットを使用した日 (YYYY-MM-DD) */
   lastDailyTicketUsedDate?: string | null;
+  /** ガチャ素材: ほしのかけら所持数 */
+  starShards: number;
 }
 
 export interface Quest {

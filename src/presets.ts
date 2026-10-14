@@ -41,6 +41,7 @@ export function createInitialState(): AppState {
       lastFreeGacha: null,
       color: 'pink',
       allowQuickLogin: true,
+      starShards: 3,
       avatar: {
         skin: 's1',
         hairStyle: 'long',
@@ -66,6 +67,7 @@ export function createInitialState(): AppState {
       lastFreeGacha: null,
       color: 'sky',
       allowQuickLogin: true,
+      starShards: 2,
       avatar: {
         skin: 's2',
         hairStyle: 'spiky',
@@ -90,6 +92,7 @@ export function createInitialState(): AppState {
       ownedItems: [],
       lastFreeGacha: null,
       color: 'lime',
+      starShards: 1,
       avatar: {
         skin: 's1',
         hairStyle: 'twintails',

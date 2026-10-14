@@ -423,11 +423,12 @@ export function giftBonus(childId: string, coins: number, shopItemId: string | n
 export type RarityNumber = 1 | 2 | 3;
 
 export interface GachaPrize {
-  kind: 'coins' | 'ticket' | 'avatar';
+  kind: 'coins' | 'ticket' | 'avatar' | 'shards';
   icon: string;
   label: string;
   rarity: RarityNumber;
   coins: number;
+  shards: number;
   shopItemId: string | null;
   avatarItemId: string | null;
 }
@@ -439,6 +440,7 @@ export type GachaOutcome =
       free: boolean;
       isDuplicate: boolean;
       refundCoins: number;
+      refundShards: number;
     }
   | { ok: false; reason: 'nocoins' | 'error' };
 
@@ -446,8 +448,8 @@ export function canFreeGacha(c: Child): boolean {
   return c.lastFreeGacha !== todayKey();
 }
 
-function coinPrize(coins: number, rarity: RarityNumber, label: string): GachaPrize {
-  return { kind: 'coins', icon: '🪙', label, rarity, coins, shopItemId: null, avatarItemId: null };
+function shardsPrize(shards: number, coins: number, rarity: RarityNumber, label: string): GachaPrize {
+  return { kind: 'shards', icon: '🌟', label, rarity, coins, shards, shopItemId: null, avatarItemId: null };
 }
 
 function rollPrize(s: AppState): GachaPrize {
@@ -456,96 +458,114 @@ function rollPrize(s: AppState): GachaPrize {
   // ---------------- ★3 レジェンド (10%: 90 <= r < 100) ----------------
   if (r >= 90) {
     const sub = Math.random() * 100;
-    // 200コイン (黄金ジャックポット)
-    if (sub < 25) {
-      return coinPrize(200, 3, '★3 黄金ジャックポット！(200コイン)');
-    }
-    // レジェンドチケット
-    if (sub < 45) {
-      const dinner = s.shop.find((x) => x.id === 'sh-dinner');
-      if (dinner) {
-        return { kind: 'ticket', icon: dinner.icon, label: dinner.name, rarity: 3, coins: 0, shopItemId: dinner.id, avatarItemId: null };
+
+    // 1. レジェンドアバターアイテム直撃 (60%)
+    if (sub < 60) {
+      const legendAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 3);
+      if (legendAvatarOptions.length > 0) {
+        const pick = legendAvatarOptions[Math.floor(Math.random() * legendAvatarOptions.length)];
+        return {
+          kind: 'avatar',
+          icon: pick.icon,
+          label: pick.name,
+          rarity: 3,
+          coins: 0,
+          shards: 0,
+          shopItemId: null,
+          avatarItemId: pick.id,
+        };
       }
-      const outing = s.shop.find((x) => x.id === 'sh-outing');
-      if (outing) {
-        return { kind: 'ticket', icon: outing.icon, label: outing.name, rarity: 3, coins: 0, shopItemId: outing.id, avatarItemId: null };
-      }
     }
-    // レジェンドアバターアイテム
-    const legendAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 3);
-    if (legendAvatarOptions.length > 0) {
-      const pick = legendAvatarOptions[Math.floor(Math.random() * legendAvatarOptions.length)];
-      return {
-        kind: 'avatar',
-        icon: pick.icon,
-        label: pick.name,
-        rarity: 3,
-        coins: 0,
-        shopItemId: null,
-        avatarItemId: pick.id,
-      };
+
+    // 2. 🌟 ほしのかけら 4個 ＋ 50コイン (25%)
+    if (sub < 85) {
+      return shardsPrize(4, 50, 3, '★3 ほしのかけら×4 ＋ 50コイン！');
     }
-    return coinPrize(200, 3, '★3 黄金ジャックポット！(200コイン)');
+
+    // 3. レジェンドチケット (15%)
+    const dinner = s.shop.find((x) => x.id === 'sh-dinner');
+    if (dinner) {
+      return { kind: 'ticket', icon: dinner.icon, label: dinner.name, rarity: 3, coins: 0, shards: 0, shopItemId: dinner.id, avatarItemId: null };
+    }
+    const outing = s.shop.find((x) => x.id === 'sh-outing');
+    if (outing) {
+      return { kind: 'ticket', icon: outing.icon, label: outing.name, rarity: 3, coins: 0, shards: 0, shopItemId: outing.id, avatarItemId: null };
+    }
+
+    return shardsPrize(4, 50, 3, '★3 ほしのかけら×4 ＋ 50コイン！');
   }
 
-  // ---------------- ★2 レア (30%: 60 <= r < 90) ----------------
-  if (r >= 60) {
+  // ---------------- ★2 レア (35%: 55 <= r < 90) ----------------
+  if (r >= 55) {
     const sub = Math.random() * 100;
-    // 80コイン (ラッキー袋)
-    if (sub < 30) {
-      return coinPrize(80, 2, '★2 ラッキー袋！(80コイン)');
-    }
-    // レアチケット
-    if (sub < 55) {
-      const candidates = s.shop.filter((x) => ['sh-tab15', 'sh-snack-up', 'sh-book'].includes(x.id));
-      if (candidates.length > 0) {
-        const t = candidates[Math.floor(Math.random() * candidates.length)];
-        return { kind: 'ticket', icon: t.icon, label: `★2 ${t.name}`, rarity: 2, coins: 0, shopItemId: t.id, avatarItemId: null };
+
+    // 1. レアアバターアイテム直撃 (45%)
+    if (sub < 45) {
+      const rareAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 2);
+      if (rareAvatarOptions.length > 0) {
+        const pick = rareAvatarOptions[Math.floor(Math.random() * rareAvatarOptions.length)];
+        return {
+          kind: 'avatar',
+          icon: pick.icon,
+          label: `★2 ${pick.name}`,
+          rarity: 2,
+          coins: 0,
+          shards: 0,
+          shopItemId: null,
+          avatarItemId: pick.id,
+        };
       }
     }
-    // レアアバターアイテム
-    const rareAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 2);
-    if (rareAvatarOptions.length > 0) {
-      const pick = rareAvatarOptions[Math.floor(Math.random() * rareAvatarOptions.length)];
-      return {
-        kind: 'avatar',
-        icon: pick.icon,
-        label: `★2 ${pick.name}`,
-        rarity: 2,
-        coins: 0,
-        shopItemId: null,
-        avatarItemId: pick.id,
-      };
-    }
-    return coinPrize(80, 2, '★2 ラッキー袋！(80コイン)');
-  }
 
-  // ---------------- ★1 ノーマル (60%: 0 <= r < 60) ----------------
-  const sub = Math.random() * 100;
-  if (sub < 55) {
-    return coinPrize(30, 1, '★1 コイン(参加賞 30コイン)');
-  }
-  if (sub < 80) {
-    const candidates = s.shop.filter((x) => ['sh-tab10', 'sh-snack'].includes(x.id));
+    // 2. 🌟 ほしのかけら 2個 ＋ 20コイン (35%)
+    if (sub < 80) {
+      return shardsPrize(2, 20, 2, '★2 ほしのかけら×2 ＋ 20コイン！');
+    }
+
+    // 3. レアチケット (20%)
+    const candidates = s.shop.filter((x) => ['sh-tab15', 'sh-snack-up', 'sh-book'].includes(x.id));
     if (candidates.length > 0) {
       const t = candidates[Math.floor(Math.random() * candidates.length)];
-      return { kind: 'ticket', icon: t.icon, label: `★1 ${t.name}`, rarity: 1, coins: 0, shopItemId: t.id, avatarItemId: null };
+      return { kind: 'ticket', icon: t.icon, label: `★2 ${t.name}`, rarity: 2, coins: 0, shards: 0, shopItemId: t.id, avatarItemId: null };
+    }
+
+    return shardsPrize(2, 20, 2, '★2 ほしのかけら×2 ＋ 20コイン！');
+  }
+
+  // ---------------- ★1 ノーマル (55%: 0 <= r < 55) ----------------
+  const sub = Math.random() * 100;
+
+  // 1. 🌟 ほしのかけら 1個 ＋ 15コイン (65%)
+  if (sub < 65) {
+    return shardsPrize(1, 15, 1, '★1 ほしのかけら×1 ＋ 15コイン');
+  }
+
+  // 2. ノーマルアバターアイテム (20%)
+  if (sub < 85) {
+    const normalAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 1 && o.id !== 'acc_none' && o.id !== 'wp_none' && o.id !== 'pet_none');
+    if (normalAvatarOptions.length > 0) {
+      const pick = normalAvatarOptions[Math.floor(Math.random() * normalAvatarOptions.length)];
+      return {
+        kind: 'avatar',
+        icon: pick.icon,
+        label: `★1 ${pick.name}`,
+        rarity: 1,
+        coins: 0,
+        shards: 0,
+        shopItemId: null,
+        avatarItemId: pick.id,
+      };
     }
   }
-  const normalAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 1 && o.id !== 'acc_none' && o.id !== 'wp_none' && o.id !== 'pet_none');
-  if (normalAvatarOptions.length > 0) {
-    const pick = normalAvatarOptions[Math.floor(Math.random() * normalAvatarOptions.length)];
-    return {
-      kind: 'avatar',
-      icon: pick.icon,
-      label: `★1 ${pick.name}`,
-      rarity: 1,
-      coins: 0,
-      shopItemId: null,
-      avatarItemId: pick.id,
-    };
+
+  // 3. プチチケット (15%)
+  const candidates = s.shop.filter((x) => ['sh-tab10', 'sh-snack'].includes(x.id));
+  if (candidates.length > 0) {
+    const t = candidates[Math.floor(Math.random() * candidates.length)];
+    return { kind: 'ticket', icon: t.icon, label: `★1 ${t.name}`, rarity: 1, coins: 0, shards: 0, shopItemId: t.id, avatarItemId: null };
   }
-  return coinPrize(30, 1, '★1 コイン(参加賞 30コイン)');
+
+  return shardsPrize(1, 15, 1, '★1 ほしのかけら×1 ＋ 15コイン');
 }
 
 export function spinGacha(childId: string): GachaOutcome {
@@ -558,6 +578,7 @@ export function spinGacha(childId: string): GachaOutcome {
   const prize = rollPrize(s0);
   let isDuplicate = false;
   let refundCoins = 0;
+  let refundShards = 0;
 
   setState((s) => {
     const c = findChild(s, childId);
@@ -566,7 +587,10 @@ export function spinGacha(childId: string): GachaOutcome {
     if (free) c.lastFreeGacha = todayKey();
     else c.coins -= GACHA_COST;
 
-    if (prize.kind === 'coins') {
+    if (prize.kind === 'shards') {
+      c.starShards = (c.starShards ?? 0) + prize.shards;
+      c.coins += prize.coins;
+    } else if (prize.kind === 'coins') {
       c.coins += prize.coins;
     } else if (prize.kind === 'ticket' && prize.shopItemId) {
       const it = s.shop.find((x) => x.id === prize.shopItemId);
@@ -575,21 +599,55 @@ export function spinGacha(childId: string): GachaOutcome {
       if (!c.ownedItems.includes(prize.avatarItemId)) {
         c.ownedItems.push(prize.avatarItemId);
       } else {
-        // ダブり救済ロジック
+        // ダブり救済ロジック：ほしのかけら＋コインに変換！
         isDuplicate = true;
-        refundCoins = prize.rarity === 3 ? 60 : prize.rarity === 2 ? 35 : 20;
+        refundShards = prize.rarity === 3 ? 3 : prize.rarity === 2 ? 2 : 1;
+        refundCoins = prize.rarity === 3 ? 30 : prize.rarity === 2 ? 15 : 10;
+        c.starShards = (c.starShards ?? 0) + refundShards;
         c.coins += refundCoins;
       }
     }
 
     if (isDuplicate) {
-      addLog(s, '🎰', `${c.name}がガチャ${free ? '（無料）' : ''}で「${prize.label}」（もっているので＋${refundCoins}コインにへんかん✨）`);
+      addLog(s, '🎰', `${c.name}がガチャ${free ? '（無料）' : ''}で「${prize.label}」（もっているので🌟ほしのかけら+${refundShards}個＆+${refundCoins}コインにへんかん✨）`);
+    } else if (prize.kind === 'shards') {
+      addLog(s, '🎰', `${c.name}がガチャ${free ? '（無料）' : ''}で「🌟ほしのかけら×${prize.shards} ＋ ${prize.coins}コイン」をゲット！`);
     } else {
-      addLog(s, '🎰', `${c.name}がガチャ${free ? '（無料）' : ''}で「${prize.kind === 'coins' ? `${prize.coins}コイン` : prize.label}」をゲット！`);
+      addLog(s, '🎰', `${c.name}がガチャ${free ? '（無料）' : ''}で「${prize.label}」をゲット！`);
     }
   });
 
-  return { ok: true, prize, free, isDuplicate, refundCoins };
+  return { ok: true, prize, free, isDuplicate, refundCoins, refundShards };
+}
+
+/* ---------------- ほしのかけら交換所 ---------------- */
+
+export function exchangeStarShards(
+  childId: string,
+  avatarItemId: string
+): 'ok' | 'not_enough' | 'owned' | 'error' {
+  const s0 = getState();
+  const c0 = findChild(s0, childId);
+  if (!c0) return 'error';
+  if (c0.ownedItems.includes(avatarItemId)) return 'owned';
+
+  const opt = findOption(avatarItemId);
+  if (!opt) return 'error';
+
+  // 交換レート: ★1=2個、★2=5個、★3=10個
+  const cost = opt.rarity === 3 ? 10 : opt.rarity === 2 ? 5 : 2;
+  if ((c0.starShards ?? 0) < cost) return 'not_enough';
+
+  setState((s) => {
+    const c = findChild(s, childId);
+    if (!c) return;
+    c.starShards = (c.starShards ?? 0) - cost;
+    c.ownedItems.push(avatarItemId);
+    addLog(s, '🌟', `${c.name}が🌟ほしのかけら${cost}個で「${opt.name}」を交換！`);
+    addNotice(s, c.id, '🌟', `ほしのかけらで「${opt.name}」を手に入れたよ！`);
+  });
+
+  return 'ok';
 }
 
 /* ---------------- avatar ---------------- */

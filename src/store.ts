@@ -19,6 +19,7 @@ function normalize(p: Partial<AppState>): AppState {
       coins: typeof c.coins === 'number' ? c.coins : fallbackChild.coins,
       streak: typeof c.streak === 'number' ? c.streak : fallbackChild.streak,
       totalQuests: typeof c.totalQuests === 'number' ? c.totalQuests : fallbackChild.totalQuests,
+      starShards: typeof c.starShards === 'number' ? c.starShards : (fallbackChild.starShards ?? 0),
       ownedItems: Array.isArray(c.ownedItems) ? c.ownedItems : [],
       avatar: {
         ...DEFAULT_AVATAR,
