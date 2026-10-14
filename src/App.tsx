@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useStore } from './store';
 import type { Child } from './types';
 import { TopNav } from './components/TopNav';
-import { ToastHost } from './components/ui';
+import { ToastHost, Modal } from './components/ui';
+import { PinPad } from './components/PinPad';
 import { LoginView } from './views/LoginView';
 import { KidView } from './views/KidView';
 import { ParentView } from './views/ParentView';
@@ -79,19 +80,33 @@ export default function App() {
     updateSession('kid', child.id);
   };
 
+  const [showParentPinModal, setShowParentPinModal] = useState(false);
+
   // おやモードログイン時
   const handleEnterParent = () => {
     updateSession('parent', activeChildId);
   };
 
-  // 上部バーからの直接ワンタップ切り替え
+  // 上部バーからの切り替え
   const handleSwitchMode = (target: 'kid' | 'parent') => {
     if (target === 'kid') {
       const childId = activeChildId || (state.children.length > 0 ? state.children[0].id : null);
       updateSession('kid', childId);
     } else {
-      updateSession('parent', activeChildId);
+      // おやがめんへの切り替え時は保護者PIN認証を要求
+      setShowParentPinModal(true);
     }
+  };
+
+  const handleParentPinSubmit = (pin: string): boolean => {
+    if (pin === state.parentPin) {
+      sound.fanfare();
+      setShowParentPinModal(false);
+      updateSession('parent', activeChildId);
+      return true;
+    }
+    sound.error();
+    return false;
   };
 
   const handleBackToSelect = () => {
@@ -132,6 +147,16 @@ export default function App() {
           <ParentView state={state} />
         )}
       </main>
+
+      {/* ヘッダーからのおやモードPIN認証モーダル */}
+      <Modal open={showParentPinModal} onClose={() => setShowParentPinModal(false)}>
+        <PinPad
+          title="おやモード パスコード"
+          subtitle="保護者の4けたの数字を入力してください"
+          onSubmit={handleParentPinSubmit}
+          tone="parent"
+        />
+      </Modal>
     </div>
   );
 }

@@ -163,6 +163,7 @@ export function ParentView({ state }: { state: AppState }) {
       ownedItems: [],
       lastFreeGacha: null,
       color: 'sky',
+      allowQuickLogin: true,
     };
     setEditingChild(newChild);
   };
@@ -543,8 +544,19 @@ export function ParentView({ state }: { state: AppState }) {
                           <div className="font-black text-slate-800 text-lg flex items-center gap-1">
                             <span>{child.name}</span>
                           </div>
-                          <div className="text-xs font-bold text-slate-400">
-                            {child.age}歳 / PIN: {child.pin}
+                          <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5 flex-wrap">
+                            <span>{child.age}歳</span>
+                            <span>•</span>
+                            <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-bold">PIN: {child.pin}</span>
+                            {child.allowQuickLogin !== false ? (
+                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-black text-emerald-700">
+                                かんたんログインON
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-black text-rose-700">
+                                PIN必須
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -877,9 +889,11 @@ export function ParentView({ state }: { state: AppState }) {
               <label className="label">付与コイン数</label>
               <input
                 type="number"
-                value={bonusCoins}
-                onChange={(e) => setBonusCoins(Number(e.target.value))}
+                value={bonusCoins === 0 ? '' : bonusCoins}
+                onChange={(e) => setBonusCoins(e.target.value === '' ? 0 : Number(e.target.value))}
+                onFocus={(e) => e.target.select()}
                 className="input font-bold"
+                placeholder="0"
               />
             </div>
 
@@ -958,11 +972,18 @@ export function ParentView({ state }: { state: AppState }) {
                 <label className="label">基本報酬コイン</label>
                 <input
                   type="number"
-                  value={editingQuest.reward}
-                  onChange={(e) => setEditingQuest({ ...editingQuest, reward: Number(e.target.value) })}
+                  value={editingQuest.reward === 0 ? '' : editingQuest.reward}
+                  onChange={(e) =>
+                    setEditingQuest({
+                      ...editingQuest,
+                      reward: e.target.value === '' ? 0 : Number(e.target.value),
+                    })
+                  }
+                  onFocus={(e) => e.target.select()}
                   required
                   min={1}
                   className="input font-bold"
+                  placeholder="0"
                 />
               </div>
             </div>
@@ -1020,6 +1041,7 @@ export function ParentView({ state }: { state: AppState }) {
                             }
                             setEditingQuest({ ...editingQuest, rewardOverrides: copy });
                           }}
+                          onFocus={(e) => e.target.select()}
                           className="w-24 rounded-lg border border-slate-200 px-2 py-1 text-right"
                         />
                         <span>コイン</span>
@@ -1075,11 +1097,18 @@ export function ParentView({ state }: { state: AppState }) {
                 <label className="label">価格（コイン）</label>
                 <input
                   type="number"
-                  value={editingShopItem.price}
-                  onChange={(e) => setEditingShopItem({ ...editingShopItem, price: Number(e.target.value) })}
+                  value={editingShopItem.price === 0 ? '' : editingShopItem.price}
+                  onChange={(e) =>
+                    setEditingShopItem({
+                      ...editingShopItem,
+                      price: e.target.value === '' ? 0 : Number(e.target.value),
+                    })
+                  }
+                  onFocus={(e) => e.target.select()}
                   required
                   min={1}
                   className="input font-bold"
+                  placeholder="0"
                 />
               </div>
             </div>
@@ -1089,11 +1118,18 @@ export function ParentView({ state }: { state: AppState }) {
                 <label className="label">タイマー使用分数（分）</label>
                 <input
                   type="number"
-                  value={editingShopItem.minutes}
-                  onChange={(e) => setEditingShopItem({ ...editingShopItem, minutes: Number(e.target.value) })}
+                  value={editingShopItem.minutes === 0 ? '' : editingShopItem.minutes}
+                  onChange={(e) =>
+                    setEditingShopItem({
+                      ...editingShopItem,
+                      minutes: e.target.value === '' ? 0 : Number(e.target.value),
+                    })
+                  }
+                  onFocus={(e) => e.target.select()}
                   required
                   min={1}
                   className="input font-bold"
+                  placeholder="0"
                 />
               </div>
             )}
@@ -1141,12 +1177,19 @@ export function ParentView({ state }: { state: AppState }) {
                 <label className="label">年齢</label>
                 <input
                   type="number"
-                  value={editingChild.age}
-                  onChange={(e) => setEditingChild({ ...editingChild, age: Number(e.target.value) })}
+                  value={editingChild.age || ''}
+                  onChange={(e) =>
+                    setEditingChild({
+                      ...editingChild,
+                      age: e.target.value === '' ? 0 : Number(e.target.value),
+                    })
+                  }
+                  onFocus={(e) => e.target.select()}
                   required
                   min={1}
                   max={18}
                   className="input font-bold"
+                  placeholder="例: 7"
                 />
               </div>
 
@@ -1157,11 +1200,34 @@ export function ParentView({ state }: { state: AppState }) {
                   maxLength={4}
                   value={editingChild.pin}
                   onChange={(e) => setEditingChild({ ...editingChild, pin: e.target.value })}
+                  onFocus={(e) => e.target.select()}
                   required
                   className="input font-bold text-center tracking-widest text-lg"
                   placeholder="1234"
                 />
               </div>
+            </div>
+
+            {/* かんたんログイン設定 */}
+            <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/70 p-3.5">
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <span className="text-xs font-black text-slate-800 block">
+                    かんたんログイン（数字なしで入る）を許可する
+                  </span>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    ONにすると、ログイン画面で暗証番号を入力せずにワンタップで入れるボタンを表示します。
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={editingChild.allowQuickLogin !== false}
+                  onChange={(e) =>
+                    setEditingChild({ ...editingChild, allowQuickLogin: e.target.checked })
+                  }
+                  className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 ml-3 shrink-0"
+                />
+              </label>
             </div>
 
             <div>
@@ -1192,9 +1258,16 @@ export function ParentView({ state }: { state: AppState }) {
               <label className="label">所持コインの調整</label>
               <input
                 type="number"
-                value={editingChild.coins}
-                onChange={(e) => setEditingChild({ ...editingChild, coins: Number(e.target.value) })}
+                value={editingChild.coins === 0 ? '' : editingChild.coins}
+                onChange={(e) =>
+                  setEditingChild({
+                    ...editingChild,
+                    coins: e.target.value === '' ? 0 : Number(e.target.value),
+                  })
+                }
+                onFocus={(e) => e.target.select()}
                 className="input font-bold"
+                placeholder="0"
               />
             </div>
 

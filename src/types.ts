@@ -34,6 +34,8 @@ export interface Child {
   ownedItems: string[];
   lastFreeGacha: string | null;
   color: string;
+  /** かんたんログイン（数字なしで入る）を許可するかどうか（未設定は true） */
+  allowQuickLogin?: boolean;
 }
 
 export interface Quest {

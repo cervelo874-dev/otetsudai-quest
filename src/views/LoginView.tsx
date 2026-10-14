@@ -236,18 +236,20 @@ export function LoginView({
 
             <PinPad
               title={`${selectedChildForPin.name}の 暗証番号`}
-              subtitle={`4けたの すうじ（初期値: ${selectedChildForPin.pin}）`}
+              subtitle="4けたの すうじを おしてね"
               onSubmit={handleChildPinSubmit}
               footer={
-                <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
-                  <button
-                    onClick={handleQuickLogin}
-                    className="btn-pop flex items-center justify-center gap-1.5 rounded-2xl bg-amber-100 py-3 text-sm font-black text-amber-900 hover:bg-amber-200"
-                  >
-                    <UserCheck size={18} />
-                    <span>かんたんログイン（すうじなしではいる）</span>
-                  </button>
-                </div>
+                selectedChildForPin.allowQuickLogin !== false ? (
+                  <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      onClick={handleQuickLogin}
+                      className="btn-pop flex items-center justify-center gap-1.5 rounded-2xl bg-amber-100 py-3 text-sm font-black text-amber-900 hover:bg-amber-200"
+                    >
+                      <UserCheck size={18} />
+                      <span>かんたんログイン（すうじなしではいる）</span>
+                    </button>
+                  </div>
+                ) : undefined
               }
             />
           </div>
@@ -258,7 +260,7 @@ export function LoginView({
       <Modal open={showParentModal} onClose={() => setShowParentModal(false)}>
         <PinPad
           title="おやモード パスコード"
-          subtitle="4けたの数字を入力してください（初期値: 0000）"
+          subtitle="保護者の4けたの数字を入力してください"
           onSubmit={handleParentPinSubmit}
           tone="parent"
         />
