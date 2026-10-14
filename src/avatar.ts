@@ -124,6 +124,33 @@ export const AVATAR_OPTIONS: AvatarOption[] = [
 
 const optMap = new Map<string, AvatarOption>(AVATAR_OPTIONS.map((o) => [o.id, o]));
 
+// ほしのかけら交換コスト（★1=15個、★2=40個、★3=80個）
+export const SHARD_COST = {
+  1: 15,
+  2: 40,
+  3: 80,
+} as const;
+
+export function getShardCost(rarity: number | undefined): number {
+  if (rarity === 3) return SHARD_COST[3];
+  if (rarity === 2) return SHARD_COST[2];
+  return SHARD_COST[1];
+}
+
+// デフォルトで最初からアンロックされている初期アイテムかどうか
+export function isDefaultAvatarItem(opt: AvatarOption): boolean {
+  return !(opt.locked || opt.gachaOnly);
+}
+
+// ガチャやほしのかけら交換所で排出・交換の対象となる「特別なアンロック対象アイテム」かどうか
+export function isUnlockableAvatarItem(opt: AvatarOption): boolean {
+  if (opt.hidden) return false;
+  // 「なし」アイテムは除外
+  if (opt.id === 'acc_none' || opt.id === 'wp_none' || opt.id === 'pet_none') return false;
+  // locked または gachaOnly が true のアイテムのみが対象
+  return Boolean(opt.locked || opt.gachaOnly);
+}
+
 export function findOption(id: string | null | undefined): AvatarOption | undefined {
   if (!id) return undefined;
   return optMap.get(id);

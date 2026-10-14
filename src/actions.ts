@@ -2,7 +2,7 @@ import { getState, setState } from './store';
 import type { AppState, AvatarSlot, Child, NotificationSettings, Quest, ShopItem, Ticket } from './types';
 import { uid, todayKey, yesterdayKey } from './utils';
 import { BONUS_COINS, BONUS_WINDOW_MS, GACHA_COST, rewardFor } from './logic';
-import { AVATAR_OPTIONS, findOption } from './avatar';
+import { AVATAR_OPTIONS, findOption, isUnlockableAvatarItem, isDefaultAvatarItem, getShardCost } from './avatar';
 import { createInitialState } from './presets';
 
 /* ---------------- helpers ---------------- */
@@ -461,7 +461,7 @@ function rollPrize(s: AppState): GachaPrize {
 
     // 1. レジェンドアバターアイテム直撃 (60%)
     if (sub < 60) {
-      const legendAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 3);
+      const legendAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 3 && isUnlockableAvatarItem(o));
       if (legendAvatarOptions.length > 0) {
         const pick = legendAvatarOptions[Math.floor(Math.random() * legendAvatarOptions.length)];
         return {
@@ -501,7 +501,7 @@ function rollPrize(s: AppState): GachaPrize {
 
     // 1. レアアバターアイテム直撃 (45%)
     if (sub < 45) {
-      const rareAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 2);
+      const rareAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 2 && isUnlockableAvatarItem(o));
       if (rareAvatarOptions.length > 0) {
         const pick = rareAvatarOptions[Math.floor(Math.random() * rareAvatarOptions.length)];
         return {
@@ -542,7 +542,7 @@ function rollPrize(s: AppState): GachaPrize {
 
   // 2. ノーマルアバターアイテム (20%)
   if (sub < 85) {
-    const normalAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 1 && o.id !== 'acc_none' && o.id !== 'wp_none' && o.id !== 'pet_none');
+    const normalAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 1 && isUnlockableAvatarItem(o));
     if (normalAvatarOptions.length > 0) {
       const pick = normalAvatarOptions[Math.floor(Math.random() * normalAvatarOptions.length)];
       return {
@@ -625,7 +625,7 @@ export function spinGacha(childId: string): GachaOutcome {
 export function exchangeStarShards(
   childId: string,
   avatarItemId: string
-): 'ok' | 'not_enough' | 'owned' | 'error' {
+): 'ok' | 'not_enough' | 'owned' | 'default' | 'error' {
   const s0 = getState();
   const c0 = findChild(s0, childId);
   if (!c0) return 'error';
@@ -634,8 +634,10 @@ export function exchangeStarShards(
   const opt = findOption(avatarItemId);
   if (!opt) return 'error';
 
-  // 交換レート: ★1=2個、★2=5個、★3=10個
-  const cost = opt.rarity === 3 ? 10 : opt.rarity === 2 ? 5 : 2;
+  // デフォルトで最初から持っているアイテムは交換不要
+  if (isDefaultAvatarItem(opt)) return 'default';
+
+  const cost = getShardCost(opt.rarity);
   if ((c0.starShards ?? 0) < cost) return 'not_enough';
 
   setState((s) => {

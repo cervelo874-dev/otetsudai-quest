@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Child } from '../types';
 import { canFreeGacha, spinGacha, exchangeStarShards, type GachaPrize } from '../actions';
 import { GACHA_COST } from '../logic';
-import { AVATAR_OPTIONS, type AvatarOption, findOption } from '../avatar';
+import { AVATAR_OPTIONS, type AvatarOption, findOption, isUnlockableAvatarItem, getShardCost, SHARD_COST } from '../avatar';
 import { sound } from '../sound';
 import { burst } from '../effects';
 import { toast } from './ui';
@@ -112,10 +112,8 @@ export function GachaModal({
     },
   };
 
-  // 交換対象アイテム（アクセサリや服などカテゴリー分け可能）
-  const exchangeItems = AVATAR_OPTIONS.filter(
-    (o) => !o.hidden && o.id !== 'acc_none' && o.id !== 'wp_none' && o.id !== 'pet_none'
-  );
+  // 交換対象アイテム（初期から持っているデフォルトアイテムを除外し、アンロック対象のみを表示）
+  const exchangeItems = AVATAR_OPTIONS.filter((o) => isUnlockableAvatarItem(o));
 
   const categories = [
     { id: 'all', label: 'すべて' },
@@ -552,9 +550,9 @@ export function GachaModal({
               </div>
             </div>
             <div className="text-[10px] font-bold text-slate-600 bg-white/90 px-2.5 py-1 rounded-xl border border-amber-200 text-right">
-              <div>★1: 2こ</div>
-              <div>★2: 5こ</div>
-              <div className="text-amber-700 font-black">★3: 10こ</div>
+              <div>★1: {SHARD_COST[1]}こ</div>
+              <div>★2: {SHARD_COST[2]}こ</div>
+              <div className="text-amber-700 font-black">★3: {SHARD_COST[3]}こ</div>
             </div>
           </div>
 
@@ -583,7 +581,7 @@ export function GachaModal({
           <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
             {filteredItems.map((item) => {
               const isOwned = child.ownedItems.includes(item.id);
-              const cost = item.rarity === 3 ? 10 : item.rarity === 2 ? 5 : 2;
+              const cost = getShardCost(item.rarity);
               const canAfford = (child.starShards ?? 0) >= cost;
 
               return (

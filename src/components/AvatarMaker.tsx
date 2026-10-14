@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { AvatarSlot, Child } from '../types';
-import { optionsFor, isUnlocked, type AvatarOption } from '../avatar';
+import { optionsFor, isUnlocked, type AvatarOption, getShardCost, SHARD_COST } from '../avatar';
 import { updateAvatar, exchangeStarShards } from '../actions';
 import { sound } from '../sound';
 import { burst } from '../effects';
@@ -51,7 +51,7 @@ export function AvatarMaker({
 
   // ほしのかけらで即時アンロック＆装備
   const handleUnlockWithShards = (opt: AvatarOption) => {
-    const cost = opt.rarity === 3 ? 10 : opt.rarity === 2 ? 5 : 2;
+    const cost = getShardCost(opt.rarity);
     if ((child.starShards ?? 0) < cost) {
       sound.error();
       toast('ほしのかけらが たりないよ！', '🌟');
@@ -150,7 +150,7 @@ export function AvatarMaker({
                 </span>
               </div>
               <div className="text-[11px] font-bold text-amber-800">
-                必要: <span className="font-black text-amber-600">🌟 {previewLockedItem.rarity === 3 ? 10 : previewLockedItem.rarity === 2 ? 5 : 2}こ</span>
+                必要: <span className="font-black text-amber-600">🌟 {getShardCost(previewLockedItem.rarity)}こ</span>
                 （いま持っている: {child.starShards ?? 0}こ）
               </div>
             </div>
@@ -158,7 +158,7 @@ export function AvatarMaker({
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
             {/* かけら足りている場合 */}
-            {(child.starShards ?? 0) >= (previewLockedItem.rarity === 3 ? 10 : previewLockedItem.rarity === 2 ? 5 : 2) ? (
+            {(child.starShards ?? 0) >= getShardCost(previewLockedItem.rarity) ? (
               <button
                 type="button"
                 onClick={() => handleUnlockWithShards(previewLockedItem)}
@@ -171,7 +171,7 @@ export function AvatarMaker({
               /* かけら足りない場合：ガチャへ誘導 */
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <span className="text-xs font-bold text-rose-600">
-                  あと {(previewLockedItem.rarity === 3 ? 10 : previewLockedItem.rarity === 2 ? 5 : 2) - (child.starShards ?? 0)}こ！
+                  あと {getShardCost(previewLockedItem.rarity) - (child.starShards ?? 0)}こ！
                 </span>
                 {onOpenGacha && (
                   <button
@@ -228,7 +228,7 @@ export function AvatarMaker({
           const unlocked = isUnlocked(opt, child);
           const isSelected = child.avatar[currentSlot] === opt.id;
           const isPreviewing = previewLockedItem?.id === opt.id;
-          const cost = opt.rarity === 3 ? 10 : opt.rarity === 2 ? 5 : 2;
+          const cost = getShardCost(opt.rarity);
 
           return (
             <button
