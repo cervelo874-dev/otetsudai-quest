@@ -12,7 +12,7 @@ function normalize(p: Partial<AppState>): AppState {
   const rawChildren = Array.isArray(p.children) && p.children.length > 0 ? p.children : base.children;
 
   const children = rawChildren.map((c, i) => {
-    const fallbackChild = base.children[i] || base.children[0];
+    const fallbackChild = base.children.find((bc) => bc.id === c.id) || base.children[i] || base.children[0];
     return {
       ...fallbackChild,
       ...c,
@@ -39,6 +39,7 @@ function normalize(p: Partial<AppState>): AppState {
       : base.quests,
     submissions: Array.isArray(p.submissions) ? p.submissions : [],
     chests: Array.isArray(p.chests) ? p.chests : [],
+    // ユーザーが作成・編集したチケット一覧（shop）を最優先で維持！
     shop: Array.isArray(p.shop) && p.shop.length > 0 ? p.shop : base.shop,
     tickets: Array.isArray(p.tickets) ? p.tickets : [],
     timers: Array.isArray(p.timers) ? p.timers : [],
@@ -72,7 +73,12 @@ function load(): AppState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<AppState>;
-      if (parsed && parsed.version === STATE_VERSION) return normalize(parsed);
+      // バージョンが過去のものであっても破棄せず、安全にnormalizeしてデータを保護する
+      if (parsed && typeof parsed === 'object') {
+        const migrated = normalize(parsed);
+        persist(migrated);
+        return migrated;
+      }
     }
   } catch {
     /* 壊れたデータは初期化 */

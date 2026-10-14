@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { AppState, Child, Quest, ShopItem } from '../types';
 import {
   approveSubmission,
@@ -89,6 +89,34 @@ export function ParentView({ state }: { state: AppState }) {
   const now = useNow(1000);
   const syncStatus = useSyncStatus();
   const [activeTab, setActiveTab] = useState<'approvals' | 'children' | 'quests' | 'shop' | 'logs'>('approvals');
+
+  // タイマー終了の通知追跡（重複通知防止）と非表示状態
+  const notifiedOverTimersRef = useRef<Set<string>>(new Set());
+  const [dismissedTimerIds, setDismissedTimerIds] = useState<Set<string>>(new Set());
+
+  // 終了したタイマーの検出と親スマホへのブラウザ通知（音なし・視覚通知）
+  useEffect(() => {
+    state.timers.forEach((timer) => {
+      const isOver = !timer.isPaused && now >= timer.endsAt;
+      if (isOver && !notifiedOverTimersRef.current.has(timer.childId)) {
+        notifiedOverTimersRef.current.add(timer.childId);
+        const child = state.children.find((c) => c.id === timer.childId);
+        const childName = child?.name ?? '子ども';
+        sendBrowserNotification(
+          '⏰ タブレット終了のおしらせ',
+          `${childName}ちゃんのタブレット使用時間（${timer.minutes}分）が終了しました！`
+        );
+      }
+    });
+
+    // 終了済みでなくなったタイマーの追跡クリーンアップ
+    const activeChildIds = new Set(state.timers.map((t) => t.childId));
+    notifiedOverTimersRef.current.forEach((childId) => {
+      if (!activeChildIds.has(childId)) {
+        notifiedOverTimersRef.current.delete(childId);
+      }
+    });
+  }, [state.timers, now, state.children]);
 
   // 家族のあいことば（ルームID）状態
   const [roomIdInput, setRoomIdInput] = useState(getRoomId);
@@ -418,6 +446,62 @@ export function ParentView({ state }: { state: AppState }) {
           </div>
         </div>
       </div>
+
+      {/* ⏰ タブレット終了アラートバナー（親向け） */}
+      {(() => {
+        const overTimers = state.timers.filter(
+          (t) => !t.isPaused && now >= t.endsAt && !dismissedTimerIds.has(t.childId)
+        );
+        if (overTimers.length === 0) return null;
+
+        return (
+          <div className="mb-5 flex flex-col gap-2.5">
+            {overTimers.map((t) => {
+              const child = state.children.find((c) => c.id === t.childId);
+              return (
+                <div
+                  key={t.childId}
+                  className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 p-4 text-white shadow-lg animate-pulse border-2 border-white"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl animate-bounce">⏰</span>
+                    <div>
+                      <div className="text-sm sm:text-base font-black">
+                        {child?.name}ちゃんのタブレット使用時間が終了しました！
+                      </div>
+                      <div className="text-xs text-rose-100 font-bold">
+                        「{t.name}」が終了時刻（{formatHM(t.endsAt)}）を過ぎています。声をかけてあげてください
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button
+                      onClick={() => {
+                        sound.pop();
+                        stopTimerByParent(t.childId);
+                        toast(`${child?.name}ちゃんのタイマーを終了しました`, '⏱️');
+                      }}
+                      className="btn-pop flex-1 sm:flex-none rounded-xl bg-white px-3.5 py-1.5 text-xs font-black text-rose-700 shadow-md hover:bg-rose-50"
+                    >
+                      親からタイマーを終了
+                    </button>
+                    <button
+                      onClick={() => {
+                        sound.tap();
+                        setDismissedTimerIds((prev) => new Set([...prev, t.childId]));
+                      }}
+                      className="btn-pop rounded-xl bg-black/20 px-3 py-1.5 text-xs font-bold text-white hover:bg-black/30"
+                    >
+                      確認した（閉じる）
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* タブナビゲーション */}
       <div className="flex gap-2 overflow-x-auto pb-1 mb-6 no-scrollbar">

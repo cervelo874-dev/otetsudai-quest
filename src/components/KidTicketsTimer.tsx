@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { ActiveTimer, Child, Ticket } from '../types';
 import { finishTimer, markAlarmed, redeemTicket, pauseTimer, resumeTimer } from '../actions';
 import { sound } from '../sound';
@@ -24,13 +24,14 @@ export function KidTicketsTimer({
   const now = useNow(500);
   const isPipActive = usePipActive();
   const [bonusModal, setBonusModal] = useState<{ bonus: boolean; coins: number; refundMinutes?: number } | null>(null);
+  const lastAlarmTimeRef = useRef<number>(0);
 
   const currentTimer = activeTimers.find((t) => t.childId === child.id);
   const myTickets = tickets.filter((t) => t.childId === child.id);
   const unusedTickets = myTickets.filter((t) => t.status === 'owned');
   const requestedTickets = myTickets.filter((t) => t.status === 'requested');
 
-  // PiPキャンバス描画の更新とアラーム・通知監視
+  // PiPキャンバス描画の更新とアラーム・通知監視（約5秒おきのリピートアラーム）
   useEffect(() => {
     if (!currentTimer || currentTimer.isPaused) return;
 
@@ -42,14 +43,21 @@ export function KidTicketsTimer({
       name: child.name,
     });
 
-    // 終了時刻に達した際のアラーム＆通知（1度だけ）
-    if (now >= currentTimer.endsAt && !currentTimer.alarmed) {
-      markAlarmed(child.id);
-      sound.alarm();
-      notify(
-        '⏰ じかんになりました！',
-        `${child.name}ちゃん、タブレットの おしまいの じかんだよ！アプリにもどって＋${BONUS_COINS}コインを ゲットしよう！`
-      );
+    // 終了時刻に達した際のアラーム＆通知
+    if (now >= currentTimer.endsAt) {
+      if (!currentTimer.alarmed) {
+        markAlarmed(child.id);
+        notify(
+          '⏰ じかんになりました！',
+          `${child.name}ちゃん、タブレットの おしまいの じかんだよ！アプリにもどって＋${BONUS_COINS}コインを ゲットしよう！`
+        );
+      }
+
+      // 【約5秒ごとにピピピッ！とリピートアラーム】子どもが「おしまい」ボタンを押すまで継続
+      if (now - lastAlarmTimeRef.current >= 4800) {
+        lastAlarmTimeRef.current = now;
+        sound.alarm();
+      }
     }
   }, [currentTimer, now, child]);
 
@@ -232,13 +240,15 @@ export function KidTicketsTimer({
             <button
               onClick={handleFinishTimer}
               className={`btn-pop flex items-center justify-center gap-2 rounded-2xl px-8 py-3.5 text-lg font-black text-white shadow-lg w-full sm:w-auto ${
-                inBonusWindow
+                isTimeOver
+                  ? 'bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 shadow-[0_5px_0_#991b1b] animate-bounce ring-4 ring-rose-300'
+                  : inBonusWindow
                   ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-[0_5px_0_#c2410c] animate-pulse'
                   : 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-[0_5px_0_#0f766e]'
               }`}
             >
               <CheckCircle size={22} />
-              <span>おしまい！またね！</span>
+              <span>{isTimeOver ? '⏰ おしまい！（アラームをとめる）' : 'おしまい！またね！'}</span>
             </button>
           </div>
         </div>
