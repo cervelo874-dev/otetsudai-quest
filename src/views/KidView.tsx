@@ -70,6 +70,7 @@ export function KidView({
       {myChests.length > 0 && showChestModal && (
         <ChestModal
           chests={myChests}
+          currentCoins={currentChild.coins}
           onClose={() => setShowChestModal(false)}
         />
       )}

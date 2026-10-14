@@ -105,6 +105,8 @@ export interface ChestResult {
   coins: number;
   ticketName: string | null;
   ticketIcon: string | null;
+  ticketCategory?: 'tablet' | 'real' | null;
+  ticketMinutes?: number | null;
   message: string;
 }
 
@@ -126,7 +128,14 @@ export function openChest(chestId: string): ChestResult | null {
     }
     addLog(s, '🎁', `${c.name}が宝箱を開けた（+${chest.coins}コイン${it0(item)}）`);
   });
-  return { coins: ch.coins, ticketName: item?.name ?? null, ticketIcon: item?.icon ?? null, message: ch.message };
+  return {
+    coins: ch.coins,
+    ticketName: item?.name ?? null,
+    ticketIcon: item?.icon ?? null,
+    ticketCategory: (item?.category === 'tablet' || item?.category === 'real') ? item.category : null,
+    ticketMinutes: item?.minutes ?? null,
+    message: ch.message,
+  };
 }
 
 function it0(item: ShopItem | undefined): string {
