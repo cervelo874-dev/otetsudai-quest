@@ -211,6 +211,94 @@ function renderBackground(id: string, p: string): string {
         stageShadow + cardBorder
       );
 
+    case 'rainbow':
+      // にじのスカイロード（大きな美しい虹と雲）
+      return (
+        `<defs>` +
+        `<linearGradient id="${p}_rbw" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7DD3FC"/><stop offset="50%" stop-color="#BAE6FD"/><stop offset="100%" stop-color="#E0F2FE"/></linearGradient>` +
+        `</defs>` +
+        `<rect x="5" y="5" width="190" height="230" rx="20" fill="url(#${p}_rbw)"/>` +
+        // 虹のアーチ
+        `<path d="M 15 170 A 90 90 0 0 1 185 170" fill="none" stroke="#F43F5E" stroke-width="6" opacity="0.85" />` +
+        `<path d="M 21 170 A 84 84 0 0 1 179 170" fill="none" stroke="#FB923C" stroke-width="6" opacity="0.85" />` +
+        `<path d="M 27 170 A 78 78 0 0 1 173 170" fill="none" stroke="#FDE047" stroke-width="6" opacity="0.85" />` +
+        `<path d="M 33 170 A 72 72 0 0 1 167 170" fill="none" stroke="#4ADE80" stroke-width="6" opacity="0.85" />` +
+        `<path d="M 39 170 A 66 66 0 0 1 161 170" fill="none" stroke="#38BDF8" stroke-width="6" opacity="0.85" />` +
+        `<path d="M 45 170 A 60 60 0 0 1 155 170" fill="none" stroke="#A855F7" stroke-width="6" opacity="0.85" />` +
+        // ふわふわ雲
+        `<circle cx="28" cy="165" r="14" fill="#FFFFFF" opacity="0.9" />` +
+        `<circle cx="44" cy="168" r="10" fill="#FFFFFF" opacity="0.9" />` +
+        `<circle cx="172" cy="165" r="14" fill="#FFFFFF" opacity="0.9" />` +
+        `<circle cx="156" cy="168" r="10" fill="#FFFFFF" opacity="0.9" />` +
+        `<circle cx="100" cy="55" r="2.5" fill="#FFF" />` +
+        `<circle cx="145" cy="70" r="3" fill="#FEF08A" />` +
+        `<circle cx="55" cy="75" r="2" fill="#FEF08A" />` +
+        stageShadow + cardBorder
+      );
+
+    case 'rainbow_stage':
+      // ★3 にじのキラキラステージ（スポットライトとネオンアーチ）
+      return (
+        `<defs>` +
+        `<linearGradient id="${p}_rbws" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4C1D95"/><stop offset="50%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#C084FC"/></linearGradient>` +
+        `</defs>` +
+        `<rect x="5" y="5" width="190" height="230" rx="20" fill="url(#${p}_rbws)"/>` +
+        // スポットライト光線
+        `<polygon points="100,5 30,230 70,230" fill="#FFFFFF" opacity="0.12" />` +
+        `<polygon points="100,5 170,230 130,230" fill="#FFFFFF" opacity="0.12" />` +
+        // ネオン虹
+        `<path d="M 25 185 A 80 80 0 0 1 175 185" fill="none" stroke="#F43F5E" stroke-width="4" opacity="0.7" />` +
+        `<path d="M 29 185 A 76 76 0 0 1 171 185" fill="none" stroke="#FDE047" stroke-width="4" opacity="0.7" />` +
+        `<path d="M 33 185 A 72 72 0 0 1 167 185" fill="none" stroke="#38BDF8" stroke-width="4" opacity="0.7" />` +
+        // キラキラ星
+        `<path d="${starPath(40, 60, 6)}" fill="#FEF08A" />` +
+        `<path d="${starPath(160, 50, 7)}" fill="#FEF08A" />` +
+        `<path d="${starPath(100, 35, 8)}" fill="#FFFFFF" />` +
+        stageShadow + cardBorder
+      );
+
+    case 'kirakira':
+      // パステルキラキラ
+      return (
+        `<defs>` +
+        `<linearGradient id="${p}_kk" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FCE7F3"/><stop offset="50%" stop-color="#EDE9FE"/><stop offset="100%" stop-color="#E0F2FE"/></linearGradient>` +
+        `</defs>` +
+        `<rect x="5" y="5" width="190" height="230" rx="20" fill="url(#${p}_kk)"/>` +
+        `<path d="${starPath(35, 45, 6)}" fill="#F472B6" opacity="0.8" />` +
+        `<path d="${starPath(165, 55, 7)}" fill="#A855F7" opacity="0.8" />` +
+        `<path d="${starPath(50, 140, 5)}" fill="#38BDF8" opacity="0.8" />` +
+        `<path d="${starPath(150, 145, 6)}" fill="#FBBF24" opacity="0.8" />` +
+        `<circle cx="90" cy="50" r="3" fill="#FFF" /><circle cx="120" cy="65" r="2.5" fill="#FFF" />` +
+        stageShadow + cardBorder
+      );
+
+    case 'space_station':
+      // サイバーステーション
+      return (
+        `<defs><linearGradient id="${p}_spcst" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#030712"/><stop offset="100%" stop-color="#0F172A"/></linearGradient></defs>` +
+        `<rect x="5" y="5" width="190" height="230" rx="20" fill="url(#${p}_spcst)"/>` +
+        // 地球の円弧
+        `<circle cx="100" cy="270" r="100" fill="#0284C7" opacity="0.6" />` +
+        `<circle cx="100" cy="270" r="96" fill="#38BDF8" opacity="0.3" />` +
+        // サイバーグリッド
+        `<line x1="20" y1="180" x2="180" y2="180" stroke="#06B6D4" stroke-width="1.5" opacity="0.6" />` +
+        `<line x1="40" y1="160" x2="160" y2="160" stroke="#06B6D4" stroke-width="1" opacity="0.4" />` +
+        stageShadow + cardBorder
+      );
+
+    case 'crystal_castle':
+      // ★3 まおうのクリスタルじょう
+      return (
+        `<defs><linearGradient id="${p}_cstl" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1E1B4B"/><stop offset="70%" stop-color="#312E81"/><stop offset="100%" stop-color="#4C1D95"/></linearGradient></defs>` +
+        `<rect x="5" y="5" width="190" height="230" rx="20" fill="url(#${p}_cstl)"/>` +
+        // クリスタル城のシルエット
+        `<polygon points="100,50 85,150 115,150" fill="#818CF8" opacity="0.4" />` +
+        `<polygon points="65,80 55,160 75,160" fill="#6366F1" opacity="0.3" />` +
+        `<polygon points="135,80 125,160 145,160" fill="#6366F1" opacity="0.3" />` +
+        `<circle cx="100" cy="48" r="4" fill="#C7D2FE" />` +
+        stageShadow + cardBorder
+      );
+
     case 'sky':
     default:
       return (
@@ -470,6 +558,79 @@ function renderOutfit(outfit: string): string {
         `<path d="M 78 134 Q 100 140 122 134 L 124 156 L 76 156 Z" fill="#F8FAFC" ${LINE} stroke-linejoin="round" />` +
         `<path d="M 82 144 L 82 135 L 88 135 L 88 144 L 112 144 L 112 135 L 118 135 L 118 144 L 124 154 L 126 180 L 103 180 L 103 172 L 97 172 L 97 180 L 74 180 L 76 154 Z" fill="#27272A" ${LINE} stroke-linejoin="round" />` +
         `<circle cx="100" cy="162" r="8" fill="#F8FAFC" stroke="#4A2E25" stroke-width="1.5" />` +
+        `</g>`
+      );
+
+    case 'ninja_suit':
+      // くろがねにんじゃスーツ
+      return (
+        `<g id="layer-outfit">` +
+        // 忍び袖
+        `<path d="M 80 135 Q 64 136 64 148 L 78 153 Z" fill="#1E293B" ${LINE} stroke-linejoin="round" />` +
+        `<path d="M 120 135 Q 136 136 136 148 L 122 153 Z" fill="#1E293B" ${LINE} stroke-linejoin="round" />` +
+        // 交差襟の忍者装束
+        `<path d="M 78 134 L 122 134 L 124 166 L 76 166 Z" fill="#0F172A" ${LINE} stroke-linejoin="round" />` +
+        `<path d="M 82 134 L 100 152 L 118 134" stroke="#DC2626" stroke-width="2.5" fill="none" />` +
+        // 赤い帯（腰布）
+        `<rect x="76" y="156" width="48" height="6" fill="#DC2626" stroke="#4A2E25" stroke-width="1.5" />` +
+        // 忍び袴
+        `<path d="M 76 162 L 124 162 L 126 180 L 103 180 L 103 173 L 97 173 L 97 180 L 74 180 Z" fill="#1E293B" ${LINE} stroke-linejoin="round" />` +
+        `</g>`
+      );
+
+    case 'magic_robe':
+      // まほうのスターローブ
+      return (
+        `<g id="layer-outfit">` +
+        `<ellipse cx="68" cy="144" rx="9" ry="8" fill="#4C1D95" ${LINE} />` +
+        `<ellipse cx="132" cy="144" rx="9" ry="8" fill="#4C1D95" ${LINE} />` +
+        `<path d="M 76 134 L 124 134 L 132 186 L 68 186 Z" fill="#581C87" ${LINE} />` +
+        `<path d="M 100 134 L 100 186" stroke="#FBBF24" stroke-width="2.5" />` +
+        `<path d="${starPath(88, 160, 5)}" fill="#FDE047" />` +
+        `<path d="${starPath(112, 160, 5)}" fill="#FDE047" />` +
+        `</g>`
+      );
+
+    case 'pilot_uniform':
+      // パイロットダブルせいふく
+      return (
+        `<g id="layer-outfit">` +
+        `<path d="M 80 135 Q 64 136 64 148 L 78 153 Z" fill="#1E3A8A" ${LINE} />` +
+        `<path d="M 120 135 Q 136 136 136 148 L 122 153 Z" fill="#1E3A8A" ${LINE} />` +
+        `<path d="M 78 134 L 122 134 L 124 166 L 76 166 Z" fill="#1E3A8A" ${LINE} />` +
+        // 白シャツ襟とネクタイ
+        `<polygon points="100,134 94,142 106,142" fill="#FFF" />` +
+        `<polygon points="100,142 97,156 100,160 103,156" fill="#DC2626" />` +
+        // 金ボタン
+        `<circle cx="92" cy="150" r="1.8" fill="#FBBF24" /><circle cx="108" cy="150" r="1.8" fill="#FBBF24" />` +
+        `<circle cx="92" cy="158" r="1.8" fill="#FBBF24" /><circle cx="108" cy="158" r="1.8" fill="#FBBF24" />` +
+        // ズボン
+        `<path d="M 76 166 L 124 166 L 126 180 L 103 180 L 103 173 L 97 173 L 97 180 L 74 180 Z" fill="#0F172A" ${LINE} />` +
+        `</g>`
+      );
+
+    case 'idol_dress':
+      // きらめきアイドルドレス
+      return (
+        `<g id="layer-outfit">` +
+        `<circle cx="70" cy="144" r="9" fill="#F472B6" ${LINE} />` +
+        `<circle cx="130" cy="144" r="9" fill="#F472B6" ${LINE} />` +
+        `<path d="M 78 134 Q 100 142 122 134 L 124 156 L 76 156 Z" fill="#EC4899" ${LINE} />` +
+        `<circle cx="100" cy="145" r="4" fill="#FDE047" stroke="#F59E0B" stroke-width="1" />` +
+        `<path d="M 76 156 C 55 166 48 186 54 192 C 75 196 125 196 146 192 C 152 186 145 166 124 156 Z" fill="#FBCFE8" ${LINE} />` +
+        `<path d="M 80 166 C 70 174 65 186 70 190 C 85 193 115 193 130 190 C 135 186 130 174 120 166 Z" fill="#F472B6" opacity="0.6" />` +
+        `</g>`
+      );
+
+    case 'crystal_armor':
+      // ★3 でんせつのクリスタルアーマー
+      return (
+        `<g id="layer-outfit">` +
+        `<ellipse cx="68" cy="142" rx="9" ry="7" fill="#06B6D4" ${LINE} />` +
+        `<ellipse cx="132" cy="142" rx="9" ry="7" fill="#06B6D4" ${LINE} />` +
+        `<path d="M 76 134 L 124 134 L 122 178 L 78 178 Z" fill="#22D3EE" ${LINE} />` +
+        `<polygon points="100,138 88,154 100,170 112,154" fill="#67E8F9" stroke="#0891B2" stroke-width="2" />` +
+        `<circle cx="100" cy="154" r="3" fill="#FFF" />` +
         `</g>`
       );
 
@@ -861,6 +1022,78 @@ function renderAccessory(accessory: string): string {
         `</g>`
       );
 
+    case 'ninja_band':
+      // にんじゃのハチマキ（額当て＆風になびく帯）
+      return (
+        `<g>` +
+        // なびくハチマキの紐（後頭部から右へなびく）
+        `<path d="M 144 82 C 160 80, 172 88, 182 86 C 175 92, 162 90, 146 88 Z" fill="#1E293B" stroke="#4A2E25" stroke-width="2" />` +
+        `<path d="M 144 86 C 162 90, 168 102, 178 106 C 170 104, 158 96, 145 90 Z" fill="#1E293B" stroke="#4A2E25" stroke-width="2" />` +
+        // 額に巻いたハチマキの帯
+        `<path d="M 53 82 Q 100 77 147 82 L 146 93 Q 100 88 54 93 Z" fill="#1E293B" stroke="#4A2E25" stroke-width="2.5" />` +
+        // 中央の銀色額当てプレート
+        `<rect x="87" y="78" width="26" height="12" rx="2" fill="#E2E8F0" stroke="#4A2E25" stroke-width="1.8" />` +
+        `<circle cx="91" cy="84" r="1" fill="#475569" /><circle cx="109" cy="84" r="1" fill="#475569" />` +
+        `<polygon points="100,80 102.5,84 100,88 97.5,84" fill="#334155" />` +
+        `</g>`
+      );
+
+    case 'wizard':
+      // まほうつかいのぼうし
+      return (
+        `<g>` +
+        `<ellipse cx="100" cy="54" rx="42" ry="10" fill="#3B0764" ${LINE} />` +
+        `<path d="M 70 52 L 100 10 L 130 52 Z" fill="#581C87" ${LINE} />` +
+        `<path d="M 76 48 Q 100 52 124 48 L 126 53 Q 100 57 74 53 Z" fill="#FBBF24" />` +
+        `<path d="${starPath(100, 50, 4.5)}" fill="#FEF08A" stroke="#F59E0B" stroke-width="1" />` +
+        `</g>`
+      );
+
+    case 'star_pin':
+      // キラキラスターピン
+      return (
+        `<g>` +
+        `<path d="${starPath(70, 70, 9)}" fill="#FDE047" stroke="#F59E0B" stroke-width="2" />` +
+        `<circle cx="70" cy="70" r="3" fill="#FFFFFF" />` +
+        `</g>`
+      );
+
+    case 'knight_helmet':
+      // はねかざりナイトカブト
+      return (
+        `<g>` +
+        `<path d="M 60 64 Q 100 50 140 64 L 136 78 Q 100 66 64 78 Z" fill="#94A3B8" ${LINE} />` +
+        `<path d="M 100 54 C 100 28, 118 20, 126 12 C 120 30, 110 42, 100 54 Z" fill="#EF4444" stroke="#B91C1C" stroke-width="1.5" />` +
+        `</g>`
+      );
+
+    case 'dino_hood':
+      // きょうりゅうフード
+      return (
+        `<g>` +
+        `<path d="M 56 75 C 56 36, 144 36, 144 75 Z" fill="#22C55E" ${LINE} />` +
+        `<polygon points="96,36 100,24 104,36" fill="#F97316" ${LINE} />` +
+        `<polygon points="82,42 85,32 90,43" fill="#F97316" ${LINE} />` +
+        `<polygon points="110,43 115,32 118,42" fill="#F97316" ${LINE} />` +
+        `<circle cx="74" cy="52" r="5" fill="#FFF" stroke="#4A2E25" stroke-width="1.5" /><circle cx="75" cy="52" r="2.5" fill="#000" />` +
+        `<circle cx="126" cy="52" r="5" fill="#FFF" stroke="#4A2E25" stroke-width="1.5" /><circle cx="125" cy="52" r="2.5" fill="#000" />` +
+        `</g>`
+      );
+
+    case 'cat_headphone':
+      // ネコみみヘッドホン
+      return (
+        `<g>` +
+        `<path d="M 52 95 C 50 40, 150 40, 148 95" fill="none" stroke="#F43F5E" stroke-width="4.5" stroke-linecap="round" />` +
+        `<polygon points="62,56 70,30 88,50" fill="#FDA4AF" ${LINE} />` +
+        `<polygon points="68,52 72,36 82,48" fill="#FFF" />` +
+        `<polygon points="138,56 130,30 112,50" fill="#FDA4AF" ${LINE} />` +
+        `<polygon points="132,52 128,36 118,48" fill="#FFF" />` +
+        `<circle cx="52" cy="100" r="9" fill="#FB7185" ${LINE} />` +
+        `<circle cx="148" cy="100" r="9" fill="#FB7185" ${LINE} />` +
+        `</g>`
+      );
+
     case 'acc_none':
     default:
       return '';
@@ -897,6 +1130,28 @@ function renderWeapon(weapon?: string): string {
         `</g>`
       );
 
+    case 'laser_blade':
+      // サイバーレーザーブレード
+      return (
+        `<g>` +
+        `<rect x="128" y="160" width="10" height="20" rx="2" fill="#334155" stroke="#4A2E25" stroke-width="1.5" transform="rotate(-30 133 170)" />` +
+        `<line x1="135" y1="162" x2="160" y2="114" stroke="#4ADE80" stroke-width="5" stroke-linecap="round" />` +
+        `<line x1="135" y1="162" x2="160" y2="114" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />` +
+        `</g>`
+      );
+
+    case 'flame_sword':
+      // ★3 ほのおのレジェンドブレード
+      return (
+        `<g>` +
+        `<path d="M 132 160 L 158 108 C 168 118, 150 135, 162 140 C 150 148, 142 165, 137 165 Z" fill="#EF4444" stroke="#B91C1C" stroke-width="2" />` +
+        `<path d="M 135 158 L 154 116 C 160 124, 148 135, 156 138 C 146 145, 140 158, 138 158 Z" fill="#F59E0B" />` +
+        `<path d="M 137 156 L 150 125 L 142 152 Z" fill="#FEF08A" />` +
+        `<rect x="126" y="160" width="16" height="5" fill="#FBBF24" rx="1.5" transform="rotate(-35 134 162)" />` +
+        `<circle cx="125" cy="176" r="3" fill="#DC2626" />` +
+        `</g>`
+      );
+
     case 'wp_none':
     default:
       return '';
@@ -924,6 +1179,68 @@ function renderPet(pet: string): string {
         `<ellipse cx="18" cy="17" rx="11" ry="10" fill="#10B981" ${LINE} />` +
         `<circle cx="13" cy="8" r="7.5" fill="#10B981" ${LINE} />` +
         `<circle cx="11" cy="7" r="1.3" fill="#1E293B" /><circle cx="16" cy="7" r="1.3" fill="#1E293B" />` +
+        `</g>`
+      );
+
+    case 'penguin':
+      // マフラーペンギン
+      return (
+        `<g transform="translate(18 170)">` +
+        `<ellipse cx="18" cy="18" rx="10" ry="12" fill="#18181B" ${LINE} />` +
+        `<ellipse cx="18" cy="19" rx="6.5" ry="8.5" fill="#FFFFFF" />` +
+        `<circle cx="18" cy="8" r="8" fill="#18181B" ${LINE} />` +
+        `<circle cx="15" cy="7" r="1.3" fill="#FFFFFF" /><circle cx="21" cy="7" r="1.3" fill="#FFFFFF" />` +
+        `<polygon points="18,8 15,11 21,11" fill="#F59E0B" />` +
+        `<path d="M 10 13 Q 18 16 26 13 L 26 16 Q 18 19 10 16 Z" fill="#EF4444" />` +
+        `<polygon points="23,15 25,24 21,24" fill="#DC2626" />` +
+        `</g>`
+      );
+
+    case 'slime':
+      // ぷるぷるスライム
+      return (
+        `<g transform="translate(18 176)">` +
+        `<path d="M 18 4 C 8 4 6 18 8 22 C 10 26 26 26 28 22 C 30 18 28 4 18 4 Z" fill="#38BDF8" ${LINE} />` +
+        `<ellipse cx="14" cy="14" rx="2" ry="3" fill="#0F172A" /><ellipse cx="22" cy="14" rx="2" ry="3" fill="#0F172A" />` +
+        `<circle cx="13" cy="13" r="0.8" fill="#FFF" /><circle cx="21" cy="13" r="0.8" fill="#FFF" />` +
+        `<ellipse cx="14" cy="9" rx="3" ry="1.5" fill="#FFF" opacity="0.6" transform="rotate(-20 14 9)" />` +
+        `</g>`
+      );
+
+    case 'unicorn':
+      // ミニユニコーン
+      return (
+        `<g transform="translate(16 172)">` +
+        `<ellipse cx="20" cy="18" rx="11" ry="9" fill="#FFFFFF" ${LINE} />` +
+        `<circle cx="14" cy="9" r="8" fill="#FFFFFF" ${LINE} />` +
+        `<circle cx="11" cy="9" r="1.3" fill="#1E293B" />` +
+        `<polygon points="12,2 14,8 10,8" fill="#FBBF24" ${LINE} />` +
+        `<path d="M 18 4 C 22 2, 24 10, 24 14" fill="none" stroke="#F472B6" stroke-width="2.5" stroke-linecap="round" />` +
+        `</g>`
+      );
+
+    case 'flying_unicorn':
+      // ★3 はばたくペガサス
+      return (
+        `<g transform="translate(16 172)">` +
+        `<ellipse cx="20" cy="18" rx="11" ry="9" fill="#FFFFFF" ${LINE} />` +
+        `<circle cx="14" cy="9" r="8" fill="#FFFFFF" ${LINE} />` +
+        `<circle cx="11" cy="9" r="1.3" fill="#1E293B" />` +
+        `<polygon points="12,2 14,8 10,8" fill="#FDE047" ${LINE} />` +
+        `<path d="M 18 4 C 22 2, 24 10, 24 14" fill="none" stroke="#F472B6" stroke-width="2.5" stroke-linecap="round" />` +
+        `<path d="M 22 14 C 26 6, 36 8, 32 18 C 28 18, 24 16, 22 14 Z" fill="#BAE6FD" stroke="#38BDF8" stroke-width="1.5" />` +
+        `</g>`
+      );
+
+    case 'anglerfish':
+      // ピカピカアンコウ
+      return (
+        `<g transform="translate(16 172)">` +
+        `<ellipse cx="20" cy="17" rx="13" ry="10" fill="#FBBF24" ${LINE} />` +
+        `<circle cx="13" cy="15" r="2.5" fill="#FFF" /><circle cx="13" cy="15" r="1.2" fill="#000" />` +
+        `<path d="M 18 8 C 16 0, 8 2, 7 6" fill="none" stroke="#B45309" stroke-width="2" stroke-linecap="round" />` +
+        `<circle cx="7" cy="6" r="3" fill="#FDE047" /><circle cx="7" cy="6" r="1.5" fill="#FFF" />` +
+        `<polygon points="32,17 38,12 38,22" fill="#F59E0B" ${LINE} />` +
         `</g>`
       );
 
