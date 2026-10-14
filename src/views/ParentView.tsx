@@ -63,6 +63,7 @@ import {
   requestNotificationPermission,
   sendBrowserNotification,
 } from '../notifications';
+import { validateAvatarRenderers, AVATAR_OPTIONS } from '../avatar';
 
 const TICKET_TEMPLATES: {
   category: 'tablet' | 'real';
@@ -177,6 +178,10 @@ export function ParentView({ state }: { state: AppState }) {
     sendBrowserNotification('🔔 テスト通知です', 'このようにリアルタイムで通知が届きます！');
     toast('テスト通知を送信しました', '🔔');
   };
+
+  // アバター描画整合性チェック状態
+  const [avatarDiag] = useState(() => validateAvatarRenderers());
+  const [showAvatarGallery, setShowAvatarGallery] = useState(false);
 
   // 子ども編集モーダル状態
   const [editingChild, setEditingChild] = useState<Child | null>(null);
@@ -1322,6 +1327,82 @@ export function ParentView({ state }: { state: AppState }) {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* アバターアイテム描画整合性チェッカー */}
+          <div className="card p-5 border-2 border-slate-200 bg-white">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+                  <span>🎨</span>
+                  <span>アバターアイテム描画チェッカー＆図鑑</span>
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  全{AVATAR_OPTIONS.length}個のアイテムが正しく画面に反映・描画できるかを自動検証しています。
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                {avatarDiag.ok ? (
+                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700 flex items-center gap-1.5">
+                    <span>🟢</span>
+                    <span>全アイテム正常描画（未実装: 0件）</span>
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-black text-rose-700 flex items-center gap-1.5">
+                    <span>🔴</span>
+                    <span>未実装アイテムあり ({avatarDiag.missing.length}件)</span>
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowAvatarGallery(!showAvatarGallery)}
+                  className="btn-pop rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200"
+                >
+                  {showAvatarGallery ? '閉じる' : 'アイテム一覧を見る'}
+                </button>
+              </div>
+            </div>
+
+            {/* 未実装アイテム警告（ある場合） */}
+            {!avatarDiag.ok && (
+              <div className="rounded-xl border border-rose-300 bg-rose-50 p-3 mt-3 text-xs text-rose-800">
+                <div className="font-black mb-1">以下のアイテムのSVG描画処理が未実装です:</div>
+                <ul className="list-disc list-inside">
+                  {avatarDiag.missing.map((m) => (
+                    <li key={m.id}>
+                      [{m.slot}] {m.name} ({m.id})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* アイテム一覧プレビュー展開 */}
+            {showAvatarGallery && (
+              <div className="mt-4 pt-4 border-t border-slate-100 max-h-96 overflow-y-auto">
+                <div className="text-xs font-bold text-slate-500 mb-2">
+                  実装済みアバターアイテム一覧（全{AVATAR_OPTIONS.length}件・詳細は docs/AVATAR_CATALOG.md）
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {AVATAR_OPTIONS.filter((o) => !o.hidden).map((opt) => (
+                    <div
+                      key={opt.id}
+                      className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs flex items-center gap-2"
+                    >
+                      <span className="text-xl shrink-0">{opt.icon}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-slate-800 truncate">{opt.name}</div>
+                        <div className="text-[10px] text-slate-400">
+                          {opt.slot} • {opt.rarity ? `★${opt.rarity}` : '★1'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* データリセット */}

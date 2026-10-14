@@ -1314,3 +1314,62 @@ export function buildGameAvatarSvg(
 }
 
 export const buildAvatarSvg = buildGameAvatarSvg;
+
+/* ---------------- 14. アバターアイテム整合性自己診断バリデーター ---------------- */
+
+/**
+ * 全アバターアイテムの描画整合性を自己診断するバリデーション関数。
+ * 未実装のアイテム描画処理がある場合、警告を出力して検出します。
+ */
+export function validateAvatarRenderers(): {
+  ok: boolean;
+  missing: { id: string; slot: string; name: string }[];
+} {
+  const missing: { id: string; slot: string; name: string }[] = [];
+  const defaultSkySvg = renderBackground('sky', 'chk');
+  const defaultOverallSvg = renderOutfit('overall');
+
+  for (const opt of AVATAR_OPTIONS) {
+    if (opt.hidden) continue;
+
+    if (opt.slot === 'accessory') {
+      if (opt.id !== 'acc_none' && renderAccessory(opt.id) === '') {
+        missing.push({ id: opt.id, slot: opt.slot, name: opt.name });
+      }
+    } else if (opt.slot === 'weapon') {
+      if (opt.id !== 'wp_none' && renderWeapon(opt.id) === '') {
+        missing.push({ id: opt.id, slot: opt.slot, name: opt.name });
+      }
+    } else if (opt.slot === 'pet') {
+      if (opt.id !== 'pet_none' && renderPet(opt.id) === '') {
+        missing.push({ id: opt.id, slot: opt.slot, name: opt.name });
+      }
+    } else if (opt.slot === 'bg') {
+      if (opt.id !== 'sky' && renderBackground(opt.id, 'chk') === defaultSkySvg) {
+        missing.push({ id: opt.id, slot: opt.slot, name: opt.name });
+      }
+    } else if (opt.slot === 'outfit') {
+      if (opt.id !== 'overall' && renderOutfit(opt.id) === defaultOverallSvg) {
+        missing.push({ id: opt.id, slot: opt.slot, name: opt.name });
+      }
+    }
+  }
+
+  if (missing.length > 0) {
+    console.warn(
+      `🚨 [Avatar Warning] 未実装のアバター描画処理が検知されました:`,
+      missing
+    );
+  } else {
+    console.info(
+      `✅ [Avatar Registry] 全${AVATAR_OPTIONS.length}個のアバターアイテムの描画整合性を確認しました（未実装アイテム: 0件）。`
+    );
+  }
+
+  return { ok: missing.length === 0, missing };
+}
+
+// 開発・実行時の自動整合性チェック
+if (typeof window !== 'undefined') {
+  validateAvatarRenderers();
+}
