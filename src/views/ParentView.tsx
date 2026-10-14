@@ -42,9 +42,30 @@ import {
   Key,
   QrCode,
   Share2,
+  Smartphone,
 } from 'lucide-react';
 import { useSyncStatus } from '../store';
 import { getRoomId, setRoomId, isSupabaseConfigured, getInviteUrl } from '../supabase';
+
+const TICKET_TEMPLATES: {
+  category: 'tablet' | 'real';
+  name: string;
+  icon: string;
+  price: number;
+  minutes: number;
+}[] = [
+  { category: 'tablet', name: 'タブレット30分券', icon: '📱', price: 60, minutes: 30 },
+  { category: 'tablet', name: 'ゲーム20分券', icon: '🎮', price: 40, minutes: 20 },
+  { category: 'tablet', name: 'YouTube 15分券', icon: '📺', price: 30, minutes: 15 },
+  { category: 'tablet', name: 'アニメ1話（25分）', icon: '🎬', price: 50, minutes: 25 },
+  { category: 'real', name: 'すきなおやつ券', icon: '🍪', price: 50, minutes: 0 },
+  { category: 'real', name: 'アイスクリーム券', icon: '🍦', price: 80, minutes: 0 },
+  { category: 'real', name: 'マンガ・本1さつ', icon: '📚', price: 150, minutes: 0 },
+  { category: 'real', name: 'よるふかし30分', icon: '🛌', price: 100, minutes: 0 },
+];
+
+const PRESET_ICONS = ['📱', '🎮', '📺', '🎬', '🍪', '🍦', '🍰', '📚', '🛌', '🎪', '🛹', '🧩', '🎯', '🎁'];
+const PRICE_PRESETS = [30, 50, 80, 100, 150, 200];
 
 export function ParentView({ state }: { state: AppState }) {
   const now = useNow(1000);
@@ -764,11 +785,11 @@ export function ParentView({ state }: { state: AppState }) {
                 sound.tap();
                 setEditingShopItem({
                   id: `sh-${uid()}`,
-                  name: '',
-                  icon: '🎁',
-                  price: 50,
-                  category: 'real',
-                  minutes: 0,
+                  name: 'タブレット30分券',
+                  icon: '📱',
+                  price: 60,
+                  category: 'tablet',
+                  minutes: 30,
                   avatarItemId: null,
                 });
               }}
@@ -1066,10 +1087,110 @@ export function ParentView({ state }: { state: AppState }) {
       <Modal open={Boolean(editingShopItem)} onClose={() => setEditingShopItem(null)}>
         {editingShopItem && (
           <form onSubmit={handleSaveShopSubmit} className="flex flex-col gap-4">
-            <h3 className="text-xl font-black text-slate-800">
-              商品の編集・追加
+            <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+              <span>🏪</span>
+              <span>
+                {state.shop.some((s) => s.id === editingShopItem.id)
+                  ? '商品の編集'
+                  : 'かんたん商品追加'}
+              </span>
             </h3>
 
+            {/* カテゴリ選択 */}
+            <div>
+              <label className="label">チケットの種類</label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditingShopItem({
+                      ...editingShopItem,
+                      category: 'tablet',
+                      minutes: editingShopItem.minutes > 0 ? editingShopItem.minutes : 30,
+                    })
+                  }
+                  className={`btn-pop flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-black border-2 transition-all ${
+                    editingShopItem.category === 'tablet'
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Smartphone size={16} />
+                  <span>📱 タブレット・時間券</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditingShopItem({
+                      ...editingShopItem,
+                      category: 'real',
+                      minutes: 0,
+                    })
+                  }
+                  className={`btn-pop flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-black border-2 transition-all ${
+                    editingShopItem.category === 'real'
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>🍪 おやつ・ごほうび券</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 定番テンプレートから選ぶ */}
+            <div>
+              <label className="label flex items-center justify-between">
+                <span>定番から選ぶ（ワンタップ入力）</span>
+                <span className="text-[11px] font-normal text-slate-400">タップで自動入力</span>
+              </label>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {TICKET_TEMPLATES.filter((tpl) => tpl.category === editingShopItem.category).map(
+                  (tpl) => (
+                    <button
+                      type="button"
+                      key={tpl.name}
+                      onClick={() =>
+                        setEditingShopItem({
+                          ...editingShopItem,
+                          name: tpl.name,
+                          icon: tpl.icon,
+                          price: tpl.price,
+                          minutes: tpl.minutes,
+                        })
+                      }
+                      className="btn-pop rounded-xl bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700"
+                    >
+                      <span>{tpl.icon}</span>
+                      <span className="ml-1">{tpl.name}</span>
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+
+            {/* アイコン選択 */}
+            <div>
+              <label className="label">アイコン</label>
+              <div className="flex flex-wrap gap-1.5 mt-1 mb-2">
+                {PRESET_ICONS.map((ic) => (
+                  <button
+                    type="button"
+                    key={ic}
+                    onClick={() => setEditingShopItem({ ...editingShopItem, icon: ic })}
+                    className={`btn-pop h-9 w-9 rounded-xl text-lg flex items-center justify-center border-2 transition-all ${
+                      editingShopItem.icon === ic
+                        ? 'border-indigo-600 bg-indigo-50'
+                        : 'border-slate-100 bg-white hover:bg-slate-50'
+                    }`}
+                  >
+                    {ic}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 商品名 */}
             <div>
               <label className="label">商品名</label>
               <input
@@ -1078,23 +1199,14 @@ export function ParentView({ state }: { state: AppState }) {
                 onChange={(e) => setEditingShopItem({ ...editingShopItem, name: e.target.value })}
                 required
                 className="input font-bold"
+                placeholder="例: ゲーム20分券、すきなおやつ券"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            {/* 価格 ＆ 分数 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="label">アイコン</label>
-                <input
-                  type="text"
-                  value={editingShopItem.icon}
-                  onChange={(e) => setEditingShopItem({ ...editingShopItem, icon: e.target.value })}
-                  required
-                  className="input font-bold text-center text-2xl"
-                />
-              </div>
-
-              <div>
-                <label className="label">価格（コイン）</label>
+                <label className="label">ひつようなコイン（価格）</label>
                 <input
                   type="number"
                   value={editingShopItem.price === 0 ? '' : editingShopItem.price}
@@ -1108,31 +1220,64 @@ export function ParentView({ state }: { state: AppState }) {
                   required
                   min={1}
                   className="input font-bold"
-                  placeholder="0"
+                  placeholder="50"
                 />
+                {/* 価格クイック設定ボタン */}
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {PRICE_PRESETS.map((p) => (
+                    <button
+                      type="button"
+                      key={p}
+                      onClick={() => setEditingShopItem({ ...editingShopItem, price: p })}
+                      className={`btn-pop rounded-lg px-2 py-0.5 text-[11px] font-bold ${
+                        editingShopItem.price === p
+                          ? 'bg-amber-400 text-amber-950 font-black'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {p}コイン
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {editingShopItem.category === 'tablet' && (
-              <div>
-                <label className="label">タイマー使用分数（分）</label>
-                <input
-                  type="number"
-                  value={editingShopItem.minutes === 0 ? '' : editingShopItem.minutes}
-                  onChange={(e) =>
-                    setEditingShopItem({
-                      ...editingShopItem,
-                      minutes: e.target.value === '' ? 0 : Number(e.target.value),
-                    })
-                  }
-                  onFocus={(e) => e.target.select()}
-                  required
-                  min={1}
-                  className="input font-bold"
-                  placeholder="0"
-                />
-              </div>
-            )}
+              {editingShopItem.category === 'tablet' && (
+                <div>
+                  <label className="label">タイマー使用分数（分）</label>
+                  <input
+                    type="number"
+                    value={editingShopItem.minutes === 0 ? '' : editingShopItem.minutes}
+                    onChange={(e) =>
+                      setEditingShopItem({
+                        ...editingShopItem,
+                        minutes: e.target.value === '' ? 0 : Number(e.target.value),
+                      })
+                    }
+                    onFocus={(e) => e.target.select()}
+                    required
+                    min={1}
+                    className="input font-bold"
+                    placeholder="30"
+                  />
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {[15, 20, 30, 45, 60].map((m) => (
+                      <button
+                        type="button"
+                        key={m}
+                        onClick={() => setEditingShopItem({ ...editingShopItem, minutes: m })}
+                        className={`btn-pop rounded-lg px-2 py-0.5 text-[11px] font-bold ${
+                          editingShopItem.minutes === m
+                            ? 'bg-sky-500 text-white font-black'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {m}分
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <button
               type="submit"

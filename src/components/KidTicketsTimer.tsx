@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ActiveTimer, Child, Ticket } from '../types';
-import { finishTimer, markAlarmed, redeemTicket } from '../actions';
+import { finishTimer, markAlarmed, redeemTicket, pauseTimer, resumeTimer } from '../actions';
 import { sound } from '../sound';
 import { burst } from '../effects';
 import { toast } from './ui';
@@ -10,7 +10,7 @@ import { buildAvatarSvg } from '../avatar';
 import { ensureNotificationPermission, notify } from '../notify';
 import { BONUS_COINS, BONUS_WINDOW_MS } from '../logic';
 import { formatClock, formatHMKana, todayKey } from '../utils';
-import { Play, Sparkles, PictureInPicture2, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { Play, Pause, Sparkles, PictureInPicture2, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 
 export function KidTicketsTimer({
   child,
@@ -23,7 +23,7 @@ export function KidTicketsTimer({
 }) {
   const now = useNow(500);
   const isPipActive = usePipActive();
-  const [bonusModal, setBonusModal] = useState<{ bonus: boolean; coins: number } | null>(null);
+  const [bonusModal, setBonusModal] = useState<{ bonus: boolean; coins: number; refundMinutes?: number } | null>(null);
 
   const currentTimer = activeTimers.find((t) => t.childId === child.id);
   const myTickets = tickets.filter((t) => t.childId === child.id);
@@ -32,7 +32,7 @@ export function KidTicketsTimer({
 
   // PiPキャンバス描画の更新とアラーム・通知監視
   useEffect(() => {
-    if (!currentTimer) return;
+    if (!currentTimer || currentTimer.isPaused) return;
 
     // PiPコントローラの状態更新
     const svg = buildAvatarSvg(child.avatar, 200);
@@ -97,6 +97,19 @@ export function KidTicketsTimer({
     }
   };
 
+  // タイマー一時停止・再開
+  const handleTogglePause = () => {
+    if (!currentTimer) return;
+    sound.tap();
+    if (currentTimer.isPaused) {
+      resumeTimer(child.id);
+      toast('タイマーを さいかいしたよ！▶️', '▶️');
+    } else {
+      pauseTimer(child.id);
+      toast('タイマーを いちじていししたよ！⏸️', '⏸️');
+    }
+  };
+
   // タイマー終了（おしまい！またね！ボタン）
   const handleFinishTimer = () => {
     if (!currentTimer) return;
@@ -106,24 +119,29 @@ export function KidTicketsTimer({
       if (res.bonus) {
         sound.fanfare();
         burst();
-        setBonusModal({ bonus: true, coins: BONUS_COINS });
+        setBonusModal({ bonus: true, coins: BONUS_COINS, refundMinutes: res.refundMinutes });
       } else {
         sound.pop();
-        setBonusModal({ bonus: false, coins: 0 });
+        setBonusModal({ bonus: false, coins: 0, refundMinutes: res.refundMinutes });
       }
     }
   };
 
   // タイマー進捗計算
-  const remainMs = currentTimer ? Math.max(0, currentTimer.endsAt - now) : 0;
-  const isTimeOver = currentTimer ? now >= currentTimer.endsAt : false;
-  const inBonusWindow = currentTimer
+  const isPaused = Boolean(currentTimer?.isPaused);
+  const remainMs = currentTimer
+    ? isPaused
+      ? (currentTimer.pausedRemainingMs ?? 0)
+      : Math.max(0, currentTimer.endsAt - now)
+    : 0;
+  const isTimeOver = currentTimer ? (!isPaused && now >= currentTimer.endsAt) : false;
+  const inBonusWindow = currentTimer && !isPaused
     ? Math.abs(now - currentTimer.endsAt) <= BONUS_WINDOW_MS
     : false;
 
   const totalDurationMs = currentTimer ? currentTimer.minutes * 60 * 1000 : 1;
   const progressRatio = currentTimer
-    ? Math.max(0, Math.min(1, (currentTimer.endsAt - now) / totalDurationMs))
+    ? Math.max(0, Math.min(1, remainMs / totalDurationMs))
     : 0;
 
   return (
@@ -160,6 +178,14 @@ export function KidTicketsTimer({
             </div>
           </div>
 
+          {/* 一時停止中バナー */}
+          {isPaused && (
+            <div className="mx-auto my-2 inline-flex items-center gap-1.5 rounded-full bg-amber-200 px-3.5 py-1 text-xs font-black text-amber-900 animate-pulse">
+              <Pause size={14} />
+              <span>いちじていし中（じかんは へらないよ）</span>
+            </div>
+          )}
+
           {/* タイムバー */}
           {!isTimeOver && (
             <div className="mx-auto my-3 h-4 w-full max-w-sm rounded-full bg-sky-200 overflow-hidden shadow-inner">
@@ -180,6 +206,19 @@ export function KidTicketsTimer({
 
           {/* アクションボタン */}
           <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-3">
+            {/* 一時停止 / 再開ボタン */}
+            <button
+              onClick={handleTogglePause}
+              className={`btn-pop flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black shadow-[0_4px_0_#cbd5e1] border w-full sm:w-auto ${
+                isPaused
+                  ? 'bg-amber-400 text-amber-950 border-amber-300 shadow-[0_4px_0_#b45309]'
+                  : 'bg-white text-slate-700 border-slate-200'
+              }`}
+            >
+              {isPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
+              <span>{isPaused ? 'さいかいする！' : 'いちじていし'}</span>
+            </button>
+
             {pipTimer.supported() && (
               <button
                 onClick={handleTogglePip}
@@ -297,14 +336,14 @@ export function KidTicketsTimer({
 
                   <button
                     onClick={() => handleUseTicket(ticket)}
-                    className={`btn-pop flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-black text-white ${
+                    title="つかう"
+                    className={`btn-pop flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-md active:translate-y-0.5 active:shadow-none ${
                       isDaily
                         ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-[0_3px_0_#9a3412]'
                         : 'bg-gradient-to-r from-amber-400 to-orange-400 shadow-[0_3px_0_#c2410c]'
-                    } active:shadow-none`}
+                    }`}
                   >
-                    <Play size={16} fill="white" />
-                    <span>つかう！</span>
+                    <Play size={18} fill="white" className="translate-x-0.5" />
                   </button>
                 </div>
               );
@@ -334,8 +373,23 @@ export function KidTicketsTimer({
               {bonusModal.bonus ? 'おやくそく まもれたね！' : 'またあそぼうね！'}
             </h3>
 
+            {/* 残り時間返却の案内 */}
+            {bonusModal.refundMinutes && bonusModal.refundMinutes >= 1 && (
+              <div className="my-3 flex items-center gap-2.5 rounded-2xl bg-sky-50 border-2 border-sky-200 p-3 text-left w-full">
+                <span className="text-3xl">🎫</span>
+                <div>
+                  <div className="text-xs font-black text-sky-950">
+                    のこりじかん（{bonusModal.refundMinutes}ぷん）を チケットに もどしたよ！
+                  </div>
+                  <div className="text-[11px] font-bold text-sky-700 mt-0.5">
+                    あまったじかんは つぎに また つかえるよ✨
+                  </div>
+                </div>
+              </div>
+            )}
+
             {bonusModal.bonus ? (
-              <div className="my-5 flex flex-col items-center rounded-2xl bg-amber-50 p-4 w-full border border-amber-200">
+              <div className="my-3 flex flex-col items-center rounded-2xl bg-amber-50 p-4 w-full border border-amber-200">
                 <span className="text-xs font-bold text-amber-800">
                   じかんを しっかり まもった ごほうびだよ！
                 </span>
@@ -350,7 +404,7 @@ export function KidTicketsTimer({
                 </span>
               </div>
             ) : (
-              <p className="my-4 text-sm font-bold text-slate-500">
+              <p className="my-3 text-sm font-bold text-slate-500">
                 タブレットを おしまいにしたよ！つぎも じかんを まもろうね！
               </p>
             )}

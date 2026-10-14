@@ -107,6 +107,10 @@ export interface ActiveTimer {
   startedAt: number;
   endsAt: number;
   alarmed: boolean;
+  /** 一時停止中かどうか */
+  isPaused?: boolean;
+  /** 一時停止した時点での残りミリ秒 */
+  pausedRemainingMs?: number;
 }
 
 export interface Notice {

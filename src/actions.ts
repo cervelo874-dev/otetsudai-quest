@@ -280,18 +280,80 @@ export function redeemTicket(ticketId: string): RedeemResult {
 export interface FinishResult {
   bonus: boolean;
   diffMs: number;
+  refundMinutes?: number;
+}
+
+export function pauseTimer(childId: string): void {
+  setState((s) => {
+    const t = s.timers.find((x) => x.childId === childId);
+    if (!t || t.isPaused) return;
+    const now = Date.now();
+    const remainingMs = Math.max(0, t.endsAt - now);
+    t.isPaused = true;
+    t.pausedRemainingMs = remainingMs;
+    const c = findChild(s, childId);
+    addLog(s, '⏸️', `${c?.name ?? ''}がタイマーを一時停止（残り${Math.ceil(remainingMs / 60000)}分）`);
+  });
+}
+
+export function resumeTimer(childId: string): void {
+  setState((s) => {
+    const t = s.timers.find((x) => x.childId === childId);
+    if (!t || !t.isPaused) return;
+    const now = Date.now();
+    const remain = t.pausedRemainingMs ?? 0;
+    t.isPaused = false;
+    t.endsAt = now + remain;
+    t.pausedRemainingMs = undefined;
+    const c = findChild(s, childId);
+    addLog(s, '▶️', `${c?.name ?? ''}がタイマーを再開（残り${Math.ceil(remain / 60000)}分）`);
+  });
 }
 
 export function finishTimer(childId: string): FinishResult | null {
   const s0 = getState();
   const timer = s0.timers.find((x) => x.childId === childId);
   if (!timer) return null;
-  const diff = Date.now() - timer.endsAt;
+
+  const now = Date.now();
+  const remainingMs = timer.isPaused ? (timer.pausedRemainingMs ?? 0) : Math.max(0, timer.endsAt - now);
+  const remainingMinutes = Math.floor(remainingMs / 60000);
+
+  const diff = timer.isPaused ? -(timer.pausedRemainingMs ?? 0) : now - timer.endsAt;
   const bonus = Math.abs(diff) <= BONUS_WINDOW_MS;
+
   setState((s) => {
+    // タイマーを削除
     s.timers = s.timers.filter((x) => x.childId !== childId);
     const c = findChild(s, childId);
     if (!c) return;
+
+    // もし1分以上残り時間がある場合、残り時間チケットとして所持品に返却！
+    if (remainingMinutes >= 1) {
+      const today = todayKey();
+      const originTicket = s.tickets.find((t) => t.id === timer.ticketId);
+      const isDaily = originTicket?.isDaily || timer.name.includes('まいにち');
+
+      const refundTicket: Ticket = {
+        id: `refund-${uid()}`,
+        childId: c.id,
+        shopItemId: originTicket?.shopItemId || 'refund-tablet',
+        name: isDaily ? `【まいにち・のこり${remainingMinutes}分】タブレット券` : `【のこり${remainingMinutes}分】${timer.name.replace(/【.*?】/, '')}`,
+        icon: '📱',
+        category: 'tablet',
+        minutes: remainingMinutes,
+        status: 'owned',
+        acquiredAt: now,
+        usedAt: null,
+        isDaily,
+        dateKey: isDaily ? today : undefined,
+      };
+
+      s.tickets.unshift(refundTicket);
+      addNotice(s, c.id, '🎫', `タブレットの のこりじかん（${remainingMinutes}ぷん）が チケットに もどったよ！`);
+      addLog(s, '🎫', `${c.name}に残り時間チケット（${remainingMinutes}分）を返却しました`);
+    }
+
     if (bonus) {
       c.coins += BONUS_COINS;
       addLog(s, '🌟', `${c.name}が時間を守ってタブレットを終了（おやくそくボーナス +${BONUS_COINS}）`);
@@ -300,7 +362,8 @@ export function finishTimer(childId: string): FinishResult | null {
       addLog(s, '📴', `${c.name}がタブレットを終了（予定より${mins}分${diff < 0 ? '早く' : '遅れて'}）`);
     }
   });
-  return { bonus, diffMs: diff };
+
+  return { bonus, diffMs: diff, refundMinutes: remainingMinutes >= 1 ? remainingMinutes : undefined };
 }
 
 export function stopTimerByParent(childId: string): void {
