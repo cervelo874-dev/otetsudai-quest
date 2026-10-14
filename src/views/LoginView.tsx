@@ -4,9 +4,10 @@ import { Avatar } from '../components/Avatar';
 import { PinPad } from '../components/PinPad';
 import { Modal, toast } from '../components/ui';
 import { sound } from '../sound';
-import { Shield, Sparkles, UserCheck, Key, Wifi, WifiOff } from 'lucide-react';
+import { Shield, Sparkles, UserCheck, Key, Lock, Rocket } from 'lucide-react';
 import { useSyncStatus } from '../store';
-import { getRoomId, setRoomId } from '../supabase';
+import { setRoomId, hasConfiguredRoomId } from '../supabase';
+import { setParentPin } from '../actions';
 
 export function LoginView({
   childrenList,
@@ -22,8 +23,35 @@ export function LoginView({
   const syncStatus = useSyncStatus();
   const [selectedChildForPin, setSelectedChildForPin] = useState<Child | null>(null);
   const [showParentModal, setShowParentModal] = useState(false);
-  const [showRoomModal, setShowRoomModal] = useState(false);
-  const [roomInput, setRoomInput] = useState(getRoomId);
+
+  // 初回セットアップモーダル（未設定の端末で最初に開いた場合のみ表示）
+  const [showSetupModal, setShowSetupModal] = useState(() => !hasConfiguredRoomId());
+  const [setupRoomInput, setSetupRoomInput] = useState('');
+  const [setupPinInput, setSetupPinInput] = useState('');
+
+  const handleCompleteSetup = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanRoom = setupRoomInput.trim();
+    const cleanPin = setupPinInput.trim();
+
+    if (!cleanRoom) {
+      sound.error();
+      toast('家族のあいことばを入力してください', '⚠️');
+      return;
+    }
+
+    if (cleanPin.length !== 4 || !/^\d{4}$/.test(cleanPin)) {
+      sound.error();
+      toast('保護者PINは4桁の数字で入力してください', '⚠️');
+      return;
+    }
+
+    sound.fanfare();
+    setRoomId(cleanRoom);
+    setParentPin(cleanPin);
+    setShowSetupModal(false);
+    toast('初期設定が完了しました！冒険をはじめよう！', '🎉');
+  };
 
   const handleChildClick = (child: Child) => {
     sound.tap();
@@ -119,7 +147,7 @@ export function LoginView({
         </div>
       </div>
 
-      {/* おやモード入口 ＆ 家族のあいことば設定 */}
+      {/* おやモード入口 */}
       <div className="my-6 flex flex-col items-center gap-2.5">
         <button
           onClick={() => {
@@ -131,70 +159,66 @@ export function LoginView({
           <Shield size={18} className="text-indigo-600" />
           <span>おやモード（保護者ダッシュボード）はこちら</span>
         </button>
-
-        {/* 家族の合言葉確認・変更ボタン */}
-        <button
-          onClick={() => {
-            setRoomInput(getRoomId());
-            setShowRoomModal(true);
-          }}
-          className="btn-pop flex items-center gap-1.5 rounded-full bg-white/80 px-3.5 py-1.5 text-xs font-bold text-slate-500 border border-slate-200 hover:bg-white hover:text-slate-700 shadow-sm"
-        >
-          {syncStatus === 'connected' ? (
-            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          ) : (
-            <span className="flex h-2 w-2 rounded-full bg-slate-400"></span>
-          )}
-          <Key size={13} className="text-amber-500" />
-          <span>家族のあいことば: <strong className="text-slate-800">{getRoomId()}</strong></span>
-        </button>
       </div>
 
-      {/* 家族のあいことば変更モーダル */}
-      <Modal open={showRoomModal} onClose={() => setShowRoomModal(false)}>
-        <div className="p-4 sm:p-6 text-center max-w-sm">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
-            <Key size={24} />
+      {/* ---------------- 初回ウェルカム・セットアップモーダル ---------------- */}
+      <Modal open={showSetupModal} onClose={() => {}}>
+        <div className="p-4 sm:p-6 text-center max-w-sm mx-auto">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-200">
+            <Rocket size={30} />
           </div>
-          <h3 className="text-lg font-black text-slate-800">家族のあいことば設定</h3>
-          <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-            親のスマホや他のタブレットでも同じ「あいことば」を入力すると、リアルタイムにデータが同期されます。
+          <h3 className="text-xl font-black text-slate-800">
+            ようこそ おてつだいクエストへ！🏰
+          </h3>
+          <p className="mt-2 text-xs text-slate-500 leading-relaxed">
+            家族みんなでリアルタイム同期して楽しむための<strong>「家族のあいことば」</strong>と、おやモードを開くための<strong>「保護者パスコード（4桁）」</strong>を設定してください。
           </p>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const clean = roomInput.trim() || 'default-family';
-              setRoomId(clean);
-              setShowRoomModal(false);
-              sound.fanfare();
-              toast(`家族のあいことばを「${clean}」に設定しました！`, '🔑');
-            }}
-            className="mt-4 flex flex-col gap-3"
-          >
-            <input
-              type="text"
-              value={roomInput}
-              onChange={(e) => setRoomInput(e.target.value)}
-              placeholder="例: yamada-family"
-              className="w-full rounded-2xl border-2 border-slate-200 px-4 py-2.5 text-center text-sm font-black text-slate-800 focus:border-amber-400 focus:outline-none"
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setShowRoomModal(false)}
-                className="btn-pop flex-1 rounded-2xl bg-slate-100 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-200"
-              >
-                キャンセル
-              </button>
-              <button
-                type="submit"
-                className="btn-pop flex-1 rounded-2xl bg-amber-400 py-2.5 text-xs font-black text-slate-900 shadow-md hover:bg-amber-300"
-              >
-                合言葉を変更
-              </button>
+          <form onSubmit={handleCompleteSetup} className="mt-5 flex flex-col gap-4 text-left">
+            <div>
+              <label className="block text-xs font-black text-slate-700 mb-1 flex items-center gap-1">
+                <Key size={14} className="text-amber-500" />
+                <span>家族のあいことば（家族専用の合言葉）</span>
+              </label>
+              <input
+                type="text"
+                value={setupRoomInput}
+                onChange={(e) => setSetupRoomInput(e.target.value)}
+                placeholder="例: yamada-family"
+                className="w-full rounded-2xl border-2 border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-800 focus:border-indigo-500 focus:outline-none"
+                autoFocus
+              />
+              <p className="mt-1 text-[11px] text-slate-400">
+                ※他端末（子どものタブレット等）は後からQRコードで自動接続できます。
+              </p>
             </div>
+
+            <div>
+              <label className="block text-xs font-black text-slate-700 mb-1 flex items-center gap-1">
+                <Lock size={14} className="text-indigo-600" />
+                <span>保護者パスコード（数字4桁）</span>
+              </label>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={setupPinInput}
+                onChange={(e) => setSetupPinInput(e.target.value)}
+                placeholder="例: 1234"
+                className="w-full rounded-2xl border-2 border-slate-200 px-4 py-2.5 text-center text-lg font-black tracking-widest text-slate-800 focus:border-indigo-500 focus:outline-none"
+              />
+              <p className="mt-1 text-[11px] text-slate-400">
+                ※お手伝いの承認や設定画面を開くときに使います。
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              className="btn-pop mt-2 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 py-3 text-sm font-black text-white shadow-[0_4px_0_#3730a3] active:translate-y-1 active:shadow-none"
+            >
+              <Sparkles size={18} />
+              <span>設定を完了して はじめる！</span>
+            </button>
           </form>
         </div>
       </Modal>

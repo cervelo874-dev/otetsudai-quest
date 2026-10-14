@@ -58,6 +58,19 @@ export function getRoomId(): string {
   }
 }
 
+/**
+ * 端末で明示的にあいことばが設定（または招待URLで連携）されているかどうか
+ */
+export function hasConfiguredRoomId(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    const stored = localStorage.getItem(ROOM_ID_STORAGE_KEY);
+    return !!stored && stored.trim().length > 0;
+  } catch {
+    return true;
+  }
+}
+
 export function setRoomId(newRoomId: string): void {
   const clean = newRoomId.trim() || DEFAULT_ROOM_ID;
   try {
