@@ -36,6 +36,10 @@ export interface Child {
   color: string;
   /** かんたんログイン（数字なしで入る）を許可するかどうか（未設定は true） */
   allowQuickLogin?: boolean;
+  /** 最後にデイリーログインボーナスを受け取った日 (YYYY-MM-DD) */
+  lastDailyLoginDate?: string | null;
+  /** 最後にデイリー1時間チケットを使用した日 (YYYY-MM-DD) */
+  lastDailyTicketUsedDate?: string | null;
 }
 
 export interface Quest {
@@ -89,6 +93,10 @@ export interface Ticket {
   status: TicketStatus;
   acquiredAt: number;
   usedAt: number | null;
+  /** 毎日ログインボーナスチケットフラグ */
+  isDaily?: boolean;
+  /** チケットの有効日 (YYYY-MM-DD) */
+  dateKey?: string;
 }
 
 export interface ActiveTimer {

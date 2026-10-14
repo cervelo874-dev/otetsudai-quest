@@ -1,5 +1,5 @@
 import { getState, setState } from './store';
-import type { AppState, AvatarSlot, Child, Quest, ShopItem } from './types';
+import type { AppState, AvatarSlot, Child, Quest, ShopItem, Ticket } from './types';
 import { uid, todayKey, yesterdayKey } from './utils';
 import { BONUS_COINS, BONUS_WINDOW_MS, GACHA_COST, rewardFor } from './logic';
 import { AVATAR_OPTIONS, findOption } from './avatar';
@@ -155,21 +155,108 @@ export function buyItem(childId: string, itemId: string): BuyResult {
   return 'ok';
 }
 
+/* ---------------- daily login bonus ---------------- */
+
+/**
+ * 毎日ログインボーナス（タブレット1時間券）の判定と配布
+ * - 過去の未使用デイリーチケットは期限切れとして整理（たまらないようにする）
+ * - 毎日1枚のみ配布し、今日すでに使用した場合は再配布しない
+ * @returns 新規にチケットを付与した場合は true、すでに受取済みの場合は false
+ */
+export function claimDailyLoginBonus(childId: string): boolean {
+  const today = todayKey();
+  const s0 = getState();
+  const c0 = findChild(s0, childId);
+  if (!c0) return false;
+
+  // すでに今日使用済みなら配布しない
+  if (c0.lastDailyTicketUsedDate === today) {
+    // 過去の未使用デイリーチケットがあればクリーンアップのみ行う
+    if (s0.tickets.some((t) => t.childId === childId && t.isDaily && t.status === 'owned' && t.dateKey !== today)) {
+      setState((s) => {
+        s.tickets = s.tickets.filter((t) => !(t.childId === childId && t.isDaily && t.dateKey !== today));
+      });
+    }
+    return false;
+  }
+
+  // すでに今日のデイリーチケットが存在している場合
+  const hasTodayDailyTicket = s0.tickets.some(
+    (t) => t.childId === childId && t.isDaily && t.dateKey === today
+  );
+  if (hasTodayDailyTicket) {
+    // 過去の未使用チケットのみクリーンアップ
+    if (s0.tickets.some((t) => t.childId === childId && t.isDaily && t.status === 'owned' && t.dateKey !== today)) {
+      setState((s) => {
+        s.tickets = s.tickets.filter((t) => !(t.childId === childId && t.isDaily && t.dateKey !== today));
+      });
+    }
+    return false;
+  }
+
+  // 新規に今日のデイリーチケットを1枚発行
+  setState((s) => {
+    const c = findChild(s, childId);
+    if (!c) return;
+
+    // 1. 過去の古いデイリーチケットをすべて除去（使わなかったときにたまらないようにする）
+    s.tickets = s.tickets.filter((t) => !(t.childId === childId && t.isDaily));
+
+    // 2. 本日のデイリーチケットを1枚追加
+    const dailyTicket: Ticket = {
+      id: `daily-${c.id}-${today}`,
+      childId: c.id,
+      shopItemId: 'daily-tablet-60',
+      name: '【まいにち】タブレット1時間券',
+      icon: '📱',
+      category: 'tablet',
+      minutes: 60,
+      status: 'owned',
+      acquiredAt: Date.now(),
+      usedAt: null,
+      isDaily: true,
+      dateKey: today,
+    };
+    s.tickets.unshift(dailyTicket);
+    c.lastDailyLoginDate = today;
+
+    addLog(s, '🎁', `${c.name}がまいにちログインボーナス（タブレット1時間券）を獲得！`);
+    addNotice(s, c.id, '🎁', 'まいにちログインボーナス！タブレット1時間券がとどいたよ！');
+  });
+
+  return true;
+}
+
 /* ---------------- tickets & timer ---------------- */
 
-export type RedeemResult = 'timer' | 'requested' | 'busy' | 'error';
+export type RedeemResult = 'timer' | 'requested' | 'busy' | 'daily_limit' | 'error';
 
 export function redeemTicket(ticketId: string): RedeemResult {
   const s0 = getState();
   const t0 = s0.tickets.find((x) => x.id === ticketId);
   if (!t0 || t0.status !== 'owned') return 'error';
+
+  const today = todayKey();
+  const c0 = findChild(s0, t0.childId);
+
+  // デイリーチケットの場合の1日1回限定チェック
+  if (t0.isDaily) {
+    if (c0?.lastDailyTicketUsedDate === today) {
+      return 'daily_limit';
+    }
+  }
+
   if (t0.category === 'tablet' && s0.timers.some((x) => x.childId === t0.childId)) return 'busy';
+
   setState((s) => {
     const t = s.tickets.find((x) => x.id === ticketId);
     if (!t) return;
     const c = findChild(s, t.childId);
     const now = Date.now();
     t.usedAt = now;
+    if (t.isDaily && c) {
+      c.lastDailyTicketUsedDate = today;
+    }
     if (t.category === 'tablet') {
       t.status = 'used';
       s.timers.push({

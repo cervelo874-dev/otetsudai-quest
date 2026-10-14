@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { AppState, Child } from '../types';
 import { Avatar } from '../components/Avatar';
 import { AvatarMaker } from '../components/AvatarMaker';
@@ -11,7 +11,9 @@ import { KidNotices } from '../components/KidNotices';
 import { Modal } from '../components/ui';
 import { getRank, displayStreak, themeOf } from '../logic';
 import { sound } from '../sound';
-import { Sparkles, Shirt, Award, Flame, Coins, Gift } from 'lucide-react';
+import { burst } from '../effects';
+import { claimDailyLoginBonus } from '../actions';
+import { Sparkles, Shirt, Award, Flame, Coins, Gift, Smartphone, Check } from 'lucide-react';
 
 export function KidView({
   child,
@@ -24,9 +26,20 @@ export function KidView({
   const [showAvatarMaker, setShowAvatarMaker] = useState(false);
   const [showGacha, setShowGacha] = useState(false);
   const [showChestModal, setShowChestModal] = useState(true);
+  const [showDailyBonusModal, setShowDailyBonusModal] = useState(false);
 
   // 対象の子どものデータ最新版
   const currentChild = state.children.find((c) => c.id === child.id) ?? child;
+
+  // ログイン時に毎日ログインボーナス（タブレット1時間券）を判定・付与
+  useEffect(() => {
+    const isNewClaim = claimDailyLoginBonus(currentChild.id);
+    if (isNewClaim) {
+      sound.fanfare();
+      burst();
+      setShowDailyBonusModal(true);
+    }
+  }, [currentChild.id]);
   const myChests = state.chests.filter((c) => c.childId === currentChild.id);
   const rank = getRank(currentChild.totalQuests);
   const streak = displayStreak(currentChild);
@@ -237,6 +250,56 @@ export function KidView({
           child={currentChild}
           onClose={() => setShowGacha(false)}
         />
+      </Modal>
+
+      {/* まいにちログインボーナスモーダル */}
+      <Modal
+        open={showDailyBonusModal}
+        onClose={() => setShowDailyBonusModal(false)}
+        className="max-w-sm"
+      >
+        <div className="flex flex-col items-center p-2 sm:p-4 text-center">
+          <div className="relative mb-3">
+            <span className="text-6xl animate-bounce inline-block">🎁</span>
+            <span className="absolute -top-1 -right-2 text-2xl animate-spin">✨</span>
+          </div>
+
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800 mb-2">
+            <Sparkles size={14} className="text-amber-600" />
+            <span>まいにち ログインボーナス！</span>
+          </span>
+
+          <h3 className="text-2xl font-black text-slate-800">
+            きょうのチケットが とどいたよ！
+          </h3>
+
+          <div className="my-4 flex w-full flex-col items-center rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 p-4 border-2 border-amber-300 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="text-4xl">📱</span>
+              <div className="text-left">
+                <div className="text-base font-black text-amber-950">
+                  【まいにち】タブレット1時間券
+                </div>
+                <div className="text-xs font-bold text-amber-700">
+                  たっぷり 60ぷん つかえるよ！
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 w-full border-t border-amber-200/70 pt-2 text-[11px] font-bold text-slate-500">
+              ※まいにち 1まい限定（つかわなかった分は たまらないよ）
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              sound.tap();
+              setShowDailyBonusModal(false);
+            }}
+            className="btn-pop w-full rounded-2xl bg-gradient-to-r from-amber-400 to-orange-400 py-3.5 text-base font-black text-white shadow-[0_4px_0_#c2410c] active:translate-y-1 active:shadow-none"
+          >
+            やったー！うけとる！✨
+          </button>
+        </div>
       </Modal>
     </div>
   );

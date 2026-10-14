@@ -9,7 +9,7 @@ import { useNow, usePipActive } from '../hooks';
 import { buildAvatarSvg } from '../avatar';
 import { ensureNotificationPermission, notify } from '../notify';
 import { BONUS_COINS, BONUS_WINDOW_MS } from '../logic';
-import { formatClock, formatHMKana } from '../utils';
+import { formatClock, formatHMKana, todayKey } from '../utils';
 import { Play, Sparkles, PictureInPicture2, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 
 export function KidTicketsTimer({
@@ -73,6 +73,9 @@ export function KidTicketsTimer({
     } else if (res === 'busy') {
       sound.error();
       toast('いまは タイマーが うごいているよ！', '⚠️');
+    } else if (res === 'daily_limit') {
+      sound.error();
+      toast('まいにちチケットは 1日1まいまで つかえるよ！あした またつかってね', '⚠️');
     }
   };
 
@@ -253,34 +256,69 @@ export function KidTicketsTimer({
             ))}
 
             {/* 未使用チケット */}
-            {unusedTickets.map((ticket) => (
-              <div
-                key={ticket.id}
-                className="card flex items-center justify-between p-4 border-2 border-slate-100 hover:border-amber-200"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-2xl border border-amber-100">
-                    {ticket.icon}
-                  </span>
-                  <div>
-                    <div className="font-black text-slate-800">{ticket.name}</div>
-                    <div className="text-xs font-bold text-slate-400">
-                      {ticket.category === 'tablet'
-                        ? `${ticket.minutes}ふん つかえるよ`
-                        : 'おうちのひとに みせてね'}
+            {unusedTickets.map((ticket) => {
+              const isDaily = Boolean(ticket.isDaily);
+              return (
+                <div
+                  key={ticket.id}
+                  className={`card flex items-center justify-between p-4 border-2 transition-all ${
+                    isDaily
+                      ? 'border-amber-400 bg-gradient-to-r from-amber-50/90 to-yellow-50/90 shadow-md ring-2 ring-amber-300/40'
+                      : 'border-slate-100 hover:border-amber-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`flex h-12 w-12 items-center justify-center rounded-2xl text-2xl border ${
+                        isDaily
+                          ? 'bg-amber-100 border-amber-300 shadow-sm'
+                          : 'bg-amber-50 border-amber-100'
+                      }`}
+                    >
+                      {ticket.icon}
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-black text-slate-800">{ticket.name}</span>
+                        {isDaily && (
+                          <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-black text-amber-900 animate-pulse">
+                            ⭐ 本日限定
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs font-bold text-slate-400">
+                        {ticket.category === 'tablet'
+                          ? `${ticket.minutes}ふん つかえるよ`
+                          : 'おうちのひとに みせてね'}
+                        {isDaily && '（1日1まい・きょう中）'}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <button
-                  onClick={() => handleUseTicket(ticket)}
-                  className="btn-pop flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-2 text-sm font-black text-white shadow-[0_3px_0_#c2410c] active:shadow-none"
-                >
-                  <Play size={16} fill="white" />
-                  <span>つかう！</span>
-                </button>
+                  <button
+                    onClick={() => handleUseTicket(ticket)}
+                    className={`btn-pop flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-black text-white ${
+                      isDaily
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-[0_3px_0_#9a3412]'
+                        : 'bg-gradient-to-r from-amber-400 to-orange-400 shadow-[0_3px_0_#c2410c]'
+                    } active:shadow-none`}
+                  >
+                    <Play size={16} fill="white" />
+                    <span>つかう！</span>
+                  </button>
+                </div>
+              );
+            })}
+
+            {/* 本日のまいにちチケット使用済み案内 */}
+            {child.lastDailyTicketUsedDate === todayKey() && !unusedTickets.some((t) => t.isDaily) && (
+              <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/60 p-3.5 text-center sm:col-span-2">
+                <span className="text-xs font-black text-amber-800 flex items-center justify-center gap-1">
+                  <span>✨</span>
+                  <span>きょうの「まいにちタブレット1時間券」は つかったよ！あした またとどくよ！</span>
+                </span>
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
