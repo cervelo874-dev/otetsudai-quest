@@ -15,6 +15,9 @@ import {
   deleteChild,
   setParentPin,
   resetAllData,
+  reorderQuests,
+  reorderShopItems,
+  updateNotificationSettings,
 } from '../actions';
 import { GameAvatar2D } from '../components/Avatar';
 import { Modal } from '../components/ui';
@@ -43,9 +46,23 @@ import {
   QrCode,
   Share2,
   Smartphone,
+  GripVertical,
+  ChevronUp,
+  ChevronDown,
+  Bell,
+  BellRing,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { useSyncStatus } from '../store';
 import { getRoomId, setRoomId, isSupabaseConfigured, getInviteUrl } from '../supabase';
+import { useSortableList } from '../hooks/useSortableList';
+import {
+  isNotificationSupported,
+  getNotificationPermission,
+  requestNotificationPermission,
+  sendBrowserNotification,
+} from '../notifications';
 
 const TICKET_TEMPLATES: {
   category: 'tablet' | 'real';
@@ -121,6 +138,45 @@ export function ParentView({ state }: { state: AppState }) {
 
   // ショップ編集モーダル状態
   const [editingShopItem, setEditingShopItem] = useState<ShopItem | null>(null);
+
+  // クエスト・ショップのドラッグ＆ドロップ並び替え
+  const questSortable = useSortableList(state.quests, (from, to) => {
+    reorderQuests(from, to);
+    toast('お手伝いの順番を変更しました', '✨');
+  });
+
+  const shopSortable = useSortableList(state.shop, (from, to) => {
+    reorderShopItems(from, to);
+    toast('ショップ商品の順番を変更しました', '✨');
+  });
+
+  // ブラウザ通知パーミッション状態
+  const [browserPerm, setBrowserPerm] = useState<NotificationPermission | 'unsupported'>(getNotificationPermission);
+
+  const handleToggleBrowserNotification = async () => {
+    sound.tap();
+    if (browserPerm !== 'granted') {
+      const granted = await requestNotificationPermission();
+      setBrowserPerm(getNotificationPermission());
+      if (granted) {
+        updateNotificationSettings({ browserNotification: true });
+        sendBrowserNotification('🎉 通知が有効になりました！', 'お手伝いやチケット使用の連絡が届きます');
+        toast('ブラウザ通知を有効にしました！', '🔔');
+      } else {
+        toast('ブラウザ通知が許可されませんでした', '⚠️');
+      }
+    } else {
+      const nextVal = !state.notificationSettings.browserNotification;
+      updateNotificationSettings({ browserNotification: nextVal });
+      toast(nextVal ? 'ブラウザ通知をONにしました' : 'ブラウザ通知をOFFにしました', '🔔');
+    }
+  };
+
+  const handleTestNotification = () => {
+    sound.fanfare();
+    sendBrowserNotification('🔔 テスト通知です', 'このようにリアルタイムで通知が届きます！');
+    toast('テスト通知を送信しました', '🔔');
+  };
 
   // 子ども編集モーダル状態
   const [editingChild, setEditingChild] = useState<Child | null>(null);
@@ -708,65 +764,128 @@ export function ParentView({ state }: { state: AppState }) {
           </div>
 
           <div className="flex flex-col gap-3">
-            {state.quests.map((quest) => (
-              <div
-                key={quest.id}
-                className="card p-4 sm:p-5 border-2 border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-2xl">
-                    {quest.icon}
-                  </span>
-                  <div>
-                    <div className="font-black text-slate-800 text-base">
-                      {quest.title}
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+              <span className="flex items-center gap-1.5">
+                <GripVertical size={16} className="text-slate-400" />
+                <span>「≡」をドラッグまたは「↑」「↓」ボタンでお手伝いの順番を変更できます</span>
+              </span>
+              <span className="text-slate-400">全{state.quests.length}件</span>
+            </div>
+
+            {state.quests.map((quest, index) => {
+              const isDragging = questSortable.draggedIndex === index;
+              const isOver = questSortable.overIndex === index && !isDragging;
+
+              return (
+                <div
+                  key={quest.id}
+                  ref={(el) => (questSortable.itemRefs.current[index] = el)}
+                  draggable
+                  onDragStart={() => questSortable.handleDragStart(index)}
+                  onDragOver={(e) => questSortable.handleDragOver(e, index)}
+                  onDragEnd={questSortable.handleDragEnd}
+                  className={`card p-3 sm:p-4 border-2 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                    isDragging
+                      ? 'opacity-40 border-dashed border-indigo-400 bg-indigo-50/50 scale-[0.98]'
+                      : isOver
+                      ? 'border-indigo-500 ring-2 ring-indigo-200 bg-indigo-50/20'
+                      : 'border-slate-100 hover:border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 sm:gap-3 flex-1">
+                    {/* ドラッグハンドル（スマホのタッチ操作＆PCドラッグ用） */}
+                    <div
+                      onTouchStart={(e) => questSortable.handleTouchStart(e, index)}
+                      onTouchMove={(e) => questSortable.handleTouchMove(e)}
+                      onTouchEnd={questSortable.handleTouchEnd}
+                      className="cursor-grab active:cursor-grabbing p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 touch-none select-none shrink-0"
+                      title="ドラッグして並び替え"
+                    >
+                      <GripVertical size={20} />
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                      <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                        基準: 🪙 {quest.reward}
-                      </span>
-                      <span className="text-slate-400">担当:</span>
-                      {quest.assignedTo.map((cid) => {
-                        const child = state.children.find((c) => c.id === cid);
-                        const over = quest.rewardOverrides[cid];
-                        return (
-                          <span
-                            key={cid}
-                            className="rounded-full bg-slate-100 px-2.5 py-0.5 font-bold text-slate-600 text-[11px]"
-                          >
-                            {child?.name}
-                            {typeof over === 'number' && ` (${over}コイン)`}
-                          </span>
-                        );
-                      })}
+
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-2xl">
+                      {quest.icon}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-black text-slate-800 text-base truncate">
+                        {quest.title}
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs">
+                        <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                          基準: 🪙 {quest.reward}
+                        </span>
+                        <span className="text-slate-400">担当:</span>
+                        {quest.assignedTo.map((cid) => {
+                          const child = state.children.find((c) => c.id === cid);
+                          const over = quest.rewardOverrides[cid];
+                          return (
+                            <span
+                              key={cid}
+                              className="rounded-full bg-slate-100 px-2.5 py-0.5 font-bold text-slate-600 text-[11px]"
+                            >
+                              {child?.name}
+                              {typeof over === 'number' && ` (${over}コイン)`}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2 self-end sm:self-center">
-                  <button
-                    onClick={() => setEditingQuest(quest)}
-                    className="btn-pop rounded-xl bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
-                    title="編集"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm(`「${quest.title}」を削除してもよろしいですか？`)) {
-                        sound.tap();
-                        deleteQuest(quest.id);
-                        toast('お手伝いを削除しました', '🗑️');
-                      }
-                    }}
-                    className="btn-pop rounded-xl bg-rose-50 p-2 text-rose-600 hover:bg-rose-100"
-                    title="削除"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                    {/* 上下ボタン */}
+                    <div className="flex items-center bg-slate-100 rounded-xl p-0.5 mr-1">
+                      <button
+                        onClick={() => questSortable.moveUp(index)}
+                        disabled={index === 0}
+                        className={`p-1.5 rounded-lg ${
+                          index === 0
+                            ? 'text-slate-300 cursor-not-allowed'
+                            : 'text-slate-600 hover:bg-white hover:text-indigo-600 shadow-sm'
+                        }`}
+                        title="上へ移動"
+                      >
+                        <ChevronUp size={16} />
+                      </button>
+                      <button
+                        onClick={() => questSortable.moveDown(index)}
+                        disabled={index === state.quests.length - 1}
+                        className={`p-1.5 rounded-lg ${
+                          index === state.quests.length - 1
+                            ? 'text-slate-300 cursor-not-allowed'
+                            : 'text-slate-600 hover:bg-white hover:text-indigo-600 shadow-sm'
+                        }`}
+                        title="下へ移動"
+                      >
+                        <ChevronDown size={16} />
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => setEditingQuest(quest)}
+                      className="btn-pop rounded-xl bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+                      title="編集"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`「${quest.title}」を削除してもよろしいですか？`)) {
+                          sound.tap();
+                          deleteQuest(quest.id);
+                          toast('お手伝いを削除しました', '🗑️');
+                        }
+                      }}
+                      className="btn-pop rounded-xl bg-rose-50 p-2 text-rose-600 hover:bg-rose-100"
+                      title="削除"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -800,47 +919,128 @@ export function ParentView({ state }: { state: AppState }) {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {state.shop.map((item) => (
-              <div
-                key={item.id}
-                className="card p-4 border-2 border-slate-100 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-2xl border border-amber-100">
-                    {item.icon}
-                  </span>
-                  <div>
-                    <div className="font-black text-slate-800 text-sm">{item.name}</div>
-                    <div className="text-xs font-bold text-amber-600">
-                      🪙 {item.price} コイン
-                      {item.category === 'tablet' && ` / ${item.minutes}分`}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+              <span className="flex items-center gap-1.5">
+                <GripVertical size={16} className="text-slate-400" />
+                <span>「≡」をドラッグまたは「↑」「↓」ボタンで商品の順番を変更できます</span>
+              </span>
+              <span className="text-slate-400">全{state.shop.length}件</span>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              {state.shop.map((item, index) => {
+                const isDragging = shopSortable.draggedIndex === index;
+                const isOver = shopSortable.overIndex === index && !isDragging;
+
+                return (
+                  <div
+                    key={item.id}
+                    ref={(el) => (shopSortable.itemRefs.current[index] = el)}
+                    draggable
+                    onDragStart={() => shopSortable.handleDragStart(index)}
+                    onDragOver={(e) => shopSortable.handleDragOver(e, index)}
+                    onDragEnd={shopSortable.handleDragEnd}
+                    className={`card p-3 sm:p-4 border-2 transition-all flex items-center justify-between gap-3 ${
+                      isDragging
+                        ? 'opacity-40 border-dashed border-indigo-400 bg-indigo-50/50 scale-[0.98]'
+                        : isOver
+                        ? 'border-indigo-500 ring-2 ring-indigo-200 bg-indigo-50/20'
+                        : 'border-slate-100 hover:border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
+                      {/* ドラッグハンドル */}
+                      <div
+                        onTouchStart={(e) => shopSortable.handleTouchStart(e, index)}
+                        onTouchMove={(e) => shopSortable.handleTouchMove(e)}
+                        onTouchEnd={shopSortable.handleTouchEnd}
+                        className="cursor-grab active:cursor-grabbing p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 touch-none select-none shrink-0"
+                        title="ドラッグして並び替え"
+                      >
+                        <GripVertical size={20} />
+                      </div>
+
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-2xl border border-amber-100">
+                        {item.icon}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-black text-slate-800 text-sm truncate">{item.name}</div>
+                        <div className="text-xs font-bold text-amber-600 flex items-center gap-2 mt-0.5">
+                          <span>🪙 {item.price} コイン</span>
+                          {item.category === 'tablet' && (
+                            <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-black text-blue-700">
+                              💻 {item.minutes}分
+                            </span>
+                          )}
+                          {item.category === 'real' && (
+                            <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-black text-emerald-700">
+                              🎁 ごほうび
+                            </span>
+                          )}
+                          {item.category === 'avatar' && (
+                            <span className="rounded-md bg-purple-50 px-1.5 py-0.5 text-[10px] font-black text-purple-700">
+                              👕 きせかえ
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* 上下ボタン */}
+                      <div className="flex items-center bg-slate-100 rounded-xl p-0.5 mr-1">
+                        <button
+                          onClick={() => shopSortable.moveUp(index)}
+                          disabled={index === 0}
+                          className={`p-1.5 rounded-lg ${
+                            index === 0
+                              ? 'text-slate-300 cursor-not-allowed'
+                              : 'text-slate-600 hover:bg-white hover:text-indigo-600 shadow-sm'
+                          }`}
+                          title="上へ移動"
+                        >
+                          <ChevronUp size={16} />
+                        </button>
+                        <button
+                          onClick={() => shopSortable.moveDown(index)}
+                          disabled={index === state.shop.length - 1}
+                          className={`p-1.5 rounded-lg ${
+                            index === state.shop.length - 1
+                              ? 'text-slate-300 cursor-not-allowed'
+                              : 'text-slate-600 hover:bg-white hover:text-indigo-600 shadow-sm'
+                          }`}
+                          title="下へ移動"
+                        >
+                          <ChevronDown size={16} />
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => setEditingShopItem(item)}
+                        className="btn-pop rounded-xl bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
+                        title="編集"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`「${item.name}」を削除しますか？`)) {
+                            sound.tap();
+                            deleteShopItem(item.id);
+                            toast('商品を削除しました', '🗑️');
+                          }
+                        }}
+                        className="btn-pop rounded-xl bg-rose-50 p-2 text-rose-600 hover:bg-rose-100"
+                        title="削除"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setEditingShopItem(item)}
-                    className="btn-pop rounded-xl bg-slate-100 p-2 text-slate-600 hover:bg-slate-200"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm(`「${item.name}」を削除しますか？`)) {
-                        sound.tap();
-                        deleteShopItem(item.id);
-                        toast('商品を削除しました', '🗑️');
-                      }
-                    }}
-                    className="btn-pop rounded-xl bg-rose-50 p-2 text-rose-600 hover:bg-rose-100"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -848,6 +1048,260 @@ export function ParentView({ state }: { state: AppState }) {
       {/* ---------------- 5. ログ・設定 ---------------- */}
       {activeTab === 'logs' && (
         <div className="flex flex-col gap-6">
+          {/* 通知・お知らせ設定 */}
+          <div className="card p-5 border-2 border-indigo-100 bg-indigo-50/30">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                <Bell className="text-indigo-600" size={20} />
+                <span>アクション通知・お知らせ設定</span>
+              </h2>
+              <span className="text-xs font-bold text-indigo-700 bg-indigo-100 px-2.5 py-1 rounded-full">
+                リアルタイム通知
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-600 mb-4">
+              子どもがチケットを使ったりお手伝いを報告した際、親のスマホや端末へ即座に通知します。通知する項目をカスタマイズできます。
+            </p>
+
+            <div className="flex flex-col gap-3 divide-y divide-slate-100 bg-white rounded-xl p-3 sm:p-4 border border-slate-200">
+              {/* 1. チケット使用通知 */}
+              <div className="flex items-center justify-between pt-1 first:pt-0">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-xl border border-blue-100">
+                    🎟️
+                  </span>
+                  <div>
+                    <div className="text-sm font-black text-slate-800">
+                      子どもからのチケット使用通知
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      タブレットタイマー開始、ごほうびチケット申請時に親端末へ通知
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sound.tap();
+                    updateNotificationSettings({
+                      ticketUsed: !state.notificationSettings.ticketUsed,
+                    });
+                  }}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    state.notificationSettings.ticketUsed ? 'bg-indigo-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      state.notificationSettings.ticketUsed ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* 2. お手伝い完了報告 */}
+              <div className="flex items-center justify-between pt-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-xl border border-amber-100">
+                    📝
+                  </span>
+                  <div>
+                    <div className="text-sm font-black text-slate-800">
+                      子どもからのお手伝い完了報告
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      子どもが「できたよ！」と報告した時に親端末へ通知
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sound.tap();
+                    updateNotificationSettings({
+                      questSubmitted: !state.notificationSettings.questSubmitted,
+                    });
+                  }}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    state.notificationSettings.questSubmitted ? 'bg-indigo-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      state.notificationSettings.questSubmitted ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* 3. プレゼント・宝箱通知 */}
+              <div className="flex items-center justify-between pt-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-xl border border-rose-100">
+                    🎁
+                  </span>
+                  <div>
+                    <div className="text-sm font-black text-slate-800">
+                      プレゼント・宝箱の贈呈通知
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      親がボーナスコインや宝箱を贈った時に子ども画面へ通知
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sound.tap();
+                    updateNotificationSettings({
+                      chestOrBonusGifted: !state.notificationSettings.chestOrBonusGifted,
+                    });
+                  }}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    state.notificationSettings.chestOrBonusGifted ? 'bg-indigo-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      state.notificationSettings.chestOrBonusGifted ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* 4. お手伝い承認通知 */}
+              <div className="flex items-center justify-between pt-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-xl border border-emerald-100">
+                    ✅
+                  </span>
+                  <div>
+                    <div className="text-sm font-black text-slate-800">
+                      お手伝い承認通知
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      親がお手伝いを承認してコインを付与した時に子どもへ通知
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sound.tap();
+                    updateNotificationSettings({
+                      questApproved: !state.notificationSettings.questApproved,
+                    });
+                  }}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    state.notificationSettings.questApproved ? 'bg-indigo-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      state.notificationSettings.questApproved ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* 5. 効果音 */}
+              <div className="flex items-center justify-between pt-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-indigo-600 border border-purple-100">
+                    {state.notificationSettings.soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                  </span>
+                  <div>
+                    <div className="text-sm font-black text-slate-800">
+                      通知時の効果音
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      ファンファーレやピロン音を鳴らす
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sound.tap();
+                    updateNotificationSettings({
+                      soundEnabled: !state.notificationSettings.soundEnabled,
+                    });
+                  }}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    state.notificationSettings.soundEnabled ? 'bg-indigo-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      state.notificationSettings.soundEnabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* 6. ブラウザ / スマホWebプッシュ通知設定 */}
+            <div className="mt-4 rounded-xl border border-indigo-200 bg-white p-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <BellRing className="text-indigo-600" size={18} />
+                    <span className="text-sm font-black text-slate-800">
+                      スマホ・PCブラウザ通知（Web Notification）
+                    </span>
+                    {browserPerm === 'granted' ? (
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">
+                        🟢 許可済み
+                      </span>
+                    ) : browserPerm === 'denied' ? (
+                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">
+                        🔴 ブロック中
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600">
+                        ⚪ 未設定
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    ブラウザがバックグラウンドにある時や別タブを開いている時でも、スマホの通知バーや画面上部に通知を届けます。
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  {browserPerm === 'granted' && (
+                    <button
+                      type="button"
+                      onClick={handleTestNotification}
+                      className="btn-pop rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200"
+                    >
+                      テスト通知
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleToggleBrowserNotification}
+                    className={`btn-pop flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-black shadow-sm ${
+                      state.notificationSettings.browserNotification && browserPerm === 'granted'
+                        ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    }`}
+                  >
+                    <Bell size={15} />
+                    <span>
+                      {browserPerm !== 'granted'
+                        ? 'ブラウザ通知を許可する'
+                        : state.notificationSettings.browserNotification
+                        ? '通知をOFFにする'
+                        : '通知をONにする'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* 最近のアクティビティログ */}
           <div>
             <h2 className="text-lg font-black text-slate-800 flex items-center gap-2 mb-3">

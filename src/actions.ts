@@ -1,5 +1,5 @@
 import { getState, setState } from './store';
-import type { AppState, AvatarSlot, Child, Quest, ShopItem, Ticket } from './types';
+import type { AppState, AvatarSlot, Child, NotificationSettings, Quest, ShopItem, Ticket } from './types';
 import { uid, todayKey, yesterdayKey } from './utils';
 import { BONUS_COINS, BONUS_WINDOW_MS, GACHA_COST, rewardFor } from './logic';
 import { AVATAR_OPTIONS, findOption } from './avatar';
@@ -697,3 +697,33 @@ export function setParentPin(pin: string): void {
 export function resetAllData(): void {
   setState(() => createInitialState());
 }
+
+/* ---------------- reorder items ---------------- */
+
+export function reorderQuests(fromIndex: number, toIndex: number): void {
+  setState((s) => {
+    if (fromIndex < 0 || fromIndex >= s.quests.length || toIndex < 0 || toIndex >= s.quests.length) return;
+    const item = s.quests.splice(fromIndex, 1)[0];
+    s.quests.splice(toIndex, 0, item);
+  });
+}
+
+export function reorderShopItems(fromIndex: number, toIndex: number): void {
+  setState((s) => {
+    if (fromIndex < 0 || fromIndex >= s.shop.length || toIndex < 0 || toIndex >= s.shop.length) return;
+    const item = s.shop.splice(fromIndex, 1)[0];
+    s.shop.splice(toIndex, 0, item);
+  });
+}
+
+/* ---------------- notification settings ---------------- */
+
+export function updateNotificationSettings(settings: Partial<NotificationSettings>): void {
+  setState((s) => {
+    s.notificationSettings = {
+      ...s.notificationSettings,
+      ...settings,
+    };
+  });
+}
+

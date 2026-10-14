@@ -8,6 +8,7 @@ import { LoginView } from './views/LoginView';
 import { KidView } from './views/KidView';
 import { ParentView } from './views/ParentView';
 import { sound } from './sound';
+import { checkStateChangesAndNotify } from './notifications';
 
 interface DeviceSession {
   mode: 'login' | 'kid' | 'parent';
@@ -69,6 +70,14 @@ export default function App() {
       window.removeEventListener('touchstart', unlock);
     };
   }, []);
+
+  // 端末間同期・ステート変化によるアクション通知の監視
+  useEffect(() => {
+    checkStateChangesAndNotify(state, {
+      currentRole: mode === 'parent' ? 'parent' : mode === 'kid' ? 'kid' : 'select',
+      currentChildId: activeChildId,
+    });
+  }, [state, mode, activeChildId]);
 
   // 選択中の子ども情報を取得
   const currentChild = activeChildId

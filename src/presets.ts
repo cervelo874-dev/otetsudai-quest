@@ -1,4 +1,4 @@
-import type { AppState, AvatarConfig, Child, Quest, ShopItem } from './types';
+import type { AppState, AvatarConfig, Child, NotificationSettings, Quest, ShopItem } from './types';
 import { yesterdayKey } from './utils';
 
 export const STATE_VERSION = 3; // バージョン3: 2D RPGアバター合成レイヤー＆ガチャ確率・ダブり救済システム対応
@@ -13,6 +13,15 @@ export const DEFAULT_AVATAR: AvatarConfig = {
   weapon: 'wp_none',
   pet: 'pet_none',
   bg: 'sky',
+};
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  ticketUsed: true,
+  questSubmitted: true,
+  chestOrBonusGifted: true,
+  questApproved: true,
+  soundEnabled: true,
+  browserNotification: false,
 };
 
 export function createInitialState(): AppState {
@@ -149,5 +158,6 @@ export function createInitialState(): AppState {
     notices: [],
     logs: [{ id: 'log-init', icon: '🏰', text: 'ごほうびタウンへ ようこそ！初期データを読み込みました', at: Date.now() }],
     done: [],
+    notificationSettings: { ...DEFAULT_NOTIFICATION_SETTINGS },
   };
 }

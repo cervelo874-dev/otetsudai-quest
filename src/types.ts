@@ -134,6 +134,21 @@ export interface DoneRecord {
   date: string;
 }
 
+export interface NotificationSettings {
+  /** チケット使用通知（子ども ➔ 親） */
+  ticketUsed: boolean;
+  /** お手伝い完了申請通知（子ども ➔ 親） */
+  questSubmitted: boolean;
+  /** プレゼント・宝箱贈呈通知（親 ➔ 子ども） */
+  chestOrBonusGifted: boolean;
+  /** お手伝い承認通知（親 ➔ 子ども） */
+  questApproved: boolean;
+  /** 通知時の効果音を有効にするか */
+  soundEnabled: boolean;
+  /** ブラウザ通知（Web Notification）を有効にするか */
+  browserNotification: boolean;
+}
+
 export interface AppState {
   version: number;
   parentPin: string;
@@ -147,4 +162,5 @@ export interface AppState {
   notices: Notice[];
   logs: LogEntry[];
   done: DoneRecord[];
+  notificationSettings: NotificationSettings;
 }

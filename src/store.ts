@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { AppState } from './types';
-import { DEFAULT_AVATAR, createInitialState, STATE_VERSION } from './presets';
+import { DEFAULT_AVATAR, createInitialState, STATE_VERSION, DEFAULT_NOTIFICATION_SETTINGS } from './presets';
 
 export const STORAGE_KEY = 'otetsudai-quest-state-v1';
 
@@ -44,6 +44,10 @@ function normalize(p: Partial<AppState>): AppState {
     notices: Array.isArray(p.notices) ? p.notices : [],
     logs: Array.isArray(p.logs) ? p.logs : base.logs,
     done: Array.isArray(p.done) ? p.done : [],
+    notificationSettings: {
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      ...(p.notificationSettings || {}),
+    },
     version: STATE_VERSION,
   };
 }
