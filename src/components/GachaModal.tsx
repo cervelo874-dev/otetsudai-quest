@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Child } from '../types';
 import { canFreeGacha, spinGacha, exchangeStarShards, type GachaPrize } from '../actions';
 import { GACHA_COST } from '../logic';
-import { AVATAR_OPTIONS, type AvatarOption } from '../avatar';
+import { AVATAR_OPTIONS, type AvatarOption, findOption } from '../avatar';
 import { sound } from '../sound';
 import { burst } from '../effects';
 import { toast } from './ui';
 import { GachaMachineVisual } from './GachaMachineVisual';
-import { Sparkles, Coins, RefreshCw, Star, Check, ArrowRight, X } from 'lucide-react';
+import { GameAvatar2D } from './Avatar';
+import { Sparkles, Coins, RefreshCw, Star, Check } from 'lucide-react';
 
 export function GachaModal({
   child,
@@ -39,7 +40,7 @@ export function GachaModal({
     setPhase('spinning');
     sound.gachaSpin();
 
-    // ハンドル回転演出（約1.6秒）
+    // ハンドル回転演出（約1.5秒）
     window.setTimeout(() => {
       const outcome = spinGacha(child.id);
       if (outcome.ok) {
@@ -55,7 +56,7 @@ export function GachaModal({
         sound.error();
         setPhase('idle');
       }
-    }, 1600);
+    }, 1500);
   };
 
   // カプセルをタップして開封するハンドラー
@@ -371,7 +372,7 @@ export function GachaModal({
           {/* --- D: 開封演出中 (opening) --- */}
           {phase === 'opening' && prize && (
             <div className="relative flex flex-col items-center justify-center py-10 w-full">
-              {/* 開いて飛んでいくカプセル */}
+              {/* 開いて上下に割れるカプセルSVG */}
               <div className="relative w-44 h-44 flex items-center justify-center">
                 {/* 激しい光 */}
                 <div className="absolute inset-0 rounded-full bg-yellow-300 blur-2xl animate-ping opacity-80" />
@@ -379,13 +380,34 @@ export function GachaModal({
                 <div className="absolute text-5xl -top-4 -left-4 animate-bounce">✨</div>
                 <div className="absolute text-5xl -bottom-4 -right-4 animate-bounce">🎉</div>
 
-                {/* 割れた上フタが上へ */}
-                <div className="absolute -top-12 transition-all transform -translate-y-8 rotate-12 duration-500 opacity-80">
-                  <span className="text-5xl">🌕</span>
+                {/* 割れた上フタ（上に跳ね上がる） */}
+                <div className="absolute -top-10 transition-transform transform -translate-y-8 rotate-12 duration-500 opacity-90 drop-shadow-lg">
+                  <svg viewBox="0 0 100 55" className="w-28 h-16">
+                    <path
+                      d="M 5,50 A 45,45 0 0,1 95,50 Z"
+                      fill={
+                        prize.rarity === 3
+                          ? '#eab308'
+                          : prize.rarity === 2
+                          ? '#a855f7'
+                          : '#ef4444'
+                      }
+                      stroke="#475569"
+                      strokeWidth="2.5"
+                    />
+                  </svg>
                 </div>
-                {/* 割れた下フタが下へ */}
-                <div className="absolute -bottom-12 transition-all transform translate-y-8 -rotate-12 duration-500 opacity-80">
-                  <span className="text-5xl">⚪</span>
+
+                {/* 割れた下フタ（下に沈む） */}
+                <div className="absolute -bottom-10 transition-transform transform translate-y-8 -rotate-12 duration-500 opacity-90 drop-shadow-lg">
+                  <svg viewBox="0 0 100 55" className="w-28 h-16">
+                    <path
+                      d="M 5,5 A 45,45 0 0,0 95,5 Z"
+                      fill="#ffffff"
+                      stroke="#475569"
+                      strokeWidth="2.5"
+                    />
+                  </svg>
                 </div>
               </div>
 
@@ -417,7 +439,25 @@ export function GachaModal({
                   rarityInfo[prize.rarity]?.borderCls ?? 'border-amber-200 bg-amber-50'
                 }`}
               >
-                <span className="text-6xl mb-2 drop-shadow-md">{prize.icon}</span>
+                {/* 実際のアバターパーツイラスト、またはアイコン */}
+                {prize.kind === 'avatar' && prize.avatarItemId ? (
+                  <div className="flex items-center justify-center w-24 h-24 overflow-hidden rounded-2xl bg-white/95 border-2 border-amber-300 shadow-md mb-2">
+                    <GameAvatar2D
+                      avatar={{
+                        ...child.avatar,
+                        [findOption(prize.avatarItemId)?.slot ?? 'outfit']: prize.avatarItemId,
+                      }}
+                      previewMode={findOption(prize.avatarItemId)?.slot}
+                      size={96}
+                      interactive={false}
+                      rounded="rounded-none"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <span className="text-6xl mb-2 drop-shadow-md">{prize.icon}</span>
+                )}
+
                 <span className="text-xl font-black text-slate-800">{prize.label}</span>
 
                 {/* ほしのかけら当選の場合 */}
@@ -539,7 +579,7 @@ export function GachaModal({
             ))}
           </div>
 
-          {/* アイテム一覧 */}
+          {/* アイテム一覧：実際のSVGイラストプレビューを表示 */}
           <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
             {filteredItems.map((item) => {
               const isOwned = child.ownedItems.includes(item.id);
@@ -557,13 +597,27 @@ export function GachaModal({
                       : 'bg-white border-slate-100'
                   }`}
                 >
-                  <div className="flex items-start gap-2 mb-2">
-                    <span className="text-3xl shrink-0 drop-shadow-sm">{item.icon}</span>
+                  <div className="flex items-start gap-2.5 mb-2">
+                    {/* スタンプ（絵文字）ではなく実際のアバターパーツイラストを描画 */}
+                    <div className="flex items-center justify-center w-14 h-14 shrink-0 overflow-hidden rounded-xl bg-slate-50 border border-slate-200/80 shadow-inner">
+                      <GameAvatar2D
+                        avatar={{
+                          ...child.avatar,
+                          [item.slot]: item.id,
+                        }}
+                        previewMode={item.slot}
+                        size={56}
+                        interactive={false}
+                        rounded="rounded-none"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-black text-slate-800 truncate leading-tight">
                         {item.name}
                       </div>
-                      <div className="flex items-center gap-1 mt-0.5">
+                      <div className="flex items-center gap-1 mt-1">
                         <span
                           className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
                             item.rarity === 3
