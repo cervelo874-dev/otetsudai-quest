@@ -184,53 +184,58 @@ export function getTwemojiUrl(code: string): string {
 
 export interface AvatarAssetItem {
   id: string;
-  twemojiCode?: string;
+  twemojiCode: string;
   subEffectCode?: string;
+  x?: number;
+  y?: number;
+  size?: number;
+  rotate?: number;
+  glowColor?: string;
 }
 
 export const ITEM_ASSET_INFO: Record<string, AvatarAssetItem> = {
-  // あたま (accessory)
-  ribbon: { id: 'ribbon', twemojiCode: '1f380' },
-  crown: { id: 'crown', twemojiCode: '1f451' },
-  wizard: { id: 'wizard' }, // 高品質専用ベクター帽子
-  sunglasses: { id: 'sunglasses' }, // 瞳ジャストフィットベクターサングラス
-  star_pin: { id: 'star_pin', twemojiCode: '1f31f' },
-  knight_helmet: { id: 'knight_helmet' },
-  tiara: { id: 'tiara' },
-  dino_hood: { id: 'dino_hood' },
-  ninja_band: { id: 'ninja_band' },
-  cat_headphone: { id: 'cat_headphone' },
-  angel_ring: { id: 'angel_ring', twemojiCode: '1f47c' },
+  // ---------------- あたま (accessory) ----------------
+  ribbon:        { id: 'ribbon',        twemojiCode: '1f380', x: 80, y: 26, size: 40 },
+  crown:         { id: 'crown',         twemojiCode: '1f451', x: 80, y: 20, size: 40, glowColor: '#FDE047' },
+  wizard:        { id: 'wizard',        twemojiCode: '1f9d9', subEffectCode: '2728', x: 78, y: 18, size: 44 },
+  sunglasses:    { id: 'sunglasses',    twemojiCode: '1f576', x: 72, y: 66, size: 56 },
+  star_pin:      { id: 'star_pin',      twemojiCode: '1f31f', x: 112, y: 48, size: 28, glowColor: '#FEF08A' },
+  knight_helmet: { id: 'knight_helmet', twemojiCode: '1fa96', x: 76, y: 18, size: 48 },
+  tiara:         { id: 'tiara',         twemojiCode: '1f451', subEffectCode: '1f48e', x: 82, y: 22, size: 36, glowColor: '#F472B6' },
+  dino_hood:     { id: 'dino_hood',     twemojiCode: '1f996', x: 78, y: 18, size: 44 },
+  ninja_band:    { id: 'ninja_band',    twemojiCode: '1f977', subEffectCode: '1f4a8', x: 80, y: 22, size: 40 },
+  cat_headphone: { id: 'cat_headphone', twemojiCode: '1f3a7', subEffectCode: '1f3b5', x: 76, y: 22, size: 48 },
+  angel_ring:    { id: 'angel_ring',    twemojiCode: '1faba', subEffectCode: '1f31f', x: 78, y: 12, size: 44, glowColor: '#FEF08A' },
 
-  // もちもの (weapon)
-  brave_sword: { id: 'brave_sword' },
-  magic_wand: { id: 'magic_wand' },
-  giant_candy: { id: 'giant_candy' },
-  laser_blade: { id: 'laser_blade' },
-  flame_sword: { id: 'flame_sword', subEffectCode: '1f525' },
+  // ---------------- もちもの・ぶき (weapon) ----------------
+  brave_sword:   { id: 'brave_sword',   twemojiCode: '1f5e1', x: 132, y: 118, size: 48, rotate: -15 },
+  magic_wand:    { id: 'magic_wand',    twemojiCode: '1fa84', subEffectCode: '1f496', x: 132, y: 116, size: 48, rotate: -10, glowColor: '#F472B6' },
+  giant_candy:   { id: 'giant_candy',   twemojiCode: '1f36d', subEffectCode: '2728',  x: 132, y: 116, size: 48, rotate: -10 },
+  laser_blade:   { id: 'laser_blade',   twemojiCode: '2694',  subEffectCode: '26a1',  x: 132, y: 116, size: 48, glowColor: '#38BDF8' },
+  flame_sword:   { id: 'flame_sword',   twemojiCode: '1f5e1', subEffectCode: '1f525', x: 132, y: 114, size: 52, rotate: -15, glowColor: '#F97316' },
 
-  // ペット (pet: すべて全身RPGマスコット)
-  shiba: { id: 'shiba' },
-  dragon: { id: 'dragon' },
-  mini_dragon: { id: 'mini_dragon', subEffectCode: '2728' },
-  penguin: { id: 'penguin' },
-  unicorn: { id: 'unicorn' },
-  flying_unicorn: { id: 'flying_unicorn', subEffectCode: '1faba' },
-  slime: { id: 'slime' },
-  anglerfish: { id: 'anglerfish' },
+  // ---------------- ペット (pet) ----------------
+  shiba:          { id: 'shiba',          twemojiCode: '1f415', subEffectCode: '1f43e', x: 10, y: 142, size: 48 },
+  dragon:         { id: 'dragon',         twemojiCode: '1f409', subEffectCode: '1f4a8', x: 8,  y: 140, size: 50 },
+  penguin:        { id: 'penguin',        twemojiCode: '1f427', subEffectCode: '2744',  x: 12, y: 142, size: 46 },
+  unicorn:        { id: 'unicorn',        twemojiCode: '1f984', subEffectCode: '2728',  x: 10, y: 140, size: 48, glowColor: '#F472B6' },
+  slime:          { id: 'slime',          twemojiCode: '1f4a7', subEffectCode: '2728',  x: 14, y: 144, size: 44, glowColor: '#38BDF8' },
+  anglerfish:     { id: 'anglerfish',     twemojiCode: '1f420', subEffectCode: '1f4a1', x: 10, y: 142, size: 46, glowColor: '#FDE047' },
+  mini_dragon:    { id: 'mini_dragon',    twemojiCode: '1f432', subEffectCode: '1f525', x: 8,  y: 138, size: 52, glowColor: '#FBBF24' },
+  flying_unicorn: { id: 'flying_unicorn', twemojiCode: '1f984', subEffectCode: '1f308', x: 8,  y: 136, size: 52, glowColor: '#38BDF8' },
 
-  // はいけい (bg)
-  sky: { id: 'sky', twemojiCode: '2601' },
-  meadow: { id: 'meadow', twemojiCode: '1f338' },
-  sunset: { id: 'sunset', twemojiCode: '1f3f0' },
-  kirakira: { id: 'kirakira', twemojiCode: '1f31f' },
-  space: { id: 'space', twemojiCode: '1fa90' },
-  rainbow: { id: 'rainbow', twemojiCode: '1f308' },
-  candy_land: { id: 'candy_land', twemojiCode: '1f369' },
-  ocean_temple: { id: 'ocean_temple', twemojiCode: '1f41a' },
-  space_station: { id: 'space_station', twemojiCode: '1f680' },
-  crystal_castle: { id: 'crystal_castle', twemojiCode: '1f3f0' },
-  rainbow_stage: { id: 'rainbow_stage', twemojiCode: '1f308' },
+  // ---------------- はいけい (bg) ----------------
+  sky:            { id: 'sky',            twemojiCode: '2601' },
+  meadow:         { id: 'meadow',         twemojiCode: '1f338' },
+  sunset:         { id: 'sunset',         twemojiCode: '1f3f0' },
+  kirakira:       { id: 'kirakira',       twemojiCode: '1f31f' },
+  space:          { id: 'space',          twemojiCode: '1fa90' },
+  rainbow:        { id: 'rainbow',        twemojiCode: '1f308' },
+  candy_land:     { id: 'candy_land',     twemojiCode: '1f369' },
+  ocean_temple:   { id: 'ocean_temple',   twemojiCode: '1f41a' },
+  space_station:  { id: 'space_station',  twemojiCode: '1f680' },
+  crystal_castle: { id: 'crystal_castle', twemojiCode: '1f48e' },
+  rainbow_stage:  { id: 'rainbow_stage',  twemojiCode: '1f308' },
 };
 
 export function findAsset(id: string | null | undefined): AvatarAssetItem | undefined {
@@ -1051,372 +1056,81 @@ function renderFrontHair(style: string, hc: string, hasAccessory: boolean = fals
 }
 
 /* ---------------- 10. 頭装備 (accessory) ---------------- */
-function renderAccessory(accessory: string): string {
-  if (!accessory || accessory === 'acc_none') return '';
-
-  // 1. まほうつかいのぼうし（頭の形にすっぽり被る星付きの三角帽子！人物絵文字は完全排除）
-  if (accessory === 'wizard') {
-    return (
-      `<g id="layer-accessory" class="animate-head-float">` +
-      `<ellipse cx="100" cy="54" rx="46" ry="12" fill="#3B0764" stroke="#4A2E25" stroke-width="2.2" />` +
-      `<ellipse cx="100" cy="53" rx="43" ry="10" fill="#581C87" />` +
-      `<path d="M 68 52 C 72 26 84 10 94 4 C 102 4 116 22 132 52 Z" fill="#6B21A8" stroke="#4A2E25" stroke-width="2.5" stroke-linejoin="round" />` +
-      `<path d="M 72 47 Q 100 52 128 47 L 129 52 Q 100 57 71 52 Z" fill="#FBBF24" stroke="#4A2E25" stroke-width="1.8" />` +
-      `<path d="${starPath(100, 49, 6)}" fill="#FEF08A" stroke="#F59E0B" stroke-width="1.2" />` +
-      `<path d="${starPath(78, 28, 3.5)}" fill="#FDE047" class="animate-pulse" />` +
-      `<path d="${starPath(118, 32, 3)}" fill="#FDE047" class="animate-pulse" />` +
-      `</g>`
-    );
-  }
-
-  // 2. クールサングラス（瞳の位置 cy=106 にミリ単位でジャストフィット）
-  if (accessory === 'sunglasses') {
+function renderAccessory(acc?: string): string {
+  if (!acc || acc === 'acc_none') return '';
+  if (acc === 'sunglasses') {
     return (
       `<g id="layer-accessory">` +
-      `<rect x="94" y="103" width="12" height="3.5" rx="1" fill="#18181B" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<path d="M 64 98 L 94 98 C 94 114 84 118 68 114 Z" fill="#18181B" stroke="#4A2E25" stroke-width="2.5" stroke-linejoin="round" />` +
-      `<line x1="68" y1="102" x2="84" y2="102" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity="0.8" />` +
-      `<path d="M 106 98 L 136 98 C 132 114 116 118 106 114 Z" fill="#18181B" stroke="#4A2E25" stroke-width="2.5" stroke-linejoin="round" />` +
-      `<line x1="116" y1="102" x2="132" y2="102" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity="0.8" />` +
+      `<path d="M 70 86 H 130 V 90 H 70 Z" fill="#0F172A" stroke="#4A2E25" stroke-width="1.8" />` +
+      `<path d="M 72 88 H 94 C 95 99, 90 105, 83 105 C 76 105, 71 99, 72 88 Z" fill="#18181B" stroke="#4A2E25" stroke-width="2" />` +
+      `<line x1="75" y1="91" x2="83" y2="101" stroke="#FFFFFF" stroke-width="2" opacity="0.65" stroke-linecap="round" />` +
+      `<path d="M 106 88 H 128 C 129 99, 124 105, 117 105 C 110 105, 105 99, 106 88 Z" fill="#18181B" stroke="#4A2E25" stroke-width="2" />` +
+      `<line x1="109" y1="91" x2="117" y2="101" stroke="#FFFFFF" stroke-width="2" opacity="0.65" stroke-linecap="round" />` +
       `</g>`
     );
   }
-
-  // 3. ゴールドクラウン（頭頂部に誇り高く乗る黄金王冠）
-  if (accessory === 'crown') {
+  if (acc === 'angel_ring') {
     return (
       `<g id="layer-accessory" class="animate-head-float">` +
-      `<image href="${getTwemojiUrl('1f451')}" x="76" y="14" width="48" height="42" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.2))" />` +
+      `<ellipse cx="100" cy="34" rx="26" ry="7" fill="none" stroke="#FEF08A" stroke-width="7" opacity="0.45" class="animate-pulse" />` +
+      `<ellipse cx="100" cy="34" rx="24" ry="5.5" fill="none" stroke="#FBBF24" stroke-width="3.5" />` +
+      `<image href="${getTwemojiUrl('1f31f')}" x="122" y="18" width="18" height="18" class="animate-pulse" />` +
       `</g>`
     );
   }
-
-  // 4. プリンセスティアラ（前髪の生え際にフィット）
-  if (accessory === 'tiara') {
+  const asset = findAsset(acc);
+  if (asset?.twemojiCode) {
+    const size = asset.size ?? 42;
+    const x = asset.x ?? (100 - size / 2);
+    const y = asset.y ?? 22;
+    const cx = x + size / 2;
+    const cy = y + size / 2;
     return (
       `<g id="layer-accessory" class="animate-head-float">` +
-      `<path d="M 80 46 C 88 32 94 26 100 24 C 106 26 112 32 120 46 Z" fill="#F1F5F9" stroke="#94A3B8" stroke-width="2" />` +
-      `<path d="M 90 46 L 100 30 L 110 46" fill="none" stroke="#F472B6" stroke-width="2" />` +
-      `<circle cx="100" cy="27" r="3.5" fill="#38BDF8" stroke="#FFF" stroke-width="1" />` +
-      `<circle cx="92" cy="38" r="2.5" fill="#F472B6" />` +
-      `<circle cx="108" cy="38" r="2.5" fill="#F472B6" />` +
+      (asset.glowColor ? `<circle cx="${cx}" cy="${cy}" r="${size / 2 + 3}" fill="${asset.glowColor}" opacity="0.28" class="animate-pulse" />` : '') +
+      `<image href="${getTwemojiUrl(asset.twemojiCode)}" x="${x}" y="${y}" width="${size}" height="${size}" />` +
+      (asset.subEffectCode ? `<image href="${getTwemojiUrl(asset.subEffectCode)}" x="${x + size - 10}" y="${y - 4}" width="18" height="18" class="animate-pulse" />` : '') +
       `</g>`
     );
   }
-
-  // 5. ピンクビッグリボン（頭頂部中央に配置）
-  if (accessory === 'ribbon') {
-    return (
-      `<g id="layer-accessory" class="animate-head-float">` +
-      `<image href="${getTwemojiUrl('1f380')}" x="74" y="14" width="52" height="44" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.18))" />` +
-      `</g>`
-    );
-  }
-
-  // 6. キラキラスターピン（前髪左側に留まる）
-  if (accessory === 'star_pin') {
-    return (
-      `<g id="layer-accessory">` +
-      `<image href="${getTwemojiUrl('1f31f')}" x="60" y="64" width="28" height="28" filter="drop-shadow(0 2px 3px rgba(0,0,0,0.2))" />` +
-      `</g>`
-    );
-  }
-
-  // 7. はねかざりナイトカブト
-  if (accessory === 'knight_helmet') {
-    return (
-      `<g id="layer-accessory" class="animate-head-float">` +
-      `<path d="M 58 64 Q 100 48 142 64 L 138 78 Q 100 66 62 78 Z" fill="#94A3B8" stroke="#4A2E25" stroke-width="2.5" />` +
-      `<rect x="74" y="66" width="52" height="5" rx="1.5" fill="#1E293B" />` +
-      `<path d="M 100 52 C 100 24 120 16 128 8 C 122 28 112 40 100 52 Z" fill="#EF4444" stroke="#B91C1C" stroke-width="2" />` +
-      `</g>`
-    );
-  }
-
-  // 8. きょうりゅうフード
-  if (accessory === 'dino_hood') {
-    return (
-      `<g id="layer-accessory" class="animate-head-float">` +
-      `<path d="M 54 75 C 54 34 146 34 146 75 Z" fill="#22C55E" stroke="#4A2E25" stroke-width="2.5" />` +
-      `<polygon points="96,34 100,22 104,34" fill="#F97316" stroke="#4A2E25" stroke-width="2" />` +
-      `<polygon points="82,40 85,30 90,41" fill="#F97316" stroke="#4A2E25" stroke-width="2" />` +
-      `<polygon points="110,41 115,30 118,40" fill="#F97316" stroke="#4A2E25" stroke-width="2" />` +
-      `<circle cx="72" cy="50" r="5.5" fill="#FFF" stroke="#4A2E25" stroke-width="2" /><circle cx="73" cy="50" r="2.8" fill="#000" />` +
-      `<circle cx="128" cy="50" r="5.5" fill="#FFF" stroke="#4A2E25" stroke-width="2" /><circle cx="127" cy="50" r="2.8" fill="#000" />` +
-      `</g>`
-    );
-  }
-
-  // 9. ネコみみヘッドホン
-  if (accessory === 'cat_headphone') {
-    return (
-      `<g id="layer-accessory" class="animate-head-float">` +
-      `<path d="M 52 95 C 48 38 152 38 148 95" fill="none" stroke="#F43F5E" stroke-width="5" stroke-linecap="round" />` +
-      `<polygon points="62,54 70,28 88,48" fill="#FDA4AF" stroke="#4A2E25" stroke-width="2.5" />` +
-      `<polygon points="68,50 72,34 82,46" fill="#FFF" />` +
-      `<polygon points="138,54 130,28 112,48" fill="#FDA4AF" stroke="#4A2E25" stroke-width="2.5" />` +
-      `<polygon points="132,50 128,34 118,46" fill="#FFF" />` +
-      `<circle cx="50" cy="100" r="10" fill="#FB7185" stroke="#4A2E25" stroke-width="2.5" />` +
-      `<circle cx="150" cy="100" r="10" fill="#FB7185" stroke="#4A2E25" stroke-width="2.5" />` +
-      `</g>`
-    );
-  }
-
-  // 10. ★3 ひかるてんしのリング
-  if (accessory === 'angel_ring') {
-    return (
-      `<g id="layer-accessory" class="animate-head-float">` +
-      `<ellipse cx="100" cy="18" rx="26" ry="7" fill="none" stroke="#FDE047" stroke-width="4.5" opacity="0.95" />` +
-      `<ellipse cx="100" cy="18" rx="26" ry="7" fill="none" stroke="#FFFFFF" stroke-width="1.8" />` +
-      `<image href="${getTwemojiUrl('1faba')}" x="64" y="6" width="24" height="24" />` +
-      `<image href="${getTwemojiUrl('1faba')}" x="112" y="6" width="24" height="24" transform="scale(-1, 1) translate(-248, 0)" />` +
-      `</g>`
-    );
-  }
-
-  // 11. にんじゃのハチマキ
-  if (accessory === 'ninja_band') {
-    return (
-      `<g id="layer-accessory">` +
-      `<path d="M 144 82 C 160 80, 172 88, 182 86 C 175 92, 162 90, 146 88 Z" fill="#1E293B" stroke="#4A2E25" stroke-width="2" />` +
-      `<path d="M 144 86 C 162 90, 168 102, 178 106 C 170 104, 158 96, 145 90 Z" fill="#1E293B" stroke="#4A2E25" stroke-width="2" />` +
-      `<path d="M 53 82 Q 100 77 147 82 L 146 93 Q 100 88 54 93 Z" fill="#1E293B" stroke="#4A2E25" stroke-width="2.5" />` +
-      `<rect x="87" y="78" width="26" height="12" rx="2" fill="#E2E8F0" stroke="#4A2E25" stroke-width="1.8" />` +
-      `<circle cx="91" cy="84" r="1" fill="#475569" /><circle cx="109" cy="84" r="1" fill="#475569" />` +
-      `<polygon points="100,80 102.5,84 100,88 97.5,84" fill="#334155" />` +
-      `</g>`
-    );
-  }
-
   return '';
 }
 
-/* ---------------- 11. 持ち物・武器 (weapon) ---------------- */
 function renderWeapon(weapon?: string): string {
   if (!weapon || weapon === 'wp_none') return '';
-
-  // 1. ゆうしゃのブレイブソード（手元 135,154 から斜め上に構える）
-  if (weapon === 'brave_sword') {
-    return (
-      `<g id="layer-weapon" class="animate-weapon-float">` +
-      `<line x1="130" y1="162" x2="166" y2="108" stroke="#CBD5E1" stroke-width="5.5" stroke-linecap="round" />` +
-      `<line x1="130" y1="162" x2="166" y2="108" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" />` +
-      `<rect x="131" y="152" width="16" height="5" rx="1.5" fill="#FBBF24" stroke="#4A2E25" stroke-width="1.5" transform="rotate(-35 139 154)" />` +
-      `<circle cx="127" cy="169" r="3" fill="#FBBF24" stroke="#4A2E25" stroke-width="1.2" />` +
-      `<circle cx="139" cy="154" r="2.2" fill="#38BDF8" />` +
-      `</g>`
-    );
-  }
-
-  // 2. スターマジックステッキ
-  if (weapon === 'magic_wand') {
-    return (
-      `<g id="layer-weapon" class="animate-weapon-float">` +
-      `<line x1="128" y1="172" x2="156" y2="118" stroke="#FBBF24" stroke-width="3.5" stroke-linecap="round" />` +
-      `<path d="${starPath(156, 116, 10)}" fill="#FDE047" stroke="#F59E0B" stroke-width="2" />` +
-      `<circle cx="156" cy="116" r="3" fill="#FFF" />` +
-      `<image href="${getTwemojiUrl('2728')}" x="156" y="104" width="16" height="16" class="animate-pulse" />` +
-      `</g>`
-    );
-  }
-
-  // 3. きょだいペロペロキャンディ
-  if (weapon === 'giant_candy') {
-    return (
-      `<g id="layer-weapon" class="animate-weapon-float">` +
-      `<line x1="128" y1="170" x2="150" y2="126" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" />` +
-      `<circle cx="154" cy="118" r="16" fill="#F43F5E" stroke="#4A2E25" stroke-width="2.5" />` +
-      `<circle cx="154" cy="118" r="11" fill="#FFFFFF" />` +
-      `<circle cx="154" cy="118" r="6" fill="#38BDF8" />` +
-      `</g>`
-    );
-  }
-
-  // 4. サイバーレーザーブレード
-  if (weapon === 'laser_blade') {
-    return (
-      `<g id="layer-weapon" class="animate-weapon-float">` +
-      `<line x1="132" y1="162" x2="164" y2="108" stroke="#4ADE80" stroke-width="6" stroke-linecap="round" />` +
-      `<line x1="132" y1="162" x2="164" y2="108" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" />` +
-      `<rect x="126" y="156" width="10" height="18" rx="2" fill="#334155" stroke="#4A2E25" stroke-width="1.5" transform="rotate(-35 131 165)" />` +
-      `</g>`
-    );
-  }
-
-  // 5. ★3 ほのおのレジェンドブレード
-  if (weapon === 'flame_sword') {
-    return (
-      `<g id="layer-weapon" class="animate-weapon-float">` +
-      `<path d="M 132 160 L 160 106 C 172 116 152 134 165 138 C 152 146 144 164 137 165 Z" fill="#EF4444" stroke="#B91C1C" stroke-width="2" />` +
-      `<path d="M 135 158 L 156 114 C 162 122 150 132 158 136 C 148 143 142 156 139 156 Z" fill="#F59E0B" />` +
-      `<path d="M 137 156 L 152 122 L 144 150 Z" fill="#FEF08A" />` +
-      `<rect x="127" y="158" width="16" height="5" rx="1.5" fill="#FBBF24" stroke="#4A2E25" stroke-width="1.5" transform="rotate(-35 135 160)" />` +
-      `<circle cx="126" cy="174" r="3" fill="#DC2626" />` +
-      `<image href="${getTwemojiUrl('1f525')}" x="156" y="100" width="20" height="20" class="animate-pulse" />` +
-      `</g>`
-    );
-  }
-
-  return '';
+  const asset = findAsset(weapon);
+  if (!asset?.twemojiCode) return '';
+  const x = asset.x ?? 132;
+  const y = asset.y ?? 116;
+  const size = asset.size ?? 48;
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  const rot = asset.rotate ? `transform="rotate(${asset.rotate} ${cx} ${cy})"` : '';
+  return (
+    `<g id="layer-weapon" class="animate-weapon-float">` +
+    (asset.glowColor ? `<circle cx="${cx}" cy="${cy}" r="${size / 2 + 4}" fill="${asset.glowColor}" opacity="0.3" class="animate-pulse" />` : '') +
+    `<image href="${getTwemojiUrl(asset.twemojiCode)}" x="${x}" y="${y}" width="${size}" height="${size}" ${rot} />` +
+    (asset.subEffectCode ? `<image href="${getTwemojiUrl(asset.subEffectCode)}" x="${x + size - 16}" y="${y - 8}" width="22" height="22" class="animate-pulse" />` : '') +
+    `</g>`
+  );
 }
 
-/* ---------------- 12. 相棒ペット (pet: 全身RPGマスコット) ---------------- */
-function renderPet(pet: string): string {
+function renderPet(pet?: string): string {
   if (!pet || pet === 'pet_none') return '';
-
-  // 1. ミニユニコーン（生首ではなく、全身の可愛いちびユニコーン！）
-  if (pet === 'unicorn') {
-    return (
-      `<g id="layer-pet" class="animate-pet-bounce">` +
-      `<ellipse cx="34" cy="188" rx="18" ry="4.5" fill="#000" opacity="0.18" />` +
-      `<path d="M 20 174 C 12 170 14 184 22 182" fill="none" stroke="#F472B6" stroke-width="3" stroke-linecap="round" />` +
-      `<rect x="22" y="178" width="4" height="8" rx="1.5" fill="#FFFFFF" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<rect x="22" y="184" width="4" height="2" fill="#F472B6" />` +
-      `<rect x="36" y="178" width="4" height="8" rx="1.5" fill="#FFFFFF" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<rect x="36" y="184" width="4" height="2" fill="#F472B6" />` +
-      `<ellipse cx="30" cy="174" rx="12" ry="9" fill="#FFFFFF" stroke="#4A2E25" stroke-width="2" />` +
-      `<path d="M 34 172 L 40 160 C 44 154 50 158 48 165 L 42 174 Z" fill="#FFFFFF" stroke="#4A2E25" stroke-width="2" stroke-linejoin="round" />` +
-      `<circle cx="43" cy="162" r="6" fill="#FFFFFF" stroke="#4A2E25" stroke-width="2" />` +
-      `<polygon points="44,158 48,148 42,156" fill="#FBBF24" stroke="#D97706" stroke-width="1.2" />` +
-      `<path d="M 38 156 Q 34 162 36 168 Q 32 168 34 174" fill="none" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round" />` +
-      `<circle cx="45" cy="162" r="1.3" fill="#1E293B" />` +
-      `<path d="${starPath(48, 150, 3)}" fill="#FDE047" class="animate-pulse" />` +
-      `</g>`
-    );
-  }
-
-  // 2. ★3 はばたくペガサス（聖なる翼＋光のオーラ付きミニユニコーン）
-  if (pet === 'flying_unicorn') {
-    return (
-      `<g id="layer-pet" class="animate-pet-bounce">` +
-      `<ellipse cx="34" cy="188" rx="18" ry="4.5" fill="#000" opacity="0.18" />` +
-      `<path d="M 20 174 C 12 170 14 184 22 182" fill="none" stroke="#F472B6" stroke-width="3" stroke-linecap="round" />` +
-      `<rect x="22" y="178" width="4" height="8" rx="1.5" fill="#FFFFFF" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<rect x="22" y="184" width="4" height="2" fill="#F472B6" />` +
-      `<rect x="36" y="178" width="4" height="8" rx="1.5" fill="#FFFFFF" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<rect x="36" y="184" width="4" height="2" fill="#F472B6" />` +
-      `<ellipse cx="30" cy="174" rx="12" ry="9" fill="#FFFFFF" stroke="#4A2E25" stroke-width="2" />` +
-      `<path d="M 30 168 C 24 156 36 154 36 164 Z" fill="#BAE6FD" stroke="#38BDF8" stroke-width="1.5" />` +
-      `<path d="M 34 172 L 40 160 C 44 154 50 158 48 165 L 42 174 Z" fill="#FFFFFF" stroke="#4A2E25" stroke-width="2" stroke-linejoin="round" />` +
-      `<circle cx="43" cy="162" r="6" fill="#FFFFFF" stroke="#4A2E25" stroke-width="2" />` +
-      `<polygon points="44,158 48,148 42,156" fill="#FDE047" stroke="#D97706" stroke-width="1.2" />` +
-      `<path d="M 38 156 Q 34 162 36 168 Q 32 168 34 174" fill="none" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round" />` +
-      `<circle cx="45" cy="162" r="1.3" fill="#1E293B" />` +
-      `<image href="${getTwemojiUrl('2728')}" x="42" y="146" width="16" height="16" class="animate-pulse" />` +
-      `</g>`
-    );
-  }
-
-  // 3. ころころしばいぬ（全身丸っこい愛犬）
-  if (pet === 'shiba') {
-    return (
-      `<g id="layer-pet" class="animate-pet-bounce">` +
-      `<ellipse cx="34" cy="188" rx="18" ry="4.5" fill="#000" opacity="0.18" />` +
-      `<path d="M 19 170 C 14 164 18 158 24 164" fill="none" stroke="#D97706" stroke-width="3" stroke-linecap="round" />` +
-      `<rect x="22" y="178" width="4" height="8" rx="1.5" fill="#D97706" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<rect x="36" y="178" width="4" height="8" rx="1.5" fill="#D97706" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<ellipse cx="30" cy="174" rx="12" ry="9" fill="#D97706" stroke="#4A2E25" stroke-width="2" />` +
-      `<ellipse cx="32" cy="176" rx="8" ry="6" fill="#FEF3C7" />` +
-      `<path d="M 35 168 L 44 168 L 41 174 Z" fill="#DC2626" />` +
-      `<circle cx="41" cy="163" r="7.5" fill="#D97706" stroke="#4A2E25" stroke-width="2" />` +
-      `<ellipse cx="43" cy="165" rx="5" ry="4" fill="#FEF3C7" />` +
-      `<polygon points="37,157 41,152 42,158" fill="#D97706" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<polygon points="44,157 47,153 48,158" fill="#D97706" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<circle cx="40" cy="160" r="1" fill="#FEF3C7" /><circle cx="45" cy="160" r="1" fill="#FEF3C7" />` +
-      `<circle cx="41" cy="163" r="1.3" fill="#1E293B" /><circle cx="45" cy="163" r="1.3" fill="#1E293B" />` +
-      `<circle cx="44" cy="166" r="1" fill="#1E293B" />` +
-      `</g>`
-    );
-  }
-
-  // 4. マフラーペンギン（全身丸っこいペンギン）
-  if (pet === 'penguin') {
-    return (
-      `<g id="layer-pet" class="animate-pet-bounce">` +
-      `<ellipse cx="34" cy="188" rx="16" ry="4.5" fill="#000" opacity="0.18" />` +
-      `<ellipse cx="29" cy="187" rx="3.5" ry="1.8" fill="#F59E0B" stroke="#4A2E25" stroke-width="1.2" />` +
-      `<ellipse cx="39" cy="187" rx="3.5" ry="1.8" fill="#F59E0B" stroke="#4A2E25" stroke-width="1.2" />` +
-      `<ellipse cx="34" cy="173" rx="11" ry="13" fill="#18181B" stroke="#4A2E25" stroke-width="2" />` +
-      `<ellipse cx="35" cy="174" rx="7.5" ry="9.5" fill="#FFFFFF" />` +
-      `<path d="M 25 165 Q 35 168 45 165 L 45 168 Q 35 171 25 168 Z" fill="#EF4444" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<polygon points="41,167 44,178 39,178" fill="#DC2626" stroke="#4A2E25" stroke-width="1.2" />` +
-      `<circle cx="34" cy="160" r="8" fill="#18181B" stroke="#4A2E25" stroke-width="2" />` +
-      `<circle cx="31" cy="159" r="1.4" fill="#FFF" /><circle cx="37" cy="159" r="1.4" fill="#FFF" />` +
-      `<polygon points="34,161 31,164 37,164" fill="#F59E0B" stroke="#4A2E25" stroke-width="1.2" />` +
-      `</g>`
-    );
-  }
-
-  // 5. ぷるぷるスライム
-  if (pet === 'slime') {
-    return (
-      `<g id="layer-pet" class="animate-pet-bounce">` +
-      `<ellipse cx="34" cy="188" rx="16" ry="4" fill="#000" opacity="0.16" />` +
-      `<path d="M 34 154 C 18 154 14 172 17 182 C 20 188 48 188 51 182 C 54 172 50 154 34 154 Z" fill="#38BDF8" stroke="#0284C7" stroke-width="2.5" />` +
-      `<ellipse cx="27" cy="172" rx="2.5" ry="3.5" fill="#0F172A" /><ellipse cx="41" cy="172" rx="2.5" ry="3.5" fill="#0F172A" />` +
-      `<circle cx="26" cy="170" r="1.2" fill="#FFF" /><circle cx="40" cy="170" r="1.2" fill="#FFF" />` +
-      `<ellipse cx="27" cy="162" rx="4" ry="2" fill="#FFF" opacity="0.75" transform="rotate(-20 27 162)" />` +
-      `<path d="${starPath(44, 156, 3)}" fill="#FEF08A" class="animate-pulse" />` +
-      `</g>`
-    );
-  }
-
-  // 6. ピカピカアンコウ
-  if (pet === 'anglerfish') {
-    return (
-      `<g id="layer-pet" class="animate-pet-bounce">` +
-      `<ellipse cx="34" cy="188" rx="16" ry="4" fill="#000" opacity="0.16" />` +
-      `<path d="M 38 162 C 40 150 48 150 48 156" fill="none" stroke="#B45309" stroke-width="2" stroke-linecap="round" />` +
-      `<circle cx="48" cy="157" r="4" fill="#FEF08A" stroke="#F59E0B" stroke-width="1.2" />` +
-      `<circle cx="48" cy="157" r="8" fill="#FDE047" opacity="0.35" class="animate-pulse" />` +
-      `<ellipse cx="32" cy="172" rx="13" ry="10" fill="#FBBF24" stroke="#4A2E25" stroke-width="2" />` +
-      `<polygon points="19,172 13,166 13,178" fill="#F59E0B" stroke="#4A2E25" stroke-width="1.8" />` +
-      `<circle cx="37" cy="170" r="2.8" fill="#FFF" stroke="#4A2E25" stroke-width="1.5" /><circle cx="38" cy="170" r="1.4" fill="#000" />` +
-      `<path d="M 37 176 Q 42 178 44 174" fill="none" stroke="#4A2E25" stroke-width="1.8" stroke-linecap="round" />` +
-      `</g>`
-    );
-  }
-
-  // 7. ちびドラゴン（全身ベビーファンタジードラゴン）
-  if (pet === 'dragon') {
-    return (
-      `<g id="layer-pet" class="animate-pet-bounce">` +
-      `<ellipse cx="34" cy="188" rx="18" ry="4.5" fill="#000" opacity="0.18" />` +
-      `<path d="M 20 176 C 12 176 10 166 16 164" fill="none" stroke="#10B981" stroke-width="3" stroke-linecap="round" />` +
-      `<polygon points="12,166 14,162 17,167" fill="#F59E0B" />` +
-      `<path d="M 26 168 C 18 158 28 156 30 166 Z" fill="#059669" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<rect x="22" y="178" width="5" height="8" rx="1.5" fill="#10B981" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<rect x="36" y="178" width="5" height="8" rx="1.5" fill="#10B981" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<ellipse cx="30" cy="174" rx="12" ry="9" fill="#10B981" stroke="#4A2E25" stroke-width="2" />` +
-      `<ellipse cx="33" cy="175" rx="7" ry="6" fill="#FEF08A" />` +
-      `<circle cx="41" cy="163" r="7.5" fill="#10B981" stroke="#4A2E25" stroke-width="2" />` +
-      `<polygon points="38,157 39,151 43,156" fill="#F59E0B" stroke="#4A2E25" stroke-width="1.2" />` +
-      `<circle cx="44" cy="162" r="1.5" fill="#1E293B" /><circle cx="45" cy="161" r="0.6" fill="#FFF" />` +
-      `</g>`
-    );
-  }
-
-  // 8. ★3 おうごんのミニドラゴン
-  if (pet === 'mini_dragon') {
-    return (
-      `<g id="layer-pet" class="animate-pet-bounce">` +
-      `<ellipse cx="34" cy="188" rx="18" ry="4.5" fill="#000" opacity="0.18" />` +
-      `<path d="M 20 176 C 12 176 10 166 16 164" fill="none" stroke="#FBBF24" stroke-width="3" stroke-linecap="round" />` +
-      `<polygon points="12,166 14,162 17,167" fill="#EF4444" />` +
-      `<path d="M 26 168 C 18 158 28 156 30 166 Z" fill="#F59E0B" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<rect x="22" y="178" width="5" height="8" rx="1.5" fill="#FBBF24" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<rect x="36" y="178" width="5" height="8" rx="1.5" fill="#FBBF24" stroke="#4A2E25" stroke-width="1.5" />` +
-      `<ellipse cx="30" cy="174" rx="12" ry="9" fill="#FBBF24" stroke="#4A2E25" stroke-width="2" />` +
-      `<ellipse cx="33" cy="175" rx="7" ry="6" fill="#FEF3C7" />` +
-      `<circle cx="41" cy="163" r="7.5" fill="#FBBF24" stroke="#4A2E25" stroke-width="2" />` +
-      `<polygon points="38,157 39,151 43,156" fill="#A855F7" stroke="#4A2E25" stroke-width="1.2" />` +
-      `<circle cx="44" cy="162" r="1.5" fill="#1E293B" /><circle cx="45" cy="161" r="0.6" fill="#FFF" />` +
-      `<image href="${getTwemojiUrl('1f525')}" x="44" y="152" width="14" height="14" class="animate-pulse" />` +
-      `</g>`
-    );
-  }
-
-  return '';
+  const asset = findAsset(pet);
+  if (!asset?.twemojiCode) return '';
+  const x = asset.x ?? 10;
+  const y = asset.y ?? 142;
+  const size = asset.size ?? 48;
+  const cx = x + size / 2;
+  return (
+    `<g id="layer-pet" class="animate-pet-bounce">` +
+    `<ellipse cx="${cx}" cy="190" rx="18" ry="5" fill="#0F172A" opacity="0.2" />` +
+    (asset.glowColor ? `<circle cx="${cx}" cy="${y + size / 2}" r="${size / 2 + 4}" fill="${asset.glowColor}" opacity="0.28" class="animate-pulse" />` : '') +
+    `<image href="${getTwemojiUrl(asset.twemojiCode)}" x="${x}" y="${y}" width="${size}" height="${size}" />` +
+    (asset.subEffectCode ? `<image href="${getTwemojiUrl(asset.subEffectCode)}" x="${x + size - 14}" y="${y - 6}" width="20" height="20" class="animate-pulse" />` : '') +
+    `</g>`
+  );
 }
 
 /* ---------------- 13. 総合SVG生成関数 (viewBox 0 0 200 240) ---------------- */
@@ -1489,41 +1203,8 @@ export const buildAvatarSvg = buildGameAvatarSvg;
  * 着せ替えカードやガチャ交換所カードの中央に、
  * 頭装備・武器・ペットの美麗な単体ベクターイラストを拡大表示するためのSVGビルダー。
  */
-export function renderSingleAssetPreviewSvg(slot: AvatarSlot, id: string): string {
-  if (!id || id === 'acc_none' || id === 'wp_none' || id === 'pet_none') {
-    return '';
-  }
-
-  // ペット：全身ちびマスコットを中央拡大
-  if (slot === 'pet') {
-    const petContent = renderPet(id);
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 144 48 50" width="100%" height="100%">${petContent}</svg>`;
-  }
-
-  // 武器：斜め上に構えた勇ましい武器を中央拡大
-  if (slot === 'weapon') {
-    const weaponContent = renderWeapon(id);
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="122 102 54 74" width="100%" height="100%">${weaponContent}</svg>`;
-  }
-
-  // 頭装備：アイテムの形状に合わせた最適ビューポートで中央拡大
-  if (slot === 'accessory') {
-    if (id === 'sunglasses') {
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="58 92 84 30" width="100%" height="100%">${renderAccessory(id)}</svg>`;
-    }
-    if (id === 'wizard') {
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="50 2 100 64" width="100%" height="100%">${renderAccessory(id)}</svg>`;
-    }
-    if (id === 'star_pin') {
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="56 60 36 36" width="100%" height="100%">${renderAccessory(id)}</svg>`;
-    }
-    if (id === 'ninja_band') {
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="50 72 135 40" width="100%" height="100%">${renderAccessory(id)}</svg>`;
-    }
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="68 6 64 52" width="100%" height="100%">${renderAccessory(id)}</svg>`;
-  }
-
-  return '';
+export function renderSingleAssetPreviewSvg(_slot: AvatarSlot, _id: string): string | null {
+  return null;
 }
 
 /* ---------------- 14. アバターアイテム整合性自己診断バリデーター ---------------- */

@@ -318,17 +318,6 @@ export function AvatarMaker({
                     );
                   }
 
-                  // 単体ベクターイラストSVGプレビュー（帽子・サングラス・ペット・武器）
-                  const singleSvg = renderSingleAssetPreviewSvg(currentSlot, opt.id);
-                  if (singleSvg) {
-                    return (
-                      <div
-                        className="relative flex items-center justify-center w-full h-full p-1 drop-shadow-sm"
-                        dangerouslySetInnerHTML={{ __html: singleSvg }}
-                      />
-                    );
-                  }
-
                   const asset = findAsset(opt.id);
                   if (asset?.twemojiCode) {
                     return (
@@ -336,16 +325,26 @@ export function AvatarMaker({
                         <img
                           src={getTwemojiUrl(asset.twemojiCode)}
                           alt={opt.name}
-                          className="w-12 h-12 object-contain filter drop-shadow"
+                          className="w-12 h-12 object-contain filter drop-shadow-md transition-transform group-hover:scale-110"
                         />
                         {asset.subEffectCode && (
                           <img
                             src={getTwemojiUrl(asset.subEffectCode)}
                             alt=""
-                            className="absolute top-1 right-1 w-5 h-5 animate-pulse"
+                            className="absolute top-0.5 right-0.5 w-5 h-5 animate-pulse drop-shadow"
                           />
                         )}
                       </div>
+                    );
+                  }
+
+                  const singleSvg = renderSingleAssetPreviewSvg(currentSlot, opt.id);
+                  if (singleSvg) {
+                    return (
+                      <div
+                        className="relative flex items-center justify-center w-full h-full p-1 drop-shadow-sm"
+                        dangerouslySetInnerHTML={{ __html: singleSvg }}
+                      />
                     );
                   }
 
