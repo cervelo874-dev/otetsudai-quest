@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { AvatarSlot, Child } from '../types';
-import { optionsFor, isUnlocked, type AvatarOption, getShardCost, SHARD_COST, findAsset, getTwemojiUrl, renderSingleAssetPreviewSvg } from '../avatar';
+import { optionsFor, isUnlocked, type AvatarOption, getShardCost, SHARD_COST } from '../avatar';
 import { updateAvatar, exchangeStarShards } from '../actions';
 import { sound } from '../sound';
 import { burst } from '../effects';
@@ -269,87 +269,19 @@ export function AvatarMaker({
                 </div>
               )}
 
-              {/* アイテム高精細イラストプレビュー（キャラクタースロットは2.5頭身全身/顔プレビュー、アイテムスロットは高精細イラスト） */}
+              {/* 試着ライブプレビュー */}
               <div className="flex items-center justify-center my-0.5 w-16 h-16 shrink-0 overflow-hidden rounded-xl bg-slate-50 border border-slate-200/60 shadow-inner">
-                {(() => {
-                  const isCharacterSlot =
-                    currentSlot === 'hairStyle' ||
-                    currentSlot === 'hairColor' ||
-                    currentSlot === 'expression' ||
-                    currentSlot === 'skin' ||
-                    currentSlot === 'outfit';
-
-                  // 1. 「かみがた」「かみいろ」「おかお」「はだ」「おようふく」のタブ：
-                  // 復元した可愛い2.5頭身ちびキャラでライブプレビュー
-                  if (isCharacterSlot) {
-                    return (
-                      <GameAvatar2D
-                        avatar={{
-                          ...child.avatar,
-                          [currentSlot]: opt.id,
-                        }}
-                        previewMode={currentSlot === 'outfit' ? 'full' : currentSlot}
-                        size={64}
-                        interactive={false}
-                        rounded="rounded-none"
-                        className="w-full h-full object-contain"
-                      />
-                    );
-                  }
-
-                  // 2. 「あたま」「もちもの」「ペット」「はいけい」のタブ：
-                  // カードの中央にそのアイテムの高精細イラストが大きく見やすく表示
-                  if (opt.id === 'acc_none' || opt.id === 'wp_none' || opt.id === 'pet_none') {
-                    return <span className="text-2xl text-slate-400 font-black">なし</span>;
-                  }
-
-                  if (currentSlot === 'bg') {
-                    return (
-                      <GameAvatar2D
-                        avatar={{
-                          ...child.avatar,
-                          bg: opt.id,
-                        }}
-                        size={64}
-                        interactive={false}
-                        rounded="rounded-none"
-                        className="w-full h-full object-contain"
-                      />
-                    );
-                  }
-
-                  const asset = findAsset(opt.id);
-                  if (asset?.twemojiCode) {
-                    return (
-                      <div className="relative flex items-center justify-center w-full h-full p-1.5">
-                        <img
-                          src={getTwemojiUrl(asset.twemojiCode)}
-                          alt={opt.name}
-                          className="w-12 h-12 object-contain filter drop-shadow-md transition-transform group-hover:scale-110"
-                        />
-                        {asset.subEffectCode && (
-                          <img
-                            src={getTwemojiUrl(asset.subEffectCode)}
-                            alt=""
-                            className="absolute top-0.5 right-0.5 w-5 h-5 animate-pulse drop-shadow"
-                          />
-                        )}
-                      </div>
-                    );
-                  }
-
-                  const singleSvg = renderSingleAssetPreviewSvg(currentSlot, opt.id);
-                  if (singleSvg) {
-                    return (
-                      <div
-                        className="relative flex items-center justify-center w-full h-full p-1 drop-shadow-sm"
-                        dangerouslySetInnerHTML={{ __html: singleSvg }}
-                      />
-                    );
-                  }
-
-                  return <span className="text-3xl">{opt.icon}</span>;
-                })()}
+                <GameAvatar2D
+                  avatar={{
+                    ...child.avatar,
+                    [currentSlot]: opt.id,
+                  }}
+                  previewMode={currentSlot}
+                  size={64}
+                  interactive={false}
+                  rounded="rounded-none"
+                  className="w-full h-full object-contain"
+                />
               </div>
 
               {/* アイテム名 */}

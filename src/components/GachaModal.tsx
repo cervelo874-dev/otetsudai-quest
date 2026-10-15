@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import type { Child } from '../types';
 import { canFreeGacha, spinGacha, exchangeStarShards, type GachaPrize } from '../actions';
 import { GACHA_COST } from '../logic';
-import { AVATAR_OPTIONS, type AvatarOption, findOption, findAsset, getTwemojiUrl, isUnlockableAvatarItem, getShardCost, SHARD_COST, renderSingleAssetPreviewSvg } from '../avatar';
+import { AVATAR_OPTIONS, type AvatarOption, findOption, isUnlockableAvatarItem, getShardCost, SHARD_COST } from '../avatar';
 import { sound } from '../sound';
 import { burst } from '../effects';
 import { toast } from './ui';
@@ -457,61 +457,18 @@ export function GachaModal({
               >
                 {/* 実際のアバターパーツイラスト、またはアイコン */}
                 {prize.kind === 'avatar' && prize.avatarItemId ? (
-                  <div className="relative flex items-center justify-center w-28 h-28 overflow-hidden rounded-2xl bg-white/95 border-2 border-amber-300 shadow-md mb-2 p-2">
-                    {(() => {
-                      const slot = findOption(prize.avatarItemId)?.slot ?? 'outfit';
-                      const asset = findAsset(prize.avatarItemId);
-
-                      if (slot === 'outfit') {
-                        return (
-                          <GameAvatar2D
-                            avatar={{
-                              ...child.avatar,
-                              outfit: prize.avatarItemId,
-                            }}
-                            previewMode="full"
-                            size={96}
-                            interactive={false}
-                            rounded="rounded-none"
-                            className="w-full h-full object-contain"
-                          />
-                        );
-                      }
-
-                      const singleSvg = renderSingleAssetPreviewSvg(slot, prize.avatarItemId);
-                      if (singleSvg) {
-                        return (
-                          <div
-                            className="w-24 h-24 flex items-center justify-center drop-shadow-md animate-weapon-float"
-                            dangerouslySetInnerHTML={{ __html: singleSvg }}
-                          />
-                        );
-                      }
-
-                      if (asset?.twemojiCode) {
-                        return (
-                          <img
-                            src={getTwemojiUrl(asset.twemojiCode)}
-                            alt={prize.label}
-                            className="w-20 h-20 object-contain filter drop-shadow-md animate-weapon-float"
-                          />
-                        );
-                      }
-
-                      return (
-                        <GameAvatar2D
-                          avatar={{
-                            ...child.avatar,
-                            [slot]: prize.avatarItemId,
-                          }}
-                          previewMode={slot}
-                          size={96}
-                          interactive={false}
-                          rounded="rounded-none"
-                          className="w-full h-full object-contain"
-                        />
-                      );
-                    })()}
+                  <div className="flex items-center justify-center w-24 h-24 overflow-hidden rounded-2xl bg-white/95 border-2 border-amber-300 shadow-md mb-2">
+                    <GameAvatar2D
+                      avatar={{
+                        ...child.avatar,
+                        [findOption(prize.avatarItemId)?.slot ?? 'outfit']: prize.avatarItemId,
+                      }}
+                      previewMode={findOption(prize.avatarItemId)?.slot}
+                      size={96}
+                      interactive={false}
+                      rounded="rounded-none"
+                      className="w-full h-full object-contain"
+                    />
                   </div>
                 ) : (
                   <span className="text-6xl mb-2 drop-shadow-md">{prize.icon}</span>
@@ -657,61 +614,19 @@ export function GachaModal({
                   }`}
                 >
                   <div className="flex items-start gap-2.5 mb-2">
-                    {/* プロ素材の高精細イラストまたはプレビュー */}
+                    {/* スタンプ（絵文字）ではなく実際のアバターパーツイラストを描画 */}
                     <div className="flex items-center justify-center w-14 h-14 shrink-0 overflow-hidden rounded-xl bg-slate-50 border border-slate-200/80 shadow-inner">
-                      {(() => {
-                        const asset = findAsset(item.id);
-
-                        if (item.slot === 'outfit') {
-                          return (
-                            <GameAvatar2D
-                              avatar={{
-                                ...child.avatar,
-                                outfit: item.id,
-                              }}
-                              previewMode="full"
-                              size={56}
-                              interactive={false}
-                              rounded="rounded-none"
-                              className="w-full h-full object-contain"
-                            />
-                          );
-                        }
-
-                        const singleSvg = renderSingleAssetPreviewSvg(item.slot, item.id);
-                        if (singleSvg) {
-                          return (
-                            <div
-                              className="w-12 h-12 flex items-center justify-center drop-shadow-sm"
-                              dangerouslySetInnerHTML={{ __html: singleSvg }}
-                            />
-                          );
-                        }
-
-                        if (asset?.twemojiCode) {
-                          return (
-                            <img
-                              src={getTwemojiUrl(asset.twemojiCode)}
-                              alt={item.name}
-                              className="w-11 h-11 object-contain filter drop-shadow-sm"
-                            />
-                          );
-                        }
-
-                        return (
-                          <GameAvatar2D
-                            avatar={{
-                              ...child.avatar,
-                              [item.slot]: item.id,
-                            }}
-                            previewMode={item.slot}
-                            size={56}
-                            interactive={false}
-                            rounded="rounded-none"
-                            className="w-full h-full object-contain"
-                          />
-                        );
-                      })()}
+                      <GameAvatar2D
+                        avatar={{
+                          ...child.avatar,
+                          [item.slot]: item.id,
+                        }}
+                        previewMode={item.slot}
+                        size={56}
+                        interactive={false}
+                        rounded="rounded-none"
+                        className="w-full h-full object-contain"
+                      />
                     </div>
 
                     <div className="min-w-0 flex-1">
