@@ -182,10 +182,27 @@ function starPath(cx: number, cy: number, r: number): string {
 export const LINE_COLOR = '#4A2E25';
 const LINE = `stroke="${LINE_COLOR}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"`;
 
+/* ---------------- イラスト画像アセット レジストリ ---------------- */
+export const IMAGE_ASSETS = {
+  pet: new Set(['shiba', 'dragon', 'penguin', 'unicorn', 'slime', 'anglerfish', 'mini_dragon', 'flying_unicorn']),
+  weapon: new Set(['brave_sword', 'giant_candy', 'laser_blade', 'flame_sword']),
+  accessory: new Set(['ribbon']),
+  bg: new Set<string>([]),
+};
+
 /* ---------------- 1. 背景ステージレイヤー (background: viewBox 0 0 200 240) ---------------- */
 function renderBackground(id: string, p: string): string {
   const cardBorder = `<rect x="5" y="5" width="190" height="230" rx="20" fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.85"/>`;
   const stageShadow = `<ellipse cx="100" cy="204" rx="42" ry="8" fill="#2E2038" opacity="0.2"/>`;
+
+  if (IMAGE_ASSETS.bg.has(id)) {
+    return (
+      `<clipPath id="${p}_bgclip"><rect x="5" y="5" width="190" height="230" rx="20"/></clipPath>` +
+      `<image href="/assets/avatar/bg/${id}.png" x="5" y="5" width="190" height="230" clip-path="url(#${p}_bgclip)" preserveAspectRatio="xMidYMid slice" />` +
+      stageShadow +
+      cardBorder
+    );
+  }
 
   switch (id) {
     case 'candy_land':
@@ -1006,6 +1023,13 @@ function renderFrontHair(style: string, hc: string): string {
 
 /* ---------------- 10. 頭装備 (accessory) ---------------- */
 function renderAccessory(accessory: string): string {
+  if (IMAGE_ASSETS.accessory.has(accessory)) {
+    if (accessory === 'ribbon') {
+      return `<image href="/assets/avatar/accessory/ribbon.png" x="66" y="16" width="68" height="68" preserveAspectRatio="xMidYMid meet" />`;
+    }
+    return `<image href="/assets/avatar/accessory/${accessory}.png" x="65" y="15" width="70" height="70" preserveAspectRatio="xMidYMid meet" />`;
+  }
+
   switch (accessory) {
     case 'crown':
       return (
@@ -1129,6 +1153,22 @@ function renderAccessory(accessory: string): string {
 
 /* ---------------- 11. 持ち物・武器 (weapon) ---------------- */
 function renderWeapon(weapon?: string): string {
+  if (weapon && IMAGE_ASSETS.weapon.has(weapon)) {
+    if (weapon === 'flame_sword') {
+      return `<image href="/assets/avatar/weapon/flame_sword.png" x="106" y="88" width="90" height="90" preserveAspectRatio="xMidYMid meet" />`;
+    }
+    if (weapon === 'brave_sword') {
+      return `<image href="/assets/avatar/weapon/brave_sword.png" x="108" y="94" width="84" height="84" preserveAspectRatio="xMidYMid meet" />`;
+    }
+    if (weapon === 'laser_blade') {
+      return `<image href="/assets/avatar/weapon/laser_blade.png" x="110" y="94" width="82" height="82" preserveAspectRatio="xMidYMid meet" />`;
+    }
+    if (weapon === 'giant_candy') {
+      return `<image href="/assets/avatar/weapon/giant_candy.png" x="112" y="94" width="80" height="80" preserveAspectRatio="xMidYMid meet" />`;
+    }
+    return `<image href="/assets/avatar/weapon/${weapon}.png" x="110" y="94" width="82" height="82" preserveAspectRatio="xMidYMid meet" />`;
+  }
+
   switch (weapon) {
     case 'brave_sword':
       return (
@@ -1187,6 +1227,22 @@ function renderWeapon(weapon?: string): string {
 
 /* ---------------- 12. 相棒ペット (pet) ---------------- */
 function renderPet(pet: string): string {
+  if (IMAGE_ASSETS.pet.has(pet)) {
+    if (pet === 'flying_unicorn') {
+      return `<image href="/assets/avatar/pet/flying_unicorn.png" x="4" y="138" width="72" height="72" preserveAspectRatio="xMidYMid meet" />`;
+    }
+    if (pet === 'slime') {
+      return `<image href="/assets/avatar/pet/slime.png" x="10" y="156" width="60" height="60" preserveAspectRatio="xMidYMid meet" />`;
+    }
+    if (pet === 'mini_dragon' || pet === 'dragon') {
+      return `<image href="/assets/avatar/pet/${pet}.png" x="6" y="144" width="68" height="68" preserveAspectRatio="xMidYMid meet" />`;
+    }
+    if (pet === 'unicorn') {
+      return `<image href="/assets/avatar/pet/unicorn.png" x="6" y="142" width="68" height="68" preserveAspectRatio="xMidYMid meet" />`;
+    }
+    return `<image href="/assets/avatar/pet/${pet}.png" x="8" y="146" width="66" height="66" preserveAspectRatio="xMidYMid meet" />`;
+  }
+
   switch (pet) {
     case 'shiba':
       return (
