@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import type { Child } from '../types';
 import { canFreeGacha, spinGacha, exchangeStarShards, type GachaPrize } from '../actions';
 import { GACHA_COST } from '../logic';
-import { AVATAR_OPTIONS, type AvatarOption, findOption, isUnlockableAvatarItem, getShardCost, SHARD_COST } from '../avatar';
+import { AVATAR_OPTIONS, type AvatarOption, findOption, findAsset, getTwemojiUrl, isUnlockableAvatarItem, getShardCost, SHARD_COST } from '../avatar';
 import { sound } from '../sound';
 import { burst } from '../effects';
 import { toast } from './ui';
@@ -457,18 +457,67 @@ export function GachaModal({
               >
                 {/* 実際のアバターパーツイラスト、またはアイコン */}
                 {prize.kind === 'avatar' && prize.avatarItemId ? (
-                  <div className="flex items-center justify-center w-24 h-24 overflow-hidden rounded-2xl bg-white/95 border-2 border-amber-300 shadow-md mb-2">
-                    <GameAvatar2D
-                      avatar={{
-                        ...child.avatar,
-                        [findOption(prize.avatarItemId)?.slot ?? 'outfit']: prize.avatarItemId,
-                      }}
-                      previewMode={findOption(prize.avatarItemId)?.slot}
-                      size={96}
-                      interactive={false}
-                      rounded="rounded-none"
-                      className="w-full h-full object-contain"
-                    />
+                  <div className="relative flex items-center justify-center w-28 h-28 overflow-hidden rounded-2xl bg-white/95 border-2 border-amber-300 shadow-md mb-2 p-2">
+                    {(() => {
+                      const asset = findAsset(prize.avatarItemId);
+                      if (asset?.twemojiCode) {
+                        return (
+                          <img
+                            src={getTwemojiUrl(asset.twemojiCode)}
+                            alt={prize.label}
+                            className="w-20 h-20 object-contain filter drop-shadow-md animate-weapon-float"
+                          />
+                        );
+                      }
+                      if (asset?.outfitTheme) {
+                        return (
+                          <div
+                            className="flex items-center justify-center w-full h-full rounded-xl"
+                            style={{
+                              background: `linear-gradient(135deg, ${asset.outfitTheme.primaryColor}33, ${asset.outfitTheme.secondaryColor}66)`,
+                            }}
+                          >
+                            <img
+                              src={getTwemojiUrl(asset.outfitTheme.badgeCode)}
+                              alt={prize.label}
+                              className="w-16 h-16 object-contain filter drop-shadow-md animate-pulse"
+                            />
+                          </div>
+                        );
+                      }
+                      if (asset?.stageConfig) {
+                        return (
+                          <div
+                            className="relative flex items-center justify-center w-full h-full rounded-xl overflow-hidden"
+                            style={{ background: asset.stageConfig.gradient }}
+                          >
+                            <div className="flex items-center gap-1">
+                              {asset.stageConfig.particles.slice(0, 3).map((p, idx) => (
+                                <img
+                                  key={idx}
+                                  src={getTwemojiUrl(p.code)}
+                                  alt=""
+                                  className="w-7 h-7 object-contain drop-shadow"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <GameAvatar2D
+                          avatar={{
+                            ...child.avatar,
+                            [findOption(prize.avatarItemId)?.slot ?? 'outfit']: prize.avatarItemId,
+                          }}
+                          previewMode={findOption(prize.avatarItemId)?.slot}
+                          size={96}
+                          interactive={false}
+                          rounded="rounded-none"
+                          className="w-full h-full object-contain"
+                        />
+                      );
+                    })()}
                   </div>
                 ) : (
                   <span className="text-6xl mb-2 drop-shadow-md">{prize.icon}</span>
@@ -614,19 +663,66 @@ export function GachaModal({
                   }`}
                 >
                   <div className="flex items-start gap-2.5 mb-2">
-                    {/* スタンプ（絵文字）ではなく実際のアバターパーツイラストを描画 */}
+                    {/* プロ素材の高精細イラストまたはプレビュー */}
                     <div className="flex items-center justify-center w-14 h-14 shrink-0 overflow-hidden rounded-xl bg-slate-50 border border-slate-200/80 shadow-inner">
-                      <GameAvatar2D
-                        avatar={{
-                          ...child.avatar,
-                          [item.slot]: item.id,
-                        }}
-                        previewMode={item.slot}
-                        size={56}
-                        interactive={false}
-                        rounded="rounded-none"
-                        className="w-full h-full object-contain"
-                      />
+                      {(() => {
+                        const asset = findAsset(item.id);
+                        if (asset?.twemojiCode) {
+                          return (
+                            <img
+                              src={getTwemojiUrl(asset.twemojiCode)}
+                              alt={item.name}
+                              className="w-11 h-11 object-contain filter drop-shadow-sm"
+                            />
+                          );
+                        }
+                        if (asset?.outfitTheme) {
+                          return (
+                            <div
+                              className="flex items-center justify-center w-full h-full p-1.5"
+                              style={{
+                                background: `linear-gradient(135deg, ${asset.outfitTheme.primaryColor}33, ${asset.outfitTheme.secondaryColor}66)`,
+                              }}
+                            >
+                              <img
+                                src={getTwemojiUrl(asset.outfitTheme.badgeCode)}
+                                alt={item.name}
+                                className="w-10 h-10 object-contain filter drop-shadow-sm"
+                              />
+                            </div>
+                          );
+                        }
+                        if (asset?.stageConfig) {
+                          return (
+                            <div
+                              className="relative flex items-center justify-center w-full h-full"
+                              style={{ background: asset.stageConfig.gradient }}
+                            >
+                              {asset.stageConfig.particles.slice(0, 1).map((p, pIdx) => (
+                                <img
+                                  key={pIdx}
+                                  src={getTwemojiUrl(p.code)}
+                                  alt=""
+                                  className="w-6 h-6 filter drop-shadow-sm"
+                                />
+                              ))}
+                            </div>
+                          );
+                        }
+                        return (
+                          <GameAvatar2D
+                            avatar={{
+                              ...child.avatar,
+                              [item.slot]: item.id,
+                            }}
+                            previewMode={item.slot}
+                            size={56}
+                            interactive={false}
+                            rounded="rounded-none"
+                            className="w-full h-full object-contain"
+                          />
+                        );
+                      })()}
                     </div>
 
                     <div className="min-w-0 flex-1">
