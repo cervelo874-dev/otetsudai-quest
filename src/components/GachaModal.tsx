@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { Child } from '../types';
 import { canFreeGacha, spinGacha, exchangeStarShards, type GachaPrize } from '../actions';
 import { GACHA_COST } from '../logic';
@@ -28,6 +28,24 @@ export function GachaModal({
   const [refundShards, setRefundShards] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
+  const timeoutIdsRef = useRef<number[]>([]);
+
+  const addTimeout = (cb: () => void, ms: number): number => {
+    const id = window.setTimeout(() => {
+      timeoutIdsRef.current = timeoutIdsRef.current.filter((x) => x !== id);
+      cb();
+    }, ms);
+    timeoutIdsRef.current.push(id);
+    return id;
+  };
+
+  useEffect(() => {
+    return () => {
+      timeoutIdsRef.current.forEach((id) => window.clearTimeout(id));
+      timeoutIdsRef.current = [];
+    };
+  }, []);
+
   // ガチャを回すハンドラー
   const handleSpin = () => {
     if (phase !== 'idle') return;
@@ -41,7 +59,7 @@ export function GachaModal({
     sound.gachaSpin();
 
     // ハンドル回転演出（約1.5秒）
-    window.setTimeout(() => {
+    addTimeout(() => {
       const outcome = spinGacha(child.id);
       if (outcome.ok) {
         setPrize(outcome.prize);
@@ -67,11 +85,11 @@ export function GachaModal({
     burst();
 
     if (prize.rarity === 3) {
-      window.setTimeout(() => burst(), 300);
-      window.setTimeout(() => burst(), 650);
+      addTimeout(() => burst(), 300);
+      addTimeout(() => burst(), 650);
     }
 
-    window.setTimeout(() => {
+    addTimeout(() => {
       setPhase('result');
     }, 700);
   };

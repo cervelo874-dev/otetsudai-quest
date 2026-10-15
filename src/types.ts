@@ -167,6 +167,10 @@ export interface AppState {
   notificationSettings: NotificationSettings;
   /** 意図的に削除された子どものID（別端末同期時のゾンビ復活防止） */
   deletedChildIds?: string[];
+  /** 意図的に削除されたお手伝いのID（別端末同期時のゾンビ復活防止） */
+  deletedQuestIds?: string[];
+  /** 意図的に削除されたショップ商品のID（別端末同期時のゾンビ復活防止） */
+  deletedShopItemIds?: string[];
   /** 最終更新日時タイムスタンプ（ミリ秒） */
   lastUpdatedAt?: number;
 }

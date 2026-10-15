@@ -178,6 +178,8 @@ export function createInitialState(): AppState {
     done: [],
     notificationSettings: { ...DEFAULT_NOTIFICATION_SETTINGS },
     deletedChildIds: [],
+    deletedQuestIds: [],
+    deletedShopItemIds: [],
     lastUpdatedAt: Date.now(),
   };
 }

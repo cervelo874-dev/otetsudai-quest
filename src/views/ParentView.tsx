@@ -86,7 +86,8 @@ const PRESET_ICONS = ['📱', '🎮', '📺', '🎬', '🍪', '🍦', '🍰', '�
 const PRICE_PRESETS = [30, 50, 80, 100, 150, 200];
 
 export function ParentView({ state }: { state: AppState }) {
-  const now = useNow(1000);
+  // タイマーが稼働している時だけ 1秒更新を行い、タイマーがない時は無駄な再描画を完全に停止
+  const now = useNow(1000, state.timers.length > 0);
   const syncStatus = useSyncStatus();
   const [activeTab, setActiveTab] = useState<'approvals' | 'children' | 'quests' | 'shop' | 'logs'>('approvals');
 

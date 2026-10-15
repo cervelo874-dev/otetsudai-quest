@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { Chest } from '../types';
 import { openChest } from '../actions';
 import { sound } from '../sound';
@@ -29,6 +29,21 @@ export function ChestModal({
   const [displayCoins, setDisplayCoins] = useState(currentCoins);
   const [countingFinished, setCountingFinished] = useState(false);
 
+  const openTimeoutRef = useRef<number | null>(null);
+  const countIntervalRef = useRef<number | null>(null);
+
+  // アンマウント時のタイマークリーンアップ
+  useEffect(() => {
+    return () => {
+      if (openTimeoutRef.current !== null) {
+        window.clearTimeout(openTimeoutRef.current);
+      }
+      if (countIntervalRef.current !== null) {
+        window.clearInterval(countIntervalRef.current);
+      }
+    };
+  }, []);
+
   if (chests.length === 0) return null;
   const currentChest = chests[0];
 
@@ -43,7 +58,8 @@ export function ChestModal({
     setDisplayCoins(prevCoins);
     setCountingFinished(false);
 
-    window.setTimeout(() => {
+    openTimeoutRef.current = window.setTimeout(() => {
+      openTimeoutRef.current = null;
       const res = openChest(currentChest.id);
       if (res) {
         sound.fanfare();
@@ -58,10 +74,13 @@ export function ChestModal({
           const intervalTime = Math.max(30, Math.floor(800 / steps));
           let currentStep = 0;
 
-          const timer = window.setInterval(() => {
+          countIntervalRef.current = window.setInterval(() => {
             currentStep++;
             if (currentStep >= steps) {
-              window.clearInterval(timer);
+              if (countIntervalRef.current !== null) {
+                window.clearInterval(countIntervalRef.current);
+                countIntervalRef.current = null;
+              }
               setDisplayCoins(targetCoins);
               setCountingFinished(true);
               sound.pop();

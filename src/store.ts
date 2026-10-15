@@ -51,6 +51,8 @@ export function normalize(p: Partial<AppState>): AppState {
     parentPin: typeof p.parentPin === 'string' ? p.parentPin : base.parentPin,
     children,
     deletedChildIds: Array.isArray(p.deletedChildIds) ? p.deletedChildIds : [],
+    deletedQuestIds: Array.isArray(p.deletedQuestIds) ? p.deletedQuestIds : [],
+    deletedShopItemIds: Array.isArray(p.deletedShopItemIds) ? p.deletedShopItemIds : [],
     quests: Array.isArray(p.quests) && p.quests.length > 0
       ? p.quests.map((q) => ({ ...q, rewardOverrides: q.rewardOverrides ?? {} }))
       : base.quests,
@@ -135,23 +137,37 @@ export function mergeStates(local: AppState, remote: Partial<AppState>): { merge
     }
   });
 
+  const deletedQuestSet = new Set([
+    ...(local.deletedQuestIds || []),
+    ...(normRemote.deletedQuestIds || []),
+  ]);
+
+  const deletedShopSet = new Set([
+    ...(local.deletedShopItemIds || []),
+    ...(normRemote.deletedShopItemIds || []),
+  ]);
+
   const mergedChildren = Array.from(childMap.values());
 
-  // 2. Shop（チケット）のマージ：ユーザー追加のチケットを保護
+  // 2. Shop（チケット）のマージ：削除リストに含まれないものを対象にユーザー追加チケットを保護
   const shopMap = new Map<string, ShopItem>();
-  normRemote.shop.forEach((s) => shopMap.set(s.id, s));
+  normRemote.shop.forEach((s) => {
+    if (!deletedShopSet.has(s.id)) shopMap.set(s.id, s);
+  });
   local.shop.forEach((s) => {
-    if (!shopMap.has(s.id)) {
+    if (!deletedShopSet.has(s.id) && !shopMap.has(s.id)) {
       shopMap.set(s.id, s);
       hasLocalNewData = true;
     }
   });
 
-  // 3. Quests のマージ
+  // 3. Quests のマージ：削除リストに含まれないものを対象にユーザー追加クエストを保護
   const questMap = new Map<string, Quest>();
-  normRemote.quests.forEach((q) => questMap.set(q.id, q));
+  normRemote.quests.forEach((q) => {
+    if (!deletedQuestSet.has(q.id)) questMap.set(q.id, q);
+  });
   local.quests.forEach((q) => {
-    if (!questMap.has(q.id)) {
+    if (!deletedQuestSet.has(q.id) && !questMap.has(q.id)) {
       questMap.set(q.id, q);
       hasLocalNewData = true;
     }
@@ -179,6 +195,8 @@ export function mergeStates(local: AppState, remote: Partial<AppState>): { merge
     submissions: normRemote.submissions,
     chests: normRemote.chests,
     deletedChildIds: Array.from(deletedSet),
+    deletedQuestIds: Array.from(deletedQuestSet),
+    deletedShopItemIds: Array.from(deletedShopSet),
     lastUpdatedAt: Math.max(local.lastUpdatedAt || 0, normRemote.lastUpdatedAt || 0, Date.now()),
   };
 

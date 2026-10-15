@@ -157,6 +157,7 @@ export function buyItem(childId: string, itemId: string): BuyResult {
     const c = findChild(s, childId);
     const it = s.shop.find((x) => x.id === itemId);
     if (!c || !it) return;
+    if (c.coins < it.price) return;
     c.coins -= it.price;
     grantShopItem(s, c, it);
     addLog(s, '🛒', `${c.name}が「${it.name}」を購入（-${it.price}コイン）`);
@@ -583,6 +584,7 @@ export function spinGacha(childId: string): GachaOutcome {
   setState((s) => {
     const c = findChild(s, childId);
     if (!c) return;
+    if (!free && c.coins < GACHA_COST) return;
 
     if (free) c.lastFreeGacha = todayKey();
     else c.coins -= GACHA_COST;
@@ -674,6 +676,9 @@ export function dismissNotice(id: string): void {
 
 export function saveQuest(q: Quest): void {
   setState((s) => {
+    if (s.deletedQuestIds) {
+      s.deletedQuestIds = s.deletedQuestIds.filter((id) => id !== q.id);
+    }
     const i = s.quests.findIndex((x) => x.id === q.id);
     if (i >= 0) s.quests[i] = q;
     else s.quests.push(q);
@@ -684,6 +689,10 @@ export function saveQuest(q: Quest): void {
 
 export function deleteQuest(id: string): void {
   setState((s) => {
+    if (!s.deletedQuestIds) s.deletedQuestIds = [];
+    if (!s.deletedQuestIds.includes(id)) {
+      s.deletedQuestIds.push(id);
+    }
     const q = s.quests.find((x) => x.id === id);
     s.quests = s.quests.filter((x) => x.id !== id);
     s.submissions = s.submissions.filter((x) => x.questId !== id);
@@ -696,6 +705,9 @@ export function deleteQuest(id: string): void {
 
 export function saveShopItem(it: ShopItem): void {
   setState((s) => {
+    if (s.deletedShopItemIds) {
+      s.deletedShopItemIds = s.deletedShopItemIds.filter((id) => id !== it.id);
+    }
     const i = s.shop.findIndex((x) => x.id === it.id);
     if (i >= 0) s.shop[i] = it;
     else s.shop.push(it);
@@ -706,6 +718,10 @@ export function saveShopItem(it: ShopItem): void {
 
 export function deleteShopItem(id: string): void {
   setState((s) => {
+    if (!s.deletedShopItemIds) s.deletedShopItemIds = [];
+    if (!s.deletedShopItemIds.includes(id)) {
+      s.deletedShopItemIds.push(id);
+    }
     const it = s.shop.find((x) => x.id === id);
     s.shop = s.shop.filter((x) => x.id !== id);
     if (it) addLog(s, '🗑️', `商品「${it.name}」を削除`);

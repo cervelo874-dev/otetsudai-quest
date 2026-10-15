@@ -182,7 +182,7 @@ export function KidTicketsTimer({
               {isTimeOver ? 'おしまい！' : formatClock(remainMs)}
             </div>
             <div className="mt-1 text-sm font-bold text-slate-500">
-              {formatHMKana(currentTimer.endsAt)} まで
+              {isPaused ? '⏸️ タイマー一時停止中' : `${formatHMKana(currentTimer.endsAt)} まで`}
             </div>
           </div>
 

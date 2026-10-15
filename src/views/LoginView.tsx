@@ -105,13 +105,13 @@ export function LoginView({
           </p>
         </div>
 
-        {/* こどもアバター一覧 */}
-        <div className="my-8 grid grid-cols-1 sm:grid-cols-3 gap-6">
+        {/* こどもアバター一覧（何人でも中央揃えでバランス良く配置） */}
+        <div className="my-8 flex flex-wrap justify-center gap-6">
           {childrenList.map((child) => (
             <button
               key={child.id}
               onClick={() => handleChildClick(child)}
-              className="btn-pop group relative flex flex-col items-center rounded-3xl bg-white p-6 shadow-[0_10px_0_rgba(0,0,0,0.06)] border-4 border-amber-200/60 hover:border-amber-400 hover:shadow-xl transition-all"
+              className="btn-pop group relative flex flex-col items-center rounded-3xl bg-white p-6 shadow-[0_10px_0_rgba(0,0,0,0.06)] border-4 border-amber-200/60 hover:border-amber-400 hover:shadow-xl transition-all w-full sm:w-[260px] max-w-sm"
             >
               <div className="relative">
                 <Avatar
