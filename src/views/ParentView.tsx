@@ -259,10 +259,10 @@ export function ParentView({ state }: { state: AppState }) {
 
   /* ---------------- 子ども新規作成 ---------------- */
   const handleAddNewChild = () => {
-    sound.tap();
+    sound.fanfare();
     const newChild: Child = {
       id: `c-${uid()}`,
-      name: 'あたらしいこ',
+      name: `あたらしいこ`,
       age: 6,
       pin: '1234',
       coins: 50,
@@ -276,7 +276,10 @@ export function ParentView({ state }: { state: AppState }) {
       allowQuickLogin: true,
       starShards: 0,
     };
+    // 追加した瞬間に即座に保存・同期（途中でモーダルを閉じても絶対に消えない）
+    saveChild(newChild);
     setEditingChild(newChild);
+    toast('新しい子どもを追加しました！お名前やPINコードを設定してください', '👶');
   };
 
   const tabs: { key: 'approvals' | 'children' | 'quests' | 'shop' | 'logs'; label: string; icon: string; count?: number }[] = [

@@ -24,6 +24,21 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   browserNotification: false,
 };
 
+export const DEFAULT_CHILD_PROPS: Omit<Child, 'id' | 'name'> = {
+  age: 6,
+  pin: '1234',
+  coins: 50,
+  streak: 0,
+  lastDoneDate: null,
+  totalQuests: 0,
+  avatar: DEFAULT_AVATAR,
+  ownedItems: [],
+  lastFreeGacha: null,
+  color: 'sky',
+  allowQuickLogin: true,
+  starShards: 0,
+};
+
 export function createInitialState(): AppState {
   const y = yesterdayKey();
 
@@ -162,5 +177,7 @@ export function createInitialState(): AppState {
     logs: [{ id: 'log-init', icon: '🏰', text: 'ごほうびタウンへ ようこそ！初期データを読み込みました', at: Date.now() }],
     done: [],
     notificationSettings: { ...DEFAULT_NOTIFICATION_SETTINGS },
+    deletedChildIds: [],
+    lastUpdatedAt: Date.now(),
   };
 }

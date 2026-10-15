@@ -1,4 +1,4 @@
-import { getState, setState } from './store';
+import { getState, setState, flushSync } from './store';
 import type { AppState, AvatarSlot, Child, NotificationSettings, Quest, ShopItem, Ticket } from './types';
 import { uid, todayKey, yesterdayKey } from './utils';
 import { BONUS_COINS, BONUS_WINDOW_MS, GACHA_COST, rewardFor } from './logic';
@@ -679,6 +679,7 @@ export function saveQuest(q: Quest): void {
     else s.quests.push(q);
     addLog(s, '📝', `お手伝い「${q.title}」を${i >= 0 ? '更新' : '追加'}`);
   });
+  flushSync();
 }
 
 export function deleteQuest(id: string): void {
@@ -688,6 +689,7 @@ export function deleteQuest(id: string): void {
     s.submissions = s.submissions.filter((x) => x.questId !== id);
     if (q) addLog(s, '🗑️', `お手伝い「${q.title}」を削除`);
   });
+  flushSync();
 }
 
 /* ---------------- admin: shop ---------------- */
@@ -699,6 +701,7 @@ export function saveShopItem(it: ShopItem): void {
     else s.shop.push(it);
     addLog(s, '🏪', `商品「${it.name}」を${i >= 0 ? '更新' : '追加'}`);
   });
+  flushSync();
 }
 
 export function deleteShopItem(id: string): void {
@@ -707,12 +710,17 @@ export function deleteShopItem(id: string): void {
     s.shop = s.shop.filter((x) => x.id !== id);
     if (it) addLog(s, '🗑️', `商品「${it.name}」を削除`);
   });
+  flushSync();
 }
 
 /* ---------------- admin: children ---------------- */
 
 export function saveChild(c: Child): void {
   setState((s) => {
+    // 意図的に削除されたIDリストにあれば解除
+    if (s.deletedChildIds) {
+      s.deletedChildIds = s.deletedChildIds.filter((id) => id !== c.id);
+    }
     const i = s.children.findIndex((x) => x.id === c.id);
     if (i >= 0) {
       const prevName = s.children[i].name;
@@ -727,10 +735,16 @@ export function saveChild(c: Child): void {
       addLog(s, '👶', `新しい子ども「${c.name}」を追加`);
     }
   });
+  // クラウドへ即座に送信（デバウンス待機なし）
+  flushSync();
 }
 
 export function deleteChild(id: string): void {
   setState((s) => {
+    if (!s.deletedChildIds) s.deletedChildIds = [];
+    if (!s.deletedChildIds.includes(id)) {
+      s.deletedChildIds.push(id);
+    }
     const c = findChild(s, id);
     s.children = s.children.filter((x) => x.id !== id);
     s.quests.forEach((q) => {
@@ -745,6 +759,8 @@ export function deleteChild(id: string): void {
     s.done = s.done.filter((x) => x.childId !== id);
     if (c) addLog(s, '🗑️', `${c.name}を削除`);
   });
+  // クラウドへ即座に送信（デバウンス待機なし）
+  flushSync();
 }
 
 export function setParentPin(pin: string): void {

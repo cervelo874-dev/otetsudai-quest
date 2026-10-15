@@ -152,11 +152,39 @@ export function applyRemoteStateSafe(remoteState: AppState): void {
   }
 }
 
+let pendingState: AppState | null = null;
+
+async function pushToSupabase(stateToPush: AppState): Promise<boolean> {
+  if (!supabase || !isSupabaseConfigured) return false;
+  const roomId = getRoomId();
+  try {
+    const { error } = await supabase.from('family_states').upsert({
+      room_id: roomId,
+      state: stateToPush,
+      updated_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      console.warn('Supabase upsert warning:', error.message);
+      setSyncStatus('error');
+      return false;
+    } else {
+      setSyncStatus('connected');
+      return true;
+    }
+  } catch (err) {
+    console.warn('Supabase upsert network error:', err);
+    setSyncStatus('error');
+    return false;
+  }
+}
+
 /**
  * Supabase への非同期 UPSERT（デバウンス処理付き）
  */
 export function scheduleCloudSync(state: AppState): void {
   if (!supabase || !isSupabaseConfigured || isRemoteUpdating) return;
+  pendingState = state;
 
   if (upsertTimeout !== null) {
     window.clearTimeout(upsertTimeout);
@@ -164,25 +192,54 @@ export function scheduleCloudSync(state: AppState): void {
 
   upsertTimeout = window.setTimeout(async () => {
     upsertTimeout = null;
-    const roomId = getRoomId();
-    try {
-      const { error } = await supabase.from('family_states').upsert({
-        room_id: roomId,
-        state: state,
-        updated_at: new Date().toISOString(),
-      });
-
-      if (error) {
-        console.warn('Supabase upsert warning:', error.message);
-        setSyncStatus('error');
-      } else {
-        setSyncStatus('connected');
-      }
-    } catch (err) {
-      console.warn('Supabase upsert network error:', err);
-      setSyncStatus('error');
+    if (pendingState) {
+      const target = pendingState;
+      pendingState = null;
+      await pushToSupabase(target);
     }
   }, 400); // 400ms デバウンス
+}
+
+/**
+ * 即座に Supabase へ同期をフラッシュ（子どもの作成・削除や重要データ変更時）
+ */
+export async function flushCloudSync(state: AppState): Promise<boolean> {
+  if (!supabase || !isSupabaseConfigured) return false;
+  if (upsertTimeout !== null) {
+    window.clearTimeout(upsertTimeout);
+    upsertTimeout = null;
+  }
+  pendingState = null;
+  return await pushToSupabase(state);
+}
+
+// 画面離脱・非表示時に pending なステートを確実に送信
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    if (pendingState) {
+      // Beacon または即時同期
+      const roomId = getRoomId();
+      try {
+        if (supabase) {
+          supabase.from('family_states').upsert({
+            room_id: roomId,
+            state: pendingState,
+            updated_at: new Date().toISOString(),
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && pendingState) {
+      const target = pendingState;
+      pendingState = null;
+      pushToSupabase(target);
+    }
+  });
 }
 
 /**
