@@ -184,9 +184,9 @@ const LINE = `stroke="${LINE_COLOR}" stroke-width="2.5" stroke-linecap="round" s
 
 /* ---------------- イラスト画像アセット レジストリ ---------------- */
 export const IMAGE_ASSETS = {
-  pet: new Set(['shiba', 'dragon', 'penguin', 'unicorn', 'slime', 'anglerfish', 'mini_dragon', 'flying_unicorn']),
-  weapon: new Set(['brave_sword', 'giant_candy', 'laser_blade', 'flame_sword']),
-  accessory: new Set(['ribbon']),
+  pet: new Set<string>(['anglerfish', 'dragon', 'flying_unicorn', 'mini_dragon', 'penguin', 'shiba', 'slime', 'unicorn']),
+  weapon: new Set<string>(['brave_sword', 'flame_sword', 'giant_candy', 'laser_blade']),
+  accessory: new Set<string>(['ribbon']),
   bg: new Set<string>([]),
 };
 
@@ -1024,10 +1024,32 @@ function renderFrontHair(style: string, hc: string): string {
 /* ---------------- 10. 頭装備 (accessory) ---------------- */
 function renderAccessory(accessory: string): string {
   if (IMAGE_ASSETS.accessory.has(accessory)) {
-    if (accessory === 'ribbon') {
-      return `<image href="/assets/avatar/accessory/ribbon.png" x="66" y="16" width="68" height="68" preserveAspectRatio="xMidYMid meet" />`;
+    switch (accessory) {
+      case 'ribbon':
+        return `<image href="/assets/avatar/accessory/ribbon.png" x="66" y="16" width="68" height="68" preserveAspectRatio="xMidYMid meet" />`;
+      case 'crown':
+        return `<image href="/assets/avatar/accessory/crown.png" x="68" y="14" width="64" height="64" preserveAspectRatio="xMidYMid meet" />`;
+      case 'wizard':
+        return `<image href="/assets/avatar/accessory/wizard.png" x="52" y="2" width="96" height="96" preserveAspectRatio="xMidYMid meet" />`;
+      case 'sunglasses':
+        return `<image href="/assets/avatar/accessory/sunglasses.png" x="65" y="80" width="70" height="40" preserveAspectRatio="xMidYMid meet" />`;
+      case 'star_pin':
+        return `<image href="/assets/avatar/accessory/star_pin.png" x="60" y="52" width="48" height="48" preserveAspectRatio="xMidYMid meet" />`;
+      case 'knight_helmet':
+        return `<image href="/assets/avatar/accessory/knight_helmet.png" x="52" y="20" width="96" height="96" preserveAspectRatio="xMidYMid meet" />`;
+      case 'tiara':
+        return `<image href="/assets/avatar/accessory/tiara.png" x="68" y="22" width="64" height="50" preserveAspectRatio="xMidYMid meet" />`;
+      case 'dino_hood':
+        return `<image href="/assets/avatar/accessory/dino_hood.png" x="48" y="12" width="104" height="104" preserveAspectRatio="xMidYMid meet" />`;
+      case 'ninja_band':
+        return `<image href="/assets/avatar/accessory/ninja_band.png" x="48" y="62" width="104" height="50" preserveAspectRatio="xMidYMid meet" />`;
+      case 'cat_headphone':
+        return `<image href="/assets/avatar/accessory/cat_headphone.png" x="48" y="24" width="104" height="104" preserveAspectRatio="xMidYMid meet" />`;
+      case 'angel_ring':
+        return `<image href="/assets/avatar/accessory/angel_ring.png" x="62" y="4" width="76" height="48" preserveAspectRatio="xMidYMid meet" />`;
+      default:
+        return `<image href="/assets/avatar/accessory/${accessory}.png" x="65" y="15" width="70" height="70" preserveAspectRatio="xMidYMid meet" />`;
     }
-    return `<image href="/assets/avatar/accessory/${accessory}.png" x="65" y="15" width="70" height="70" preserveAspectRatio="xMidYMid meet" />`;
   }
 
   switch (accessory) {
@@ -1165,6 +1187,9 @@ function renderWeapon(weapon?: string): string {
     }
     if (weapon === 'giant_candy') {
       return `<image href="/assets/avatar/weapon/giant_candy.png" x="112" y="94" width="80" height="80" preserveAspectRatio="xMidYMid meet" />`;
+    }
+    if (weapon === 'magic_wand') {
+      return `<image href="/assets/avatar/weapon/magic_wand.png" x="108" y="92" width="84" height="84" preserveAspectRatio="xMidYMid meet" />`;
     }
     return `<image href="/assets/avatar/weapon/${weapon}.png" x="110" y="94" width="82" height="82" preserveAspectRatio="xMidYMid meet" />`;
   }
