@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import type { Child } from '../types';
 import { canFreeGacha, spinGacha, exchangeStarShards, type GachaPrize } from '../actions';
 import { GACHA_COST } from '../logic';
-import { AVATAR_OPTIONS, type AvatarOption, findOption, findAsset, getTwemojiUrl, isUnlockableAvatarItem, getShardCost, SHARD_COST } from '../avatar';
+import { AVATAR_OPTIONS, type AvatarOption, findOption, findAsset, getTwemojiUrl, isUnlockableAvatarItem, getShardCost, SHARD_COST, renderSingleAssetPreviewSvg } from '../avatar';
 import { sound } from '../sound';
 import { burst } from '../effects';
 import { toast } from './ui';
@@ -478,6 +478,16 @@ export function GachaModal({
                         );
                       }
 
+                      const singleSvg = renderSingleAssetPreviewSvg(slot, prize.avatarItemId);
+                      if (singleSvg) {
+                        return (
+                          <div
+                            className="w-24 h-24 flex items-center justify-center drop-shadow-md animate-weapon-float"
+                            dangerouslySetInnerHTML={{ __html: singleSvg }}
+                          />
+                        );
+                      }
+
                       if (asset?.twemojiCode) {
                         return (
                           <img
@@ -664,6 +674,16 @@ export function GachaModal({
                               interactive={false}
                               rounded="rounded-none"
                               className="w-full h-full object-contain"
+                            />
+                          );
+                        }
+
+                        const singleSvg = renderSingleAssetPreviewSvg(item.slot, item.id);
+                        if (singleSvg) {
+                          return (
+                            <div
+                              className="w-12 h-12 flex items-center justify-center drop-shadow-sm"
+                              dangerouslySetInnerHTML={{ __html: singleSvg }}
                             />
                           );
                         }

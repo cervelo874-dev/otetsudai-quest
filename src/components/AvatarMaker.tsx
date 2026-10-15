@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { AvatarSlot, Child } from '../types';
-import { optionsFor, isUnlocked, type AvatarOption, getShardCost, SHARD_COST, findAsset, getTwemojiUrl } from '../avatar';
+import { optionsFor, isUnlocked, type AvatarOption, getShardCost, SHARD_COST, findAsset, getTwemojiUrl, renderSingleAssetPreviewSvg } from '../avatar';
 import { updateAvatar, exchangeStarShards } from '../actions';
 import { sound } from '../sound';
 import { burst } from '../effects';
@@ -314,6 +314,17 @@ export function AvatarMaker({
                         interactive={false}
                         rounded="rounded-none"
                         className="w-full h-full object-contain"
+                      />
+                    );
+                  }
+
+                  // 単体ベクターイラストSVGプレビュー（帽子・サングラス・ペット・武器）
+                  const singleSvg = renderSingleAssetPreviewSvg(currentSlot, opt.id);
+                  if (singleSvg) {
+                    return (
+                      <div
+                        className="relative flex items-center justify-center w-full h-full p-1 drop-shadow-sm"
+                        dangerouslySetInnerHTML={{ __html: singleSvg }}
                       />
                     );
                   }
