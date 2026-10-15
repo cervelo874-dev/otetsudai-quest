@@ -459,7 +459,25 @@ export function GachaModal({
                 {prize.kind === 'avatar' && prize.avatarItemId ? (
                   <div className="relative flex items-center justify-center w-28 h-28 overflow-hidden rounded-2xl bg-white/95 border-2 border-amber-300 shadow-md mb-2 p-2">
                     {(() => {
+                      const slot = findOption(prize.avatarItemId)?.slot ?? 'outfit';
                       const asset = findAsset(prize.avatarItemId);
+
+                      if (slot === 'outfit') {
+                        return (
+                          <GameAvatar2D
+                            avatar={{
+                              ...child.avatar,
+                              outfit: prize.avatarItemId,
+                            }}
+                            previewMode="full"
+                            size={96}
+                            interactive={false}
+                            rounded="rounded-none"
+                            className="w-full h-full object-contain"
+                          />
+                        );
+                      }
+
                       if (asset?.twemojiCode) {
                         return (
                           <img
@@ -469,48 +487,14 @@ export function GachaModal({
                           />
                         );
                       }
-                      if (asset?.outfitTheme) {
-                        return (
-                          <div
-                            className="flex items-center justify-center w-full h-full rounded-xl"
-                            style={{
-                              background: `linear-gradient(135deg, ${asset.outfitTheme.primaryColor}33, ${asset.outfitTheme.secondaryColor}66)`,
-                            }}
-                          >
-                            <img
-                              src={getTwemojiUrl(asset.outfitTheme.badgeCode)}
-                              alt={prize.label}
-                              className="w-16 h-16 object-contain filter drop-shadow-md animate-pulse"
-                            />
-                          </div>
-                        );
-                      }
-                      if (asset?.stageConfig) {
-                        return (
-                          <div
-                            className="relative flex items-center justify-center w-full h-full rounded-xl overflow-hidden"
-                            style={{ background: asset.stageConfig.gradient }}
-                          >
-                            <div className="flex items-center gap-1">
-                              {asset.stageConfig.particles.slice(0, 3).map((p, idx) => (
-                                <img
-                                  key={idx}
-                                  src={getTwemojiUrl(p.code)}
-                                  alt=""
-                                  className="w-7 h-7 object-contain drop-shadow"
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      }
+
                       return (
                         <GameAvatar2D
                           avatar={{
                             ...child.avatar,
-                            [findOption(prize.avatarItemId)?.slot ?? 'outfit']: prize.avatarItemId,
+                            [slot]: prize.avatarItemId,
                           }}
-                          previewMode={findOption(prize.avatarItemId)?.slot}
+                          previewMode={slot}
                           size={96}
                           interactive={false}
                           rounded="rounded-none"
@@ -667,6 +651,23 @@ export function GachaModal({
                     <div className="flex items-center justify-center w-14 h-14 shrink-0 overflow-hidden rounded-xl bg-slate-50 border border-slate-200/80 shadow-inner">
                       {(() => {
                         const asset = findAsset(item.id);
+
+                        if (item.slot === 'outfit') {
+                          return (
+                            <GameAvatar2D
+                              avatar={{
+                                ...child.avatar,
+                                outfit: item.id,
+                              }}
+                              previewMode="full"
+                              size={56}
+                              interactive={false}
+                              rounded="rounded-none"
+                              className="w-full h-full object-contain"
+                            />
+                          );
+                        }
+
                         if (asset?.twemojiCode) {
                           return (
                             <img
@@ -676,39 +677,7 @@ export function GachaModal({
                             />
                           );
                         }
-                        if (asset?.outfitTheme) {
-                          return (
-                            <div
-                              className="flex items-center justify-center w-full h-full p-1.5"
-                              style={{
-                                background: `linear-gradient(135deg, ${asset.outfitTheme.primaryColor}33, ${asset.outfitTheme.secondaryColor}66)`,
-                              }}
-                            >
-                              <img
-                                src={getTwemojiUrl(asset.outfitTheme.badgeCode)}
-                                alt={item.name}
-                                className="w-10 h-10 object-contain filter drop-shadow-sm"
-                              />
-                            </div>
-                          );
-                        }
-                        if (asset?.stageConfig) {
-                          return (
-                            <div
-                              className="relative flex items-center justify-center w-full h-full"
-                              style={{ background: asset.stageConfig.gradient }}
-                            >
-                              {asset.stageConfig.particles.slice(0, 1).map((p, pIdx) => (
-                                <img
-                                  key={pIdx}
-                                  src={getTwemojiUrl(p.code)}
-                                  alt=""
-                                  className="w-6 h-6 filter drop-shadow-sm"
-                                />
-                              ))}
-                            </div>
-                          );
-                        }
+
                         return (
                           <GameAvatar2D
                             avatar={{

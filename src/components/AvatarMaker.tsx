@@ -269,95 +269,76 @@ export function AvatarMaker({
                 </div>
               )}
 
-              {/* アイテム高精細イラストプレビュー（装備・ペット・衣装・背景は単体イラストを大きく表示） */}
+              {/* アイテム高精細イラストプレビュー（キャラクタースロットは2.5頭身全身/顔プレビュー、アイテムスロットは高精細イラスト） */}
               <div className="flex items-center justify-center my-0.5 w-16 h-16 shrink-0 overflow-hidden rounded-xl bg-slate-50 border border-slate-200/60 shadow-inner">
                 {(() => {
-                  const asset = findAsset(opt.id);
+                  const isCharacterSlot =
+                    currentSlot === 'hairStyle' ||
+                    currentSlot === 'hairColor' ||
+                    currentSlot === 'expression' ||
+                    currentSlot === 'skin' ||
+                    currentSlot === 'outfit';
 
-                  // 1. あたま・ぶき・ペット（Twemoji高精細ベクターイラスト）
-                  if (currentSlot === 'accessory' || currentSlot === 'weapon' || currentSlot === 'pet') {
-                    if (opt.id === 'acc_none' || opt.id === 'wp_none' || opt.id === 'pet_none') {
-                      return <span className="text-2xl text-slate-400 font-black">なし</span>;
-                    }
-                    if (asset?.twemojiCode) {
-                      return (
-                        <div className="relative flex items-center justify-center w-full h-full p-2">
-                          <img
-                            src={getTwemojiUrl(asset.twemojiCode)}
-                            alt={opt.name}
-                            className="w-12 h-12 object-contain filter drop-shadow"
-                          />
-                          {asset.subEffectCode && (
-                            <img
-                              src={getTwemojiUrl(asset.subEffectCode)}
-                              alt=""
-                              className="absolute top-1 right-1 w-5 h-5 animate-pulse"
-                            />
-                          )}
-                        </div>
-                      );
-                    }
+                  // 1. 「かみがた」「かみいろ」「おかお」「はだ」「おようふく」のタブ：
+                  // 復元した可愛い2.5頭身ちびキャラでライブプレビュー
+                  if (isCharacterSlot) {
+                    return (
+                      <GameAvatar2D
+                        avatar={{
+                          ...child.avatar,
+                          [currentSlot]: opt.id,
+                        }}
+                        previewMode={currentSlot === 'outfit' ? 'full' : currentSlot}
+                        size={64}
+                        interactive={false}
+                        rounded="rounded-none"
+                        className="w-full h-full object-contain"
+                      />
+                    );
                   }
 
-                  // 2. おようふく（衣装モチーフ＋テーマカラー）
-                  if (currentSlot === 'outfit') {
-                    if (asset?.outfitTheme) {
-                      return (
-                        <div
-                          className="flex items-center justify-center w-full h-full p-2 rounded-xl"
-                          style={{
-                            background: `linear-gradient(135deg, ${asset.outfitTheme.primaryColor}33, ${asset.outfitTheme.secondaryColor}66)`,
-                          }}
-                        >
-                          <img
-                            src={getTwemojiUrl(asset.outfitTheme.badgeCode)}
-                            alt={opt.name}
-                            className="w-11 h-11 object-contain filter drop-shadow"
-                          />
-                        </div>
-                      );
-                    }
+                  // 2. 「あたま」「もちもの」「ペット」「はいけい」のタブ：
+                  // カードの中央にそのアイテムの高精細イラストが大きく見やすく表示
+                  if (opt.id === 'acc_none' || opt.id === 'wp_none' || opt.id === 'pet_none') {
+                    return <span className="text-2xl text-slate-400 font-black">なし</span>;
                   }
 
-                  // 3. はいけい（背景ステージミニチュア）
                   if (currentSlot === 'bg') {
-                    if (asset?.stageConfig) {
-                      return (
-                        <div
-                          className="relative flex items-center justify-center w-full h-full rounded-xl overflow-hidden shadow-inner"
-                          style={{ background: asset.stageConfig.gradient }}
-                        >
-                          {asset.stageConfig.particles.slice(0, 2).map((p, pIdx) => (
-                            <img
-                              key={pIdx}
-                              src={getTwemojiUrl(p.code)}
-                              alt=""
-                              className="absolute w-5 h-5 opacity-90 filter drop-shadow-sm"
-                              style={{
-                                left: `${pIdx === 0 ? '20%' : '70%'}`,
-                                top: `${pIdx === 0 ? '30%' : '60%'}`,
-                              }}
-                            />
-                          ))}
-                        </div>
-                      );
-                    }
+                    return (
+                      <GameAvatar2D
+                        avatar={{
+                          ...child.avatar,
+                          bg: opt.id,
+                        }}
+                        size={64}
+                        interactive={false}
+                        rounded="rounded-none"
+                        className="w-full h-full object-contain"
+                      />
+                    );
                   }
 
-                  // 4. かみがた・かみいろ・おかお・はだ（キャラクター顔ズームプレビュー）
-                  return (
-                    <GameAvatar2D
-                      avatar={{
-                        ...child.avatar,
-                        [currentSlot]: opt.id,
-                      }}
-                      previewMode={currentSlot}
-                      size={64}
-                      interactive={false}
-                      rounded="rounded-none"
-                      className="w-full h-full object-contain"
-                    />
-                  );
+                  const asset = findAsset(opt.id);
+                  if (asset?.twemojiCode) {
+                    return (
+                      <div className="relative flex items-center justify-center w-full h-full p-1.5">
+                        <img
+                          src={getTwemojiUrl(asset.twemojiCode)}
+                          alt={opt.name}
+                          className="w-12 h-12 object-contain filter drop-shadow"
+                        />
+                        {asset.subEffectCode && (
+                          <img
+                            src={getTwemojiUrl(asset.subEffectCode)}
+                            alt=""
+                            className="absolute top-1 right-1 w-5 h-5 animate-pulse"
+                          />
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return <span className="text-3xl">{opt.icon}</span>;
                 })()}
               </div>
 
