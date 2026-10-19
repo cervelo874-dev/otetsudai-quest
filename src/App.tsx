@@ -4,6 +4,7 @@ import type { Child } from './types';
 import { TopNav } from './components/TopNav';
 import { ToastHost, Modal } from './components/ui';
 import { PinPad } from './components/PinPad';
+import { AvatarNewItemsNotifier } from './components/AvatarNewItemsNotifier';
 import { LoginView } from './views/LoginView';
 import { KidView } from './views/KidView';
 import { ParentView } from './views/ParentView';
@@ -126,6 +127,9 @@ export default function App() {
     <div className="min-h-screen bg-[#FFF8EC] text-slate-800 font-sans selection:bg-amber-200">
       {/* トースト表示ホスト */}
       <ToastHost />
+
+      {/* 新着アバターパーツ検知＆ローカル保存プロンプト */}
+      <AvatarNewItemsNotifier />
 
       {/* 常設ワンタップ切替バー */}
       <TopNav

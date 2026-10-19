@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Circle,
   CircleUser,
+  Cloud,
   Copy,
   Download,
   FlipHorizontal,
@@ -80,6 +81,11 @@ import {
   saveCatalogPart,
   type DuplicateCatalogPartOptions,
 } from '../storage/partCatalog';
+import {
+  checkNewCloudItems,
+  importCloudPartsToLocal,
+  uploadCatalogToCloud,
+} from '../storage/cloudCatalogSync';
 import { toast } from '../../../components/ui';
 import { downloadDataUrl, exportAvatarAsDataURL } from '../utils/composeAvatar';
 import { AvatarRenderer } from './AvatarRenderer';
@@ -750,6 +756,28 @@ export function AvatarCloset({
     [savedTemplate],
   );
   const hasActiveCategoryTemplate = Boolean(savedTemplate[activeCategory]);
+
+  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
+
+  // クラウド上の最新パーツを手動でチェック・同期
+  const handleManualCloudSync = async () => {
+    setIsCloudSyncing(true);
+    try {
+      const diff = await checkNewCloudItems();
+      if (diff && diff.newCount > 0) {
+        const count = await importCloudPartsToLocal(diff.newParts);
+        showActionNotice(`☁️ クラウドから ${count} 件の新しいパーツを取り込みました！`);
+      } else {
+        await uploadCatalogToCloud();
+        showActionNotice('☁️ すでに最新の状態です（クラウドと同期完了）');
+      }
+    } catch (err) {
+      console.error('Manual cloud sync failed:', err);
+      showActionNotice('❌ クラウド同期に失敗しました');
+    } finally {
+      setIsCloudSyncing(false);
+    }
+  };
 
   // 全パーツの現在の微調整配置をテンプレートとして記憶
   const handleSaveAllTemplates = () => {
@@ -1855,6 +1883,21 @@ export function AvatarCloset({
                 <span>{CATEGORY_META[activeCategory].label}のみ適用</span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleManualCloudSync}
+              disabled={isCloudSyncing}
+              className="flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 active:scale-95 disabled:opacity-50 transition"
+              title="クラウドから他の端末で作成した最新パーツを取得・同期します"
+            >
+              {isCloudSyncing ? (
+                <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />
+              ) : (
+                <Cloud className="h-3 w-3 text-indigo-600" />
+              )}
+              <span>クラウド同期</span>
+            </button>
           </div>
 
           <label className="flex cursor-pointer select-none items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1 text-xs text-zinc-700 shadow-sm hover:bg-zinc-50 transition">

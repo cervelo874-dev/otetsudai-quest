@@ -115,6 +115,7 @@ export async function saveCatalogPart(part: AvatarPart): Promise<AvatarPart> {
   }
 
   notifyCatalogUpdated();
+  void import('./cloudCatalogSync').then((m) => m.scheduleCloudCatalogUpload()).catch(() => {});
   return normalized;
 }
 
@@ -205,6 +206,7 @@ export async function removeCatalogPart(partId: string): Promise<void> {
     writeFallbackParts(current.filter((p) => p.id !== partId));
   }
   notifyCatalogUpdated();
+  void import('./cloudCatalogSync').then((m) => m.scheduleCloudCatalogUpload()).catch(() => {});
 }
 
 /** カタログ内のパーツをすべて消去 */
@@ -226,5 +228,6 @@ export async function clearCatalogParts(): Promise<void> {
     // ignore
   }
   notifyCatalogUpdated();
+  void import('./cloudCatalogSync').then((m) => m.scheduleCloudCatalogUpload()).catch(() => {});
 }
 

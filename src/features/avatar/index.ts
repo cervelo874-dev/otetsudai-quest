@@ -96,6 +96,16 @@ export {
   type DuplicateCatalogPartOptions,
 } from './storage/partCatalog';
 export {
+  fetchCloudCatalog,
+  checkNewCloudItems,
+  importCloudPartsToLocal,
+  uploadCatalogToCloud,
+  scheduleCloudCatalogUpload,
+  startCloudCatalogSync,
+  NEW_AVATAR_PARTS_DETECTED_EVENT,
+  type NewPartsDetectedDetail,
+} from './storage/cloudCatalogSync';
+export {
   loadReferenceAnchors,
   saveReferenceAnchors,
   loadProportionGuideConfig,
