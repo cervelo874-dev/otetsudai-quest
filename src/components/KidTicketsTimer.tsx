@@ -6,7 +6,12 @@ import { burst } from '../effects';
 import { toast } from './ui';
 import { pipTimer } from '../pip';
 import { useNow, usePipActive } from '../hooks';
-import { buildAvatarSvg } from '../avatar';
+import {
+  usePartCatalog,
+  resolveChildEquippedParts,
+  exportAvatarAsDataURL,
+  PRESET_BODY_SRC,
+} from '../features/avatar';
 import { ensureNotificationPermission, notify } from '../notify';
 import { BONUS_COINS, BONUS_WINDOW_MS } from '../logic';
 import { formatClock, formatHMKana, todayKey } from '../utils';
@@ -26,6 +31,34 @@ export function KidTicketsTimer({
   const [bonusModal, setBonusModal] = useState<{ bonus: boolean; coins: number; refundMinutes?: number } | null>(null);
   const lastAlarmTimeRef = useRef<number>(0);
 
+  const { parts: catalogParts } = usePartCatalog();
+  const [avatarDataUrl, setAvatarDataUrl] = useState<string>(PRESET_BODY_SRC);
+
+  // 子どもの新アバターからPiP用アイコン画像を生成
+  useEffect(() => {
+    let canceled = false;
+    const equipped = resolveChildEquippedParts(child.avatarStudio ?? undefined, catalogParts);
+    exportAvatarAsDataURL(equipped, {
+      adjustments: child.avatarStudio?.adjustments,
+      size: 200,
+      faceOnly: true,
+      circleClip: true,
+    })
+      .then((url) => {
+        if (!canceled && url) {
+          setAvatarDataUrl(url);
+        }
+      })
+      .catch(() => {
+        if (!canceled) {
+          setAvatarDataUrl(PRESET_BODY_SRC);
+        }
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [child.avatarStudio, catalogParts]);
+
   const currentTimer = activeTimers.find((t) => t.childId === child.id);
   const myTickets = tickets.filter((t) => t.childId === child.id);
   const unusedTickets = myTickets.filter((t) => t.status === 'owned');
@@ -36,9 +69,8 @@ export function KidTicketsTimer({
     if (!currentTimer || currentTimer.isPaused) return;
 
     // PiPコントローラの状態更新
-    const svg = buildAvatarSvg(child.avatar, 200);
     pipTimer.update({
-      svg,
+      imageSrc: avatarDataUrl,
       endsAt: currentTimer.endsAt,
       name: child.name,
     });
@@ -59,7 +91,7 @@ export function KidTicketsTimer({
         sound.alarm();
       }
     }
-  }, [currentTimer, now, child]);
+  }, [currentTimer, now, child, avatarDataUrl]);
 
   // チケットを使用
   const handleUseTicket = async (ticket: Ticket) => {

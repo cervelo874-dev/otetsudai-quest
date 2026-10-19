@@ -70,13 +70,16 @@ export function Modal({
   }, [open, onClose]);
 
   if (!open) return null;
+  const maxWClass = className.includes('max-w-') ? '' : 'max-w-md';
+  const padClass = className.includes('p-') ? '' : 'p-6';
+
   return (
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className={`animate-popin relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl ${className}`}
+        className={`animate-popin relative max-h-[92vh] w-full ${maxWClass} ${padClass} overflow-y-auto rounded-3xl bg-white shadow-2xl ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {!hideClose && (

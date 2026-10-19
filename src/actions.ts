@@ -4,6 +4,7 @@ import { uid, todayKey, yesterdayKey } from './utils';
 import { BONUS_COINS, BONUS_WINDOW_MS, GACHA_COST, rewardFor } from './logic';
 import { AVATAR_OPTIONS, findOption, isUnlockableAvatarItem, isDefaultAvatarItem, getShardCost } from './avatar';
 import { createInitialState } from './presets';
+import { DEFAULT_EQUIPPED, toEquippedIdMap } from './features/avatar';
 
 /* ---------------- helpers ---------------- */
 
@@ -664,6 +665,73 @@ export function updateAvatar(childId: string, slot: AvatarSlot, value: string): 
     if (opt && (opt.locked || opt.gachaOnly) && !c.ownedItems.includes(opt.id)) return;
     c.avatar[slot] = value;
   });
+}
+
+export function updateChildAvatarStudio(
+  childId: string,
+  equipped: Partial<Record<import('./features/avatar').AvatarCategory, string | null>>,
+  adjustments: import('./features/avatar').LayerAdjustmentMap,
+  handItems?: string[],
+): void {
+  setState((s) => {
+    const c = findChild(s, childId);
+    if (!c) return;
+    const finalHandItems =
+      handItems !== undefined
+        ? handItems
+        : equipped.hand_item
+        ? [equipped.hand_item]
+        : [];
+    c.avatarStudio = {
+      equipped,
+      adjustments,
+      hand_items: finalHandItems,
+    };
+  });
+  flushSync();
+}
+
+/** 親が工房で素体を作成・更新した際に全子どもの素体を一括更新する */
+export function updateAllChildrenAvatarBody(bodyPartId: string): void {
+  const defaultMap = toEquippedIdMap(DEFAULT_EQUIPPED);
+  setState((s) => {
+    for (const c of s.children) {
+      if (!c.avatarStudio) {
+        c.avatarStudio = {
+          equipped: {
+            ...defaultMap,
+            body: bodyPartId,
+          },
+          adjustments: {},
+        };
+      } else {
+        c.avatarStudio.equipped = {
+          ...defaultMap,
+          ...c.avatarStudio.equipped,
+          body: bodyPartId,
+        };
+      }
+    }
+  });
+  flushSync();
+}
+
+/** 親が工房で設定したアバター（装備＆微調整）を全子どもに完全同期する */
+export function syncParentStudioAvatarToChildren(
+  equipped: Partial<Record<import('./features/avatar').AvatarCategory, string | null>>,
+  adjustments: import('./features/avatar').LayerAdjustmentMap,
+  handItems?: string[],
+): void {
+  setState((s) => {
+    for (const c of s.children) {
+      c.avatarStudio = {
+        equipped: { ...equipped },
+        adjustments: { ...adjustments },
+        hand_items: handItems ?? (equipped.hand_item ? [equipped.hand_item] : []),
+      };
+    }
+  });
+  flushSync();
 }
 
 export function dismissNotice(id: string): void {

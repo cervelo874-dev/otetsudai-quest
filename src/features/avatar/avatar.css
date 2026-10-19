@@ -1,0 +1,147 @@
+/* ============================================================
+ * Avatar Module Styles (Tailwindに依存せず単体で機能するCSSアニメーション)
+ * ============================================================ */
+
+/* 透過背景確認用のチェッカーボード（市松模様） */
+.avatar-checker {
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(45deg, #f1f5f9 25%, transparent 25%),
+    linear-gradient(-45deg, #f1f5f9 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #f1f5f9 75%),
+    linear-gradient(-45deg, transparent 75%, #f1f5f9 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.avatar-checker-dark {
+  background-color: #1e293b;
+  background-image:
+    linear-gradient(45deg, #334155 25%, transparent 25%),
+    linear-gradient(-45deg, #334155 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #334155 75%),
+    linear-gradient(-45deg, transparent 75%, #334155 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+/* ---------- 呼吸・揺れアニメーション (animate=true 時) ---------- */
+.avatar-animated .avatar-body-group,
+.avatar-animated .avatar-body-layer {
+  transform-origin: 50% 92%;
+  animation: avatar-breathe 3.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+.avatar-animated .avatar-hand-layer {
+  transform-origin: 64% 64%;
+  animation: avatar-hand-sway 2.8s ease-in-out infinite;
+}
+
+/* 持ち物専用レイヤー（デフォルトは静止） */
+.avatar-animated .avatar-hand-item-layer {
+  animation: none;
+}
+
+.avatar-animated .avatar-pet-layer {
+  transform-origin: 21% 90%;
+  animation: avatar-pet-bounce 2.4s ease-in-out infinite;
+  will-change: transform;
+}
+
+.avatar-animated .avatar-back-fx-layer {
+  transform-origin: 50% 54%;
+  animation: avatar-back-aura 4s ease-in-out infinite;
+}
+
+.avatar-animated .avatar-front-fx-layer {
+  animation: avatar-front-sparkle 2s ease-in-out infinite;
+}
+
+@keyframes avatar-breathe {
+  0%, 100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  50% {
+    transform: translateY(-0.6%) scale(1.004, 1.012);
+  }
+}
+
+@keyframes avatar-hand-sway {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-3.5deg);
+  }
+}
+
+@keyframes avatar-pet-bounce {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg) scale(1, 1);
+  }
+  15% {
+    transform: translateY(0) scale(1.05, 0.95);
+  }
+  40% {
+    transform: translateY(-3.5%) rotate(-3deg) scale(0.97, 1.03);
+  }
+  60% {
+    transform: translateY(-3.5%) rotate(3deg) scale(0.97, 1.03);
+  }
+  85% {
+    transform: translateY(0) scale(1.04, 0.96);
+  }
+}
+
+@keyframes avatar-back-aura {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.88;
+  }
+  50% {
+    transform: scale(1.035) rotate(2.5deg);
+    opacity: 1;
+  }
+}
+
+@keyframes avatar-front-sparkle {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 0.82;
+    filter: brightness(1.18);
+  }
+}
+
+/* 持ち物専用の上下動（ふわふわ浮遊動・ボビング）アニメーション (ONの時のみ) */
+.avatar-animated .avatar-item-bobbing,
+.avatar-animated .avatar-hand-item-layer.avatar-item-bobbing {
+  animation: avatar-item-float 2.5s ease-in-out infinite !important;
+  will-change: transform;
+}
+
+/* スイッチOFF時および明示的静止時の完全停止クラス */
+.avatar-item-static,
+.avatar-animated .avatar-item-static,
+.avatar-animated .avatar-hand-layer.avatar-item-static,
+.avatar-animated .avatar-hand-item-layer.avatar-item-static {
+  animation: none !important;
+}
+
+@keyframes avatar-item-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-animated * {
+    animation: none !important;
+  }
+}

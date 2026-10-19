@@ -20,6 +20,7 @@ import {
   updateNotificationSettings,
 } from '../actions';
 import { GameAvatar2D } from '../components/Avatar';
+import { AvatarStudioSection } from '../components/AvatarStudioSection';
 import { Modal } from '../components/ui';
 import { sound } from '../sound';
 import { toast } from '../components/ui';
@@ -63,7 +64,7 @@ import {
   requestNotificationPermission,
   sendBrowserNotification,
 } from '../notifications';
-import { validateAvatarRenderers, AVATAR_OPTIONS } from '../avatar';
+import { usePartCatalog, PRESET_PARTS } from '../features/avatar';
 
 const TICKET_TEMPLATES: {
   category: 'tablet' | 'real';
@@ -89,7 +90,7 @@ export function ParentView({ state }: { state: AppState }) {
   // タイマーが稼働している時だけ 1秒更新を行い、タイマーがない時は無駄な再描画を完全に停止
   const now = useNow(1000, state.timers.length > 0);
   const syncStatus = useSyncStatus();
-  const [activeTab, setActiveTab] = useState<'approvals' | 'children' | 'quests' | 'shop' | 'logs'>('approvals');
+  const [activeTab, setActiveTab] = useState<'approvals' | 'children' | 'quests' | 'shop' | 'logs' | 'studio'>('approvals');
 
   // タイマー終了の通知追跡（重複通知防止）と非表示状態
   const notifiedOverTimersRef = useRef<Set<string>>(new Set());
@@ -208,8 +209,8 @@ export function ParentView({ state }: { state: AppState }) {
     toast('テスト通知を送信しました', '🔔');
   };
 
-  // アバター描画整合性チェック状態
-  const [avatarDiag] = useState(() => validateAvatarRenderers());
+  // 新アバター工房のパーツカタログ情報
+  const { parts: catalogParts } = usePartCatalog();
   const [showAvatarGallery, setShowAvatarGallery] = useState(false);
 
   // 子ども編集モーダル状態
@@ -283,7 +284,7 @@ export function ParentView({ state }: { state: AppState }) {
     toast('新しい子どもを追加しました！お名前やPINコードを設定してください', '👶');
   };
 
-  const tabs: { key: 'approvals' | 'children' | 'quests' | 'shop' | 'logs'; label: string; icon: string; count?: number }[] = [
+  const tabs: { key: 'approvals' | 'children' | 'quests' | 'shop' | 'studio' | 'logs'; label: string; icon: string; count?: number }[] = [
     {
       key: 'approvals',
       label: '承認センター',
@@ -307,6 +308,11 @@ export function ParentView({ state }: { state: AppState }) {
       icon: '🏪',
     },
     {
+      key: 'studio',
+      label: 'アバター工房',
+      icon: '🎨',
+    },
+    {
       key: 'logs',
       label: '活動ログ・設定',
       icon: '📋',
@@ -314,7 +320,7 @@ export function ParentView({ state }: { state: AppState }) {
   ];
 
   return (
-    <div className="mx-auto max-w-4xl p-4 sm:p-6 pb-20">
+    <div className={`mx-auto ${activeTab === 'studio' ? 'max-w-7xl' : 'max-w-4xl'} p-4 sm:p-6 pb-20 transition-all`}>
       {/* 親ダッシュボードヘッダー */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 pb-4 mb-4">
         <div>
@@ -579,7 +585,7 @@ export function ParentView({ state }: { state: AppState }) {
                     className="card flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-5 border-2 border-amber-200 bg-amber-50/50"
                   >
                     <div className="flex items-center gap-3">
-                      <GameAvatar2D config={child.avatar} size={54} rounded="rounded-2xl" interactive={false} />
+                      <GameAvatar2D child={child} config={child.avatar} size={54} rounded="rounded-2xl" interactive={false} />
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-black text-slate-800 text-base">
@@ -710,7 +716,7 @@ export function ParentView({ state }: { state: AppState }) {
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <GameAvatar2D config={child.avatar} size={54} rounded="rounded-2xl" interactive={false} />
+                        <GameAvatar2D child={child} config={child.avatar} size={54} rounded="rounded-2xl" interactive={false} />
                         <div>
                           <div className="font-black text-slate-800 text-lg flex items-center gap-1">
                             <span>{child.name}</span>
@@ -1418,73 +1424,61 @@ export function ParentView({ state }: { state: AppState }) {
             </div>
           </div>
 
-          {/* アバターアイテム描画整合性チェッカー */}
-          <div className="card p-5 border-2 border-slate-200 bg-white">
+          {/* 新世代アバターカタログ＆工房情報 */}
+          <div className="card p-5 border-2 border-indigo-100 bg-white">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
                   <span>🎨</span>
-                  <span>アバターアイテム描画チェッカー＆図鑑</span>
+                  <span>アバターカタログ＆パーツ管理</span>
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  全{AVATAR_OPTIONS.length}個のアイテムが正しく画面に反映・描画できるかを自動検証しています。
+                  親が制作した自作パーツ {catalogParts.filter((p) => p.source === 'custom' || !p.id.startsWith('preset_')).length} 個、公式プリセットパーツ {PRESET_PARTS.length} 個が利用可能です。
                 </p>
               </div>
 
               <div className="flex items-center gap-2 self-end sm:self-center">
-                {avatarDiag.ok ? (
-                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700 flex items-center gap-1.5">
-                    <span>🟢</span>
-                    <span>全アイテム正常描画（未実装: 0件）</span>
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-black text-rose-700 flex items-center gap-1.5">
-                    <span>🔴</span>
-                    <span>未実装アイテムあり ({avatarDiag.missing.length}件)</span>
-                  </span>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    sound.tap();
+                    setActiveTab('studio');
+                  }}
+                  className="btn-pop rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-black text-white shadow-sm hover:bg-indigo-700 flex items-center gap-1.5"
+                >
+                  <span>🎨</span>
+                  <span>アバター工房を開く</span>
+                </button>
 
                 <button
                   type="button"
                   onClick={() => setShowAvatarGallery(!showAvatarGallery)}
-                  className="btn-pop rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200"
+                  className="btn-pop rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200"
                 >
-                  {showAvatarGallery ? '閉じる' : 'アイテム一覧を見る'}
+                  {showAvatarGallery ? '閉じる' : 'パーツ一覧'}
                 </button>
               </div>
             </div>
 
-            {/* 未実装アイテム警告（ある場合） */}
-            {!avatarDiag.ok && (
-              <div className="rounded-xl border border-rose-300 bg-rose-50 p-3 mt-3 text-xs text-rose-800">
-                <div className="font-black mb-1">以下のアイテムのSVG描画処理が未実装です:</div>
-                <ul className="list-disc list-inside">
-                  {avatarDiag.missing.map((m) => (
-                    <li key={m.id}>
-                      [{m.slot}] {m.name} ({m.id})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* アイテム一覧プレビュー展開 */}
+            {/* パーツ一覧プレビュー展開 */}
             {showAvatarGallery && (
               <div className="mt-4 pt-4 border-t border-slate-100 max-h-96 overflow-y-auto">
                 <div className="text-xs font-bold text-slate-500 mb-2">
-                  実装済みアバターアイテム一覧（全{AVATAR_OPTIONS.length}件・詳細は docs/AVATAR_CATALOG.md）
+                  登録済みパーツ一覧（自作＋プリセット 合計 {PRESET_PARTS.length + catalogParts.filter((p) => p.source === 'custom' || !p.id.startsWith('preset_')).length} 件）
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                  {AVATAR_OPTIONS.filter((o) => !o.hidden).map((opt) => (
+                  {[...catalogParts.filter((p) => p.source === 'custom' || !p.id.startsWith('preset_')), ...PRESET_PARTS].map((part) => (
                     <div
-                      key={opt.id}
-                      className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs flex items-center gap-2"
+                      key={part.id}
+                      className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs flex items-center gap-2.5"
                     >
-                      <span className="text-xl shrink-0">{opt.icon}</span>
+                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white p-0.5 border border-slate-200 flex items-center justify-center">
+                        <img src={part.src} alt={part.name} className="h-full w-full object-contain" />
+                      </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-bold text-slate-800 truncate">{opt.name}</div>
+                        <div className="font-bold text-slate-800 truncate">{part.name}</div>
                         <div className="text-[10px] text-slate-400">
-                          {opt.slot} • {opt.rarity ? `★${opt.rarity}` : '★1'}
+                          {part.source === 'custom' || !part.id.startsWith('preset_') ? '💛 てづくり' : '公式'} • {part.category}
                         </div>
                       </div>
                     </div>
@@ -1516,6 +1510,11 @@ export function ParentView({ state }: { state: AppState }) {
             </button>
           </div>
         </div>
+      )}
+
+      {/* ---------------- 6. アバター制作工房（スタジオ） ---------------- */}
+      {activeTab === 'studio' && (
+        <AvatarStudioSection />
       )}
 
       {/* ---------------- サプライズボーナスモーダル ---------------- */}

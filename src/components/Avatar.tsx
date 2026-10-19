@@ -1,9 +1,16 @@
-import { useMemo, useState, useEffect, useId } from 'react';
-import type { AvatarConfig, AvatarSlot } from '../types';
-import { buildGameAvatarSvg } from '../avatar';
+import { memo, useMemo, useState, useEffect } from 'react';
+import type { AvatarConfig, AvatarSlot, Child, ChildAvatarStudio } from '../types';
 import { sound } from '../sound';
+import {
+  AvatarRenderer,
+  resolveChildEquippedParts,
+  usePartCatalog,
+  type EquippedParts,
+} from '../features/avatar';
 
-export function GameAvatar2D({
+export const GameAvatar2D = memo(function GameAvatar2D({
+  child,
+  avatarStudio,
   config,
   avatar,
   size = 140,
@@ -15,6 +22,8 @@ export function GameAvatar2D({
   sparkleTrigger = 0,
   previewMode,
 }: {
+  child?: Child | null;
+  avatarStudio?: ChildAvatarStudio | null;
   config?: AvatarConfig | null;
   avatar?: AvatarConfig | null;
   size?: number;
@@ -29,11 +38,11 @@ export function GameAvatar2D({
   const [jumping, setJumping] = useState(false);
   const [sparkling, setSparkling] = useState(false);
 
-  // グラデーションID競合を防ぐユニークプレフィックス
-  const rawId = useId();
-  const idPrefix = useMemo(() => 'av' + rawId.replace(/[^a-zA-Z0-9]/g, ''), [rawId]);
+  // 親画面のアバター工房で登録されたパーツ一覧を自動購読
+  const { parts: catalogParts } = usePartCatalog();
 
-  const currentConfig = config ?? avatar;
+  // 子どものアバター設定データを取得
+  const targetStudio = child?.avatarStudio ?? avatarStudio;
 
   // 顔まわりのズーム判定
   const isFaceZoom =
@@ -45,13 +54,10 @@ export function GameAvatar2D({
     previewMode === 'face' ||
     previewMode === 'head';
 
-  const viewBox = isFaceZoom ? '35 35 130 115' : '0 0 200 240';
-
-  const key = JSON.stringify(currentConfig ?? {}) + viewBox;
-  const svg = useMemo(
-    () => buildGameAvatarSvg(currentConfig, undefined, undefined, viewBox, idPrefix),
-    [key, idPrefix]
-  );
+  // 18レイヤーの装備パーツ一式を解決
+  const equippedParts: EquippedParts = useMemo(() => {
+    return resolveChildEquippedParts(targetStudio ?? undefined, catalogParts);
+  }, [targetStudio, catalogParts]);
 
   // パーツ変更時のキラキラポップ演出
   useEffect(() => {
@@ -69,24 +75,32 @@ export function GameAvatar2D({
   };
 
   const actualWidth = width ?? size;
-  const actualHeight = height ?? (width ? undefined : isFaceZoom ? Math.round((size * 115) / 130) : Math.round((size * 240) / 200));
+  const actualHeight = height ?? actualWidth;
 
   return (
     <div
       onClick={handleTap}
-      className={`shrink-0 overflow-hidden bg-white select-none transition-transform ${rounded} ${className} ${
+      className={`relative shrink-0 overflow-hidden bg-white/40 select-none transition-transform ${rounded} ${className} ${
         jumping ? 'animate-rpg-jump' : sparkling ? 'animate-dressup-pop' : 'animate-rpg-idle'
       } ${interactive ? 'cursor-pointer hover:scale-105 active:scale-95' : ''}`}
       style={{
         width: actualWidth,
         height: actualHeight,
-        aspectRatio: isFaceZoom ? '130 / 115' : '200 / 240',
+        aspectRatio: '1 / 1',
       }}
       title={interactive ? 'タップして ジャンプ！✨' : undefined}
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    >
+      <AvatarRenderer
+        equippedParts={equippedParts}
+        adjustments={targetStudio?.adjustments}
+        size="full"
+        animate={true}
+        faceOnly={isFaceZoom}
+      />
+    </div>
   );
-}
+});
 
 // 既存コードとの完全互換用
 export const Avatar = GameAvatar2D;
+

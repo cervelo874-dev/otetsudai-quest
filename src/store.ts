@@ -133,6 +133,7 @@ export function mergeStates(local: AppState, remote: Partial<AppState>): { merge
           ...(remoteChild.avatar || {}),
           ...(localChild.avatar || {}),
         },
+        avatarStudio: chosenChild.avatarStudio ?? localChild.avatarStudio ?? remoteChild.avatarStudio,
       });
     }
   });

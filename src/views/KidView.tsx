@@ -96,6 +96,7 @@ export function KidView({
               title="きせかえをする"
             >
               <Avatar
+                child={currentChild}
                 config={currentChild.avatar}
                 size={110}
                 rounded="rounded-3xl shadow-xl border-4 border-white"
@@ -277,7 +278,8 @@ export function KidView({
       <Modal
         open={showAvatarMaker}
         onClose={() => setShowAvatarMaker(false)}
-        className="max-w-md"
+        className="max-w-3xl lg:max-w-4xl p-3 sm:p-5"
+        hideClose={true}
       >
         <AvatarMaker
           child={currentChild}

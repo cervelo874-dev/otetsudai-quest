@@ -1,3 +1,5 @@
+import type { EquippedPartMap, LayerAdjustmentMap } from './features/avatar';
+
 export type AvatarSlot =
   | 'skin'
   | 'hairStyle'
@@ -21,6 +23,13 @@ export type AvatarConfig = {
   bg: string;
 };
 
+export type ChildAvatarStudio = {
+  equipped: Partial<Record<import('./features/avatar').AvatarCategory, string | null>>;
+  adjustments?: LayerAdjustmentMap;
+  /** 複数持ち物のパーツIDリスト */
+  hand_items?: string[];
+};
+
 export interface Child {
   id: string;
   name: string;
@@ -31,6 +40,8 @@ export interface Child {
   lastDoneDate: string | null;
   totalQuests: number;
   avatar: AvatarConfig;
+  /** 18レイヤー新アバター工房の装備＆微調整データ */
+  avatarStudio?: ChildAvatarStudio;
   ownedItems: string[];
   lastFreeGacha: string | null;
   color: string;

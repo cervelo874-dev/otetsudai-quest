@@ -42,15 +42,20 @@ class PipTimerController {
     this.listeners.forEach((l) => l());
   }
 
-  update(info: { svg: string; endsAt: number; name: string }): void {
-    if (info.svg !== this.svg) {
-      this.svg = info.svg;
+  update(info: { svg?: string; imageSrc?: string; endsAt: number; name: string }): void {
+    const rawSrc = info.imageSrc || info.svg || '';
+    if (rawSrc && rawSrc !== this.svg) {
+      this.svg = rawSrc;
       const img = new Image();
       img.onload = () => {
         this.img = img;
         this.draw();
       };
-      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(info.svg)}`;
+      if (rawSrc.startsWith('data:') || rawSrc.startsWith('blob:') || rawSrc.startsWith('http') || rawSrc.startsWith('/')) {
+        img.src = rawSrc;
+      } else {
+        img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(rawSrc)}`;
+      }
     }
     this.endsAt = info.endsAt;
     this.name = info.name;
