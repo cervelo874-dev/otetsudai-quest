@@ -14,7 +14,7 @@ import {
 } from '../features/avatar';
 import { toast } from './ui';
 import { sound } from '../sound';
-import { updateAllChildrenAvatarBody, syncParentStudioAvatarToChildren } from '../actions';
+import { updateAllChildrenAvatarBody } from '../actions';
 
 type StudioSectionView = 'studio' | 'closet';
 
@@ -84,68 +84,18 @@ export function AvatarStudioSection() {
     }
   }, [adjustments]);
 
-  // クローゼットで「保存して決定」が押された時（全身のコーディネートを子どもたちにも完全同期）
+  // クローゼットで「保存して決定」が押された時（工房の装備・位置調整のみ保存し、子どものアバターには影響させない）
   const handleSaveEquipped = useCallback(
     (newEquipped: EquippedPartMap, newAdjustments: LayerAdjustmentMap) => {
       setEquippedParts(newEquipped);
       setAdjustments(newAdjustments);
       setTryOnPart(null);
 
-      // 親が工房で設定したアバター（素体・服・手足・持ち物等）を全子どもに完全同期！
-      const idMap: Partial<Record<AvatarCategory, string | null>> = {};
-      for (const [cat, part] of Object.entries(newEquipped)) {
-        if (cat === 'hand_items') continue;
-        const p = part as AvatarPart | null;
-        idMap[cat as AvatarCategory] = p?.id ?? null;
-      }
-
-      const handItemIds: string[] = [];
-      if (Array.isArray(newEquipped.hand_items)) {
-        for (const item of newEquipped.hand_items) {
-          if (!item) continue;
-          const id = typeof item === 'string' ? item : item.id;
-          if (id && !handItemIds.includes(id)) handItemIds.push(id);
-        }
-      } else if (newEquipped.hand_item) {
-        const id = typeof newEquipped.hand_item === 'string' ? newEquipped.hand_item : newEquipped.hand_item.id;
-        if (id) handItemIds.push(id);
-      }
-      idMap.hand_item = handItemIds[0] ?? null;
-
-      syncParentStudioAvatarToChildren(idMap, newAdjustments, handItemIds);
-
       sound.fanfare();
-      toast('アバターを保存し、子どもたちのアバターにも即時反映しました！✨', '🎉');
+      toast('工房のアバター（装備・位置調整）を保存しました！✨', '🎉');
     },
     [],
   );
-
-  // 現在工房で設定されているアバターを子ども全員に即時同期反映
-  const handleSyncToAllChildren = useCallback(() => {
-    const idMap: Partial<Record<AvatarCategory, string | null>> = {};
-    for (const [cat, part] of Object.entries(equippedParts)) {
-      if (cat === 'hand_items') continue;
-      const p = part as AvatarPart | null;
-      idMap[cat as AvatarCategory] = p?.id ?? null;
-    }
-
-    const handItemIds: string[] = [];
-    if (Array.isArray(equippedParts.hand_items)) {
-      for (const item of equippedParts.hand_items) {
-        if (!item) continue;
-        const id = typeof item === 'string' ? item : item.id;
-        if (id && !handItemIds.includes(id)) handItemIds.push(id);
-      }
-    } else if (equippedParts.hand_item) {
-      const id = typeof equippedParts.hand_item === 'string' ? equippedParts.hand_item : equippedParts.hand_item.id;
-      if (id) handItemIds.push(id);
-    }
-    idMap.hand_item = handItemIds[0] ?? null;
-
-    syncParentStudioAvatarToChildren(idMap, adjustments, handItemIds);
-    sound.fanfare();
-    toast('現在のアバターを子どもたち全員に即時反映しました！✨', '🎉');
-  }, [equippedParts, adjustments]);
 
   // 前の登録素材を一括クリア
   const handleClearOldAssets = useCallback(async () => {
