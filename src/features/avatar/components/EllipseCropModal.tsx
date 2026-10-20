@@ -769,17 +769,17 @@ export function EllipseCropModal({
   const isRedoAvailable = redoStackRef.current.length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl text-zinc-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-1 sm:p-4 animate-in fade-in duration-150">
+      <div className="flex h-[96vh] sm:h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl text-zinc-100">
         {/* ===== モーダルヘッダー ===== */}
-        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3.5 bg-zinc-950/70">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700">
+        <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-2.5 sm:px-5 sm:py-3.5 bg-zinc-950/70">
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700 shrink-0">
               <Circle className="h-4 w-4" />
             </div>
-            <div>
-              <h3 className="text-sm font-semibold text-zinc-100">{title}</h3>
-              <p className="text-[11px] text-zinc-400">
+            <div className="min-w-0">
+              <h3 className="text-xs sm:text-sm font-semibold text-zinc-100 truncate">{title}</h3>
+              <p className="hidden sm:block text-[11px] text-zinc-400">
                 GIMP風楕円選択ツール：ドラッグで範囲指定し、内側消去または外側消去を実行できます
               </p>
             </div>

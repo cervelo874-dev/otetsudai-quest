@@ -1283,10 +1283,10 @@ export function AvatarCloset({
 
   return (
     <div
-      className={`grid items-start gap-6 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[390px_minmax(0,1fr)] ${className}`}
+      className={`flex flex-col lg:grid items-start gap-3 sm:gap-4 lg:gap-6 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[390px_minmax(0,1fr)] pb-24 lg:pb-0 ${className}`}
     >
       {/* ==================== 左カラム：常時固定（Sticky）アバタープレビュー ==================== */}
-      <section className="sticky top-20 z-20 flex flex-col gap-4 rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm">
+      <section className="w-full relative lg:sticky lg:top-20 lg:z-20 flex flex-col gap-3 lg:gap-4 rounded-2xl border border-zinc-200/80 bg-white p-3 sm:p-4 lg:p-5 shadow-sm">
         {/* ヘッダー：カテゴリ名 ＆ クリーンなアイコントグル群 */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
@@ -1322,7 +1322,7 @@ export function AvatarCloset({
           onPointerMove={handlePreviewPointerMove}
           onPointerUp={handlePreviewPointerUp}
           onPointerCancel={handlePreviewPointerUp}
-          className={`relative mx-auto w-full max-w-[320px] touch-none select-none overflow-hidden rounded-xl border transition ${
+          className={`relative mx-auto w-full max-w-[190px] sm:max-w-[250px] lg:max-w-[320px] touch-none select-none overflow-hidden rounded-xl border transition ${
             isDraggingPreview
               ? 'border-zinc-900 ring-2 ring-zinc-900/10'
               : 'border-zinc-200/80 shadow-inner'
@@ -1731,8 +1731,8 @@ export function AvatarCloset({
           )}
         </div>
 
-        {/* アクションボタン群：プライマリアクションとサブアクションの明確な階層 */}
-        <div className="flex flex-col gap-2 pt-1 border-t border-zinc-100">
+        {/* アクションボタン群：プライマリアクションとサブアクションの明確な階層（PCでは左カラムに表示、スマホでは固定ボトムバーに集約） */}
+        <div className="hidden lg:flex flex-col gap-2 pt-1 border-t border-zinc-100">
           <button
             type="button"
             onClick={() => void handleSaveClick()}
@@ -1785,7 +1785,56 @@ export function AvatarCloset({
               </span>
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 xl:grid-cols-9">
+
+          {/* スマホ用: スワイプ可能な横スクロールカテゴリバー (sm:hidden) */}
+          <div className="flex sm:hidden overflow-x-auto no-scrollbar gap-1.5 py-1 -mx-2 px-2">
+            {AVATAR_LAYERS.map((category) => {
+              const Icon = CATEGORY_ICONS[category];
+              const meta = CATEGORY_META[category];
+              const isSelectedTab = category === activeCategory;
+              const isEquipped = Boolean(draft[category]);
+              const isAdjusted = hasCustomAdjustment(draftAdjustments[category]);
+              const count = partsByCategory.get(category)?.length ?? 0;
+
+              return (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => setActiveCategory(category)}
+                  className={`relative flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition border ${
+                    isSelectedTab
+                      ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs font-bold'
+                      : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100 font-medium'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{meta.label}</span>
+                  {count > 0 && (
+                    <span
+                      className={`text-[10px] ${
+                        isSelectedTab ? 'text-zinc-300' : 'text-zinc-400'
+                      }`}
+                    >
+                      ({count})
+                    </span>
+                  )}
+                  {isEquipped && (
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        isSelectedTab ? 'bg-white' : 'bg-zinc-900'
+                      }`}
+                    />
+                  )}
+                  {isAdjusted && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* PC・タブレット用: 全18カテゴリ切り替えグリッド (hidden sm:grid) */}
+          <div className="hidden sm:grid sm:grid-cols-6 xl:grid-cols-9 gap-1.5">
             {AVATAR_LAYERS.map((category) => {
               const Icon = CATEGORY_ICONS[category];
               const meta = CATEGORY_META[category];
@@ -1940,30 +1989,32 @@ export function AvatarCloset({
 
           <div className="flex flex-wrap items-center gap-2">
             {/* パーツ選択 / 位置・角度微調整 / レイヤー重なり順 タブ切り替え */}
-            <div className="flex rounded-lg bg-zinc-100 p-0.5 border border-zinc-200/60">
+            <div className="grid grid-cols-3 w-full sm:w-auto rounded-lg bg-zinc-100 p-0.5 border border-zinc-200/60">
               <button
                 type="button"
                 onClick={() => setRightTab('parts')}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition ${
+                className={`flex items-center justify-center gap-1 sm:gap-1.5 rounded-md px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs transition ${
                   rightTab === 'parts'
                     ? 'bg-white text-zinc-900 shadow-sm font-semibold'
                     : 'text-zinc-600 hover:text-zinc-900 font-medium'
                 }`}
               >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>パーツ選択</span>
+                <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                <span className="sm:hidden">パーツ</span>
+                <span className="hidden sm:inline">パーツ選択</span>
               </button>
               <button
                 type="button"
                 onClick={() => setRightTab('adjust')}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition ${
+                className={`flex items-center justify-center gap-1 sm:gap-1.5 rounded-md px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs transition ${
                   rightTab === 'adjust'
                     ? 'bg-white text-zinc-900 shadow-sm font-semibold'
                     : 'text-zinc-600 hover:text-zinc-900 font-medium'
                 }`}
               >
-                <Sliders className="h-3.5 w-3.5" />
-                <span>手足・位置微調整</span>
+                <Sliders className="h-3.5 w-3.5 shrink-0" />
+                <span className="sm:hidden">微調整</span>
+                <span className="hidden sm:inline">手足・位置微調整</span>
                 {isCurrentAdjusted && (
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
                 )}
@@ -1971,14 +2022,15 @@ export function AvatarCloset({
               <button
                 type="button"
                 onClick={() => setRightTab('layers')}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition ${
+                className={`flex items-center justify-center gap-1 sm:gap-1.5 rounded-md px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs transition ${
                   rightTab === 'layers'
                     ? 'bg-white text-zinc-900 shadow-sm font-semibold'
                     : 'text-zinc-600 hover:text-zinc-900 font-medium'
                 }`}
               >
-                <Layers className="h-3.5 w-3.5" />
-                <span>レイヤー重なり順</span>
+                <Layers className="h-3.5 w-3.5 shrink-0" />
+                <span className="sm:hidden">重なり順</span>
+                <span className="hidden sm:inline">レイヤー順</span>
                 {draftAdjustments.layerOrder && (
                   <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
                 )}
@@ -3266,6 +3318,44 @@ export function AvatarCloset({
           defaultReferenceId={defaultCropReferenceId}
         />
       )}
+
+      {/* ===== スマホ用常時固定フロート保存バー (lg:hidden) ===== */}
+      <div className="fixed bottom-0 inset-x-0 z-40 flex items-center justify-between gap-2.5 border-t border-zinc-200/90 bg-white/95 px-3.5 py-2.5 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur-md lg:hidden">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="truncate text-xs font-bold text-zinc-900">
+            {CATEGORY_META[activeCategory].label}
+          </span>
+          {isDirty && (
+            <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 shrink-0">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+              未保存
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {isDirty && (
+            <button
+              type="button"
+              onClick={handleResetAllToSaved}
+              disabled={isSaving}
+              className="flex items-center gap-1 rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-xs font-semibold text-zinc-600 hover:bg-zinc-50 active:scale-95 disabled:opacity-40"
+            >
+              <RotateCcw className="h-3.5 w-3.5 text-zinc-400" />
+              <span>戻す</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleSaveClick()}
+            disabled={isSaving}
+            className="flex items-center gap-1.5 rounded-xl bg-zinc-900 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-zinc-800 active:scale-95 disabled:opacity-50"
+          >
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            <span>{savedNotice ? '保存完了！' : '保存する'}</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

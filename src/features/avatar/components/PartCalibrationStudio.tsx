@@ -12,6 +12,10 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   Check,
   Circle,
   Copy,
@@ -24,6 +28,7 @@ import {
   ImagePlus,
   Layers,
   Maximize,
+  Minus,
   Move,
   Palette,
   Pencil,
@@ -257,16 +262,40 @@ function RangeControl({
         <span>{label}</span>
         <span className="font-mono text-slate-800">{format ? format(value) : value}</span>
       </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-indigo-600"
-      />
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          disabled={disabled || value <= min}
+          onClick={(e) => {
+            e.preventDefault();
+            onChange(Math.max(min, Math.round((value - step) * 1000) / 1000));
+          }}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 active:scale-95 disabled:opacity-30 transition"
+        >
+          <Minus className="h-3 w-3" />
+        </button>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full accent-indigo-600"
+        />
+        <button
+          type="button"
+          disabled={disabled || value >= max}
+          onClick={(e) => {
+            e.preventDefault();
+            onChange(Math.min(max, Math.round((value + step) * 1000) / 1000));
+          }}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 active:scale-95 disabled:opacity-30 transition"
+        >
+          <Plus className="h-3 w-3" />
+        </button>
+      </div>
     </label>
   );
 }
@@ -1527,16 +1556,16 @@ export function PartCalibrationStudio({
 
   return (
     <div
-      className={`grid items-start gap-6 lg:grid-cols-[minmax(0,540px)_minmax(0,1fr)] xl:grid-cols-[560px_minmax(0,1fr)] ${className}`}
+      className={`flex flex-col lg:grid items-start gap-3 sm:gap-4 lg:gap-6 lg:grid-cols-[minmax(0,540px)_minmax(0,1fr)] xl:grid-cols-[560px_minmax(0,1fr)] ${className}`}
     >
       {/* ==================== 左カラム：画面常時固定（Sticky）512x512 アバターステージ ==================== */}
-      <div className="sticky top-16 z-20 flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm">
+      <div className="w-full relative lg:sticky lg:top-16 lg:z-20 flex flex-col gap-2 sm:gap-3 rounded-2xl border border-zinc-200/80 bg-white p-3 sm:p-4 shadow-sm">
         {/* 上部ツールバー */}
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
           <button
             type="button"
             onClick={() => handleToggleTool('move')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+            className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-medium transition ${
               tool === 'move'
                 ? 'bg-zinc-900 text-white shadow-sm'
                 : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
@@ -1549,7 +1578,7 @@ export function PartCalibrationStudio({
           <button
             type="button"
             onClick={() => handleToggleTool('pick')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+            className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-medium transition ${
               tool === 'pick'
                 ? 'bg-amber-500 text-white shadow-sm'
                 : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
@@ -1563,7 +1592,7 @@ export function PartCalibrationStudio({
           <button
             type="button"
             onClick={() => handleToggleTool('erase')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+            className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-medium transition ${
               tool === 'erase'
                 ? 'bg-rose-600 text-white shadow-sm'
                 : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
@@ -1578,7 +1607,7 @@ export function PartCalibrationStudio({
             type="button"
             disabled={!hasPartLoaded}
             onClick={() => setIsEllipseCropOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-40 transition"
+            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg border border-zinc-200 bg-white px-2 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 disabled:opacity-40 transition"
             title="GIMP風の楕円選択ツールで、円形に切り抜いたり不要箇所を消去・透過します"
           >
             <Circle className="h-3.5 w-3.5 text-indigo-600" />
@@ -1589,7 +1618,7 @@ export function PartCalibrationStudio({
             type="button"
             disabled={!hasPartLoaded}
             onClick={() => applyAutoSizeAndPosition(category, true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium text-zinc-800 shadow-sm hover:bg-zinc-100 disabled:opacity-40 transition"
+            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50 px-2 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-medium text-zinc-800 shadow-sm hover:bg-zinc-100 disabled:opacity-40 transition"
             title="実体ピクセル領域を計測し、3頭身の標準サイズ・基準位置へ一発で自動正規化します"
           >
             <Sparkles className="h-3.5 w-3.5 text-zinc-500" />
@@ -1600,7 +1629,7 @@ export function PartCalibrationStudio({
             type="button"
             onClick={handleUndoErase}
             disabled={undoCount === 0}
-            className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 transition"
+            className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2 sm:px-2.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 transition"
             title="消しゴムを1つ戻す (Ctrl+Z)"
           >
             <Undo2 className="h-3.5 w-3.5" />
@@ -1611,7 +1640,7 @@ export function PartCalibrationStudio({
           <button
             type="button"
             onClick={toggleBodyOnlyMode}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition shadow-xs ${
+            className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold transition shadow-xs ${
               bodyOnlyMode
                 ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-500'
                 : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
@@ -1619,7 +1648,7 @@ export function PartCalibrationStudio({
             title="他の服や余計なガイド線・ピンをすべて隠し、編集中のパーツと素体のみをシンプルに表示します"
           >
             <User className="h-3.5 w-3.5" />
-            <span>{bodyOnlyMode ? '素体のみ表示中' : '素体のみ表示'}</span>
+            <span>{bodyOnlyMode ? '素体のみ' : '素体のみ'}</span>
           </button>
 
           {/* ステージ背景切り替え */}
@@ -1637,7 +1666,7 @@ export function PartCalibrationStudio({
                 type="button"
                 title={`背景確認: ${b.label}`}
                 onClick={() => setStageBg(b.id)}
-                className={`h-5 w-5 rounded-md transition ${b.cls} ${
+                className={`h-4 w-4 sm:h-5 sm:w-5 rounded-md transition ${b.cls} ${
                   stageBg === b.id ? 'ring-2 ring-zinc-900 scale-105' : 'ring-1 ring-zinc-200'
                 }`}
               />
@@ -1648,15 +1677,15 @@ export function PartCalibrationStudio({
         {/* サブツール選択中の分かりやすい解除バー */}
         {tool !== 'move' && (
           <div
-            className={`flex items-center justify-between gap-2 rounded-xl px-3 py-1.5 text-xs font-bold text-white shadow-sm ${
+            className={`flex items-center justify-between gap-2 rounded-xl px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-bold text-white shadow-sm ${
               tool === 'erase'
                 ? 'bg-rose-600'
                 : 'bg-amber-500'
             }`}
           >
             <span className="truncate">
-              {tool === 'erase' && '【消しゴム中】ドラッグで消去。再クリックまたは右ボタンで解除'}
-              {tool === 'pick' && '【スポイト中】透明にしたい背景色をクリック'}
+              {tool === 'erase' && '【消しゴム中】ドラッグで消去。再クリックで解除'}
+              {tool === 'pick' && '【スポイト中】透明にしたい色をクリック'}
             </span>
             <button
               type="button"
@@ -1664,12 +1693,12 @@ export function PartCalibrationStudio({
               className="flex shrink-0 items-center gap-1 rounded-lg bg-white/20 px-2 py-0.5 text-[11px] font-extrabold text-white hover:bg-white/30"
             >
               <Check className="h-3 w-3" />
-              解除 (Esc)
+              解除
             </button>
           </div>
         )}
         {/* 512x512 ステージ本体 */}
-        <div className="mx-auto w-full max-w-[min(100%,calc(100vh-14.5rem))]">
+        <div className="mx-auto w-full max-w-[210px] sm:max-w-[280px] lg:max-w-[min(100%,calc(100vh-14.5rem))]">
           <div
             ref={stageContainerRef}
             tabIndex={0}
@@ -1850,11 +1879,11 @@ export function PartCalibrationStudio({
         <div className="grid grid-cols-4 gap-1 rounded-xl border border-zinc-200/70 bg-zinc-100/70 p-1">
           {(
             [
-              { id: 'source', label: '① 読込・保存', icon: Sparkles },
-              { id: 'chroma', label: '② 透過・消去', icon: Wand2 },
-              { id: 'transform', label: '③ 位置・サイズ', icon: Move },
-              { id: 'catalog', label: `④ 一覧(${customParts.length})`, icon: Layers },
-            ] as { id: StudioPanelTab; label: string; icon: typeof Save }[]
+              { id: 'source', label: '① 読込', fullLabel: '① 読込・保存', icon: Sparkles },
+              { id: 'chroma', label: '② 透過', fullLabel: '② 透過・消去', icon: Wand2 },
+              { id: 'transform', label: '③ 調整', fullLabel: '③ 位置・サイズ', icon: Move },
+              { id: 'catalog', label: `④ 一覧`, fullLabel: `④ 一覧(${customParts.length})`, icon: Layers },
+            ] as { id: StudioPanelTab; label: string; fullLabel: string; icon: typeof Save }[]
           ).map((t) => {
             const Icon = t.icon;
             const active = panelTab === t.id;
@@ -1863,48 +1892,49 @@ export function PartCalibrationStudio({
                 key={t.id}
                 type="button"
                 onClick={() => setPanelTab(t.id)}
-                className={`flex flex-col items-center gap-0.5 rounded-lg px-1.5 py-1.5 text-[11px] font-medium transition sm:flex-row sm:justify-center sm:gap-1.5 sm:text-xs ${
+                className={`flex flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-[11px] font-bold transition sm:flex-row sm:justify-center sm:gap-1.5 sm:text-xs ${
                   active
                     ? 'bg-white text-zinc-900 shadow-sm'
                     : 'text-zinc-600 hover:text-zinc-900 hover:bg-white/50'
                 }`}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{t.label}</span>
+                <span className="sm:hidden">{t.label}</span>
+                <span className="hidden sm:inline truncate">{t.fullLabel}</span>
               </button>
             );
           })}
         </div>
 
-        <div className="max-h-[calc(100vh-14.5rem)] overflow-y-auto pr-1">
+        <div className="max-h-none lg:max-h-[calc(100vh-14.5rem)] lg:overflow-y-auto pr-0 sm:pr-1">
           {/* ---------- タブ1: 素材読み込み ＆ 自動サイズ・関節ソケット設定 ＆ 保存 ---------- */}
           {panelTab === 'source' && (
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h3 className="text-sm font-extrabold text-slate-800">
-                    AIパーツ読み込み ＆ 自動サイズ・関節ソケット設定
+                    AIパーツ読み込み ＆ 自動設定
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="hidden sm:block text-xs text-slate-500">
                     画像を読み込むと自動で背景透過・3頭身サイズ正規化・関節ソケット検出を行います。
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => void handleReadClipboardButton()}
-                    className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
-                  >
-                    <ImagePlus className="h-4 w-4" />
-                    貼り付け (Ctrl+V)
-                  </button>
+                <div className="flex w-full sm:w-auto items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-700"
+                    className="flex flex-1 sm:flex-initial items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-700"
                   >
                     <Upload className="h-4 w-4" />
-                    画像を読み込む
+                    画像・写真を選択
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleReadClipboardButton()}
+                    className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
+                  >
+                    <ImagePlus className="h-4 w-4" />
+                    貼り付け
                   </button>
                 </div>
               </div>
@@ -2631,35 +2661,92 @@ export function PartCalibrationStudio({
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-600">中心 X座標 (px)</span>
-                  <input
-                    type="number"
-                    value={transform.x}
-                    step={1}
-                    disabled={!hasPartLoaded}
-                    onChange={(e) => {
-                      setUserManuallyMovedPart(true);
-                      setTransform((prev) => ({ ...prev, x: Number(e.target.value) || 0 }));
-                    }}
-                    className="rounded-xl bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-slate-800 ring-1 ring-slate-200"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-600">中心 Y座標 (px)</span>
-                  <input
-                    type="number"
-                    value={transform.y}
-                    step={1}
-                    disabled={!hasPartLoaded}
-                    onChange={(e) => {
-                      setUserManuallyMovedPart(true);
-                      setTransform((prev) => ({ ...prev, y: Number(e.target.value) || 0 }));
-                    }}
-                    className="rounded-xl bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-slate-800 ring-1 ring-slate-200"
-                  />
-                </label>
+              <div className="flex flex-col gap-2 rounded-xl bg-slate-50 p-2.5 sm:p-3 ring-1 ring-slate-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">位置オフセット微調整</span>
+                  {/* スマホでも直感的に押せる十字ボタン */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={!hasPartLoaded}
+                      onClick={() => {
+                        setUserManuallyMovedPart(true);
+                        setTransform((prev) => ({ ...prev, x: prev.x - 2 }));
+                      }}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-xs hover:bg-slate-100 active:scale-95 disabled:opacity-40"
+                      title="左へ2px"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!hasPartLoaded}
+                      onClick={() => {
+                        setUserManuallyMovedPart(true);
+                        setTransform((prev) => ({ ...prev, y: prev.y - 2 }));
+                      }}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-xs hover:bg-slate-100 active:scale-95 disabled:opacity-40"
+                      title="上へ2px"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!hasPartLoaded}
+                      onClick={() => {
+                        setUserManuallyMovedPart(true);
+                        setTransform((prev) => ({ ...prev, y: prev.y + 2 }));
+                      }}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-xs hover:bg-slate-100 active:scale-95 disabled:opacity-40"
+                      title="下へ2px"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!hasPartLoaded}
+                      onClick={() => {
+                        setUserManuallyMovedPart(true);
+                        setTransform((prev) => ({ ...prev, x: prev.x + 2 }));
+                      }}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-xs hover:bg-slate-100 active:scale-95 disabled:opacity-40"
+                      title="右へ2px"
+                    >
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-slate-200">
+                    <span className="text-xs font-bold text-slate-500">X:</span>
+                    <input
+                      type="number"
+                      value={Math.round(transform.x)}
+                      disabled={!hasPartLoaded}
+                      onChange={(e) => {
+                        setUserManuallyMovedPart(true);
+                        setTransform((prev) => ({ ...prev, x: Number(e.target.value) || 0 }));
+                      }}
+                      className="w-full font-mono text-xs font-bold text-slate-800 outline-none"
+                    />
+                    <span className="text-[10px] text-slate-400">px</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-slate-200">
+                    <span className="text-xs font-bold text-slate-500">Y:</span>
+                    <input
+                      type="number"
+                      value={Math.round(transform.y)}
+                      disabled={!hasPartLoaded}
+                      onChange={(e) => {
+                        setUserManuallyMovedPart(true);
+                        setTransform((prev) => ({ ...prev, y: Number(e.target.value) || 0 }));
+                      }}
+                      className="w-full font-mono text-xs font-bold text-slate-800 outline-none"
+                    />
+                    <span className="text-[10px] text-slate-400">px</span>
+                  </div>
+                </div>
               </div>
 
               <RangeControl
