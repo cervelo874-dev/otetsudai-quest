@@ -1997,14 +1997,14 @@ export function PartCalibrationStudio({
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-bold text-slate-600">
-                    対象カテゴリ（全18レイヤー）
+                    対象カテゴリ
                   </span>
                   <select
                     value={category}
                     onChange={(e) => handleCategoryChange(e.target.value as AvatarCategory)}
                     className="rounded-xl bg-slate-50 px-3 py-2.5 text-xs font-bold text-slate-800 ring-1 ring-slate-200 outline-none focus:ring-indigo-500"
                   >
-                    {AVATAR_LAYERS.map((cat) => (
+                    {AVATAR_LAYERS.filter((cat) => cat !== 'face_mouth').map((cat) => (
                       <option key={cat} value={cat}>
                         {String(CATEGORY_META[cat].order).padStart(2, '0')}.{' '}
                         {CATEGORY_META[cat].label} ({cat})

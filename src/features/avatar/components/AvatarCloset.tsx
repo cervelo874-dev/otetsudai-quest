@@ -27,9 +27,11 @@ import {
   RotateCcw,
   Save,
   Scissors,
+  Shirt,
   Sliders,
   Sparkles,
   Trash2,
+  User,
   X,
 } from 'lucide-react';
 import {
@@ -142,6 +144,41 @@ const PROMOTABLE_TO_ABOVE_TOPS: AvatarCategory[] = [
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
+interface CategoryGroup {
+  id: string;
+  label: string;
+  icon: typeof Sparkles;
+  categories: AvatarCategory[];
+}
+
+/** 案1: スマホ用大分類4グループ（口・眉・表情は不要のため除外） */
+const CATEGORY_GROUPS: CategoryGroup[] = [
+  {
+    id: 'face_hair',
+    label: '顔・髪',
+    icon: User,
+    categories: ['face_eyes', 'hair_front', 'hair_back', 'body'],
+  },
+  {
+    id: 'clothes',
+    label: 'お洋服',
+    icon: Shirt,
+    categories: ['tops', 'bottoms', 'shoes', 'arm_left', 'arm_right', 'leg_left', 'leg_right'],
+  },
+  {
+    id: 'accessories',
+    label: '小物',
+    icon: Sparkles,
+    categories: ['hat_glasses', 'hand_item', 'pet'],
+  },
+  {
+    id: 'effects_bg',
+    label: '背景',
+    icon: Layers,
+    categories: ['background', 'front_effect', 'back_effect'],
+  },
+];
+
 /**
  * 既存アプリ組み込み用：着せ替えクローゼットUI (<AvatarCloset />)
  *
@@ -176,10 +213,43 @@ export function AvatarCloset({
   const [draftAdjustments, setDraftAdjustments] = useState<LayerAdjustmentMap>(
     () => ({ ...initialAdjustments }),
   );
-  const [activeCategory, setActiveCategory] = useState<AvatarCategory>(
-    initialTryOnPart?.category ?? initialCategory ?? 'body',
-  );
+  const [activeCategory, setActiveCategory] = useState<AvatarCategory>(() => {
+    const init = initialTryOnPart?.category ?? initialCategory ?? 'body';
+    return init === 'face_mouth' ? 'face_eyes' : init;
+  });
   const [rightTab, setRightTab] = useState<'parts' | 'adjust' | 'layers'>('parts');
+
+  // 現在の activeCategory が属する大分類グループID
+  const currentGroupId = useMemo(() => {
+    for (const group of CATEGORY_GROUPS) {
+      if (group.categories.includes(activeCategory)) {
+        return group.id;
+      }
+    }
+    return CATEGORY_GROUPS[0].id;
+  }, [activeCategory]);
+
+  const [selectedGroupId, setSelectedGroupId] = useState<string>(currentGroupId);
+
+  // activeCategory の変化に合わせて大分類グループも追従
+  useEffect(() => {
+    const activeGroup = CATEGORY_GROUPS.find((g) => g.categories.includes(activeCategory));
+    if (activeGroup && activeGroup.id !== selectedGroupId) {
+      setSelectedGroupId(activeGroup.id);
+    }
+  }, [activeCategory, selectedGroupId]);
+
+  const handleSelectGroup = (groupId: string) => {
+    setSelectedGroupId(groupId);
+    const group = CATEGORY_GROUPS.find((g) => g.id === groupId);
+    if (group && !group.categories.includes(activeCategory)) {
+      setActiveCategory(group.categories[0]);
+    }
+  };
+
+  const activeGroupObj = useMemo(() => {
+    return CATEGORY_GROUPS.find((g) => g.id === selectedGroupId) || CATEGORY_GROUPS[0];
+  }, [selectedGroupId]);
 
   // レイヤー重なり順の変更ハンドラ
   const handleLayerOrderChange = (newOrder: AvatarCategory[]) => {
@@ -1766,9 +1836,9 @@ export function AvatarCloset({
         </div>
       </section>
 
-      {/* ==================== 右カラム：18カテゴリタブ ＆ パーツ選択・位置微調整パネル ==================== */}
-      <section className="flex min-w-0 flex-col gap-5 rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm sm:p-6">
-        {/* 全18カテゴリ切り替えグリッド */}
+      {/* ==================== 右カラム：カテゴリ ＆ パーツ選択・位置微調整パネル ==================== */}
+      <section className="flex min-w-0 flex-col gap-4 sm:gap-5 rounded-2xl border border-zinc-200/80 bg-white p-3.5 sm:p-5 shadow-sm sm:p-6 max-w-full overflow-hidden">
+        {/* カテゴリ切り替えエリア */}
         <div>
           <div className="mb-2.5 flex items-center justify-between">
             <span className="text-xs font-semibold text-zinc-900">
@@ -1786,56 +1856,85 @@ export function AvatarCloset({
             </div>
           </div>
 
-          {/* スマホ用: スワイプ可能な横スクロールカテゴリバー (sm:hidden) */}
-          <div className="flex sm:hidden overflow-x-auto no-scrollbar gap-1.5 py-1 -mx-2 px-2">
-            {AVATAR_LAYERS.map((category) => {
-              const Icon = CATEGORY_ICONS[category];
-              const meta = CATEGORY_META[category];
-              const isSelectedTab = category === activeCategory;
-              const isEquipped = Boolean(draft[category]);
-              const isAdjusted = hasCustomAdjustment(draftAdjustments[category]);
-              const count = partsByCategory.get(category)?.length ?? 0;
+          {/* ===== スマホ用: 案1 大分類タブ ＋ 部位ピル（2階層スマート方式・横スクロールゼロ） (sm:hidden) ===== */}
+          <div className="flex sm:hidden flex-col gap-2 w-full max-w-full">
+            {/* 第1階層: 4つの大分類グループタブ（1行にぴったり収まり横スクロールなし） */}
+            <div className="grid grid-cols-4 gap-1 p-1 bg-zinc-100 rounded-xl border border-zinc-200/70">
+              {CATEGORY_GROUPS.map((group) => {
+                const Icon = group.icon;
+                const isActive = selectedGroupId === group.id;
+                const hasEquippedInGroup = group.categories.some((cat) => Boolean(draft[cat]));
+                const hasAdjustedInGroup = group.categories.some((cat) => hasCustomAdjustment(draftAdjustments[cat]));
 
-              return (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => setActiveCategory(category)}
-                  className={`relative flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition border ${
-                    isSelectedTab
-                      ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs font-bold'
-                      : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100 font-medium'
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{meta.label}</span>
-                  {count > 0 && (
-                    <span
-                      className={`text-[10px] ${
-                        isSelectedTab ? 'text-zinc-300' : 'text-zinc-400'
-                      }`}
-                    >
-                      ({count})
-                    </span>
-                  )}
-                  {isEquipped && (
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        isSelectedTab ? 'bg-white' : 'bg-zinc-900'
-                      }`}
-                    />
-                  )}
-                  {isAdjusted && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                  )}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={group.id}
+                    type="button"
+                    onClick={() => handleSelectGroup(group.id)}
+                    className={`relative flex flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 px-0.5 text-[11px] font-bold transition ${
+                      isActive
+                        ? 'bg-white text-zinc-900 shadow-xs'
+                        : 'text-zinc-500 hover:text-zinc-800 hover:bg-white/50'
+                    }`}
+                  >
+                    <Icon className={`h-3.5 w-3.5 ${isActive ? 'text-zinc-900' : 'text-zinc-400'}`} />
+                    <span className="truncate">{group.label}</span>
+                    <div className="absolute right-1 top-1 flex gap-0.5">
+                      {hasEquippedInGroup && (
+                        <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-zinc-900' : 'bg-zinc-500'}`} />
+                      )}
+                      {hasAdjustedInGroup && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 第2階層: 選択中グループの部位ボタン（画面幅内に綺麗に折り返し整列・口眉表情は除外） */}
+            <div className="flex flex-wrap gap-1.5 w-full">
+              {activeGroupObj.categories.map((category) => {
+                const Icon = CATEGORY_ICONS[category];
+                const meta = CATEGORY_META[category];
+                const isSelected = category === activeCategory;
+                const isEquipped = Boolean(draft[category]);
+                const isAdjusted = hasCustomAdjustment(draftAdjustments[category]);
+                const count = partsByCategory.get(category)?.length ?? 0;
+
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => setActiveCategory(category)}
+                    className={`relative flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs transition border ${
+                      isSelected
+                        ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs font-bold'
+                        : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100 font-medium'
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{meta.label}</span>
+                    {count > 0 && (
+                      <span className={`text-[10px] ${isSelected ? 'text-zinc-300' : 'text-zinc-400'}`}>
+                        ({count})
+                      </span>
+                    )}
+                    {isEquipped && (
+                      <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-zinc-900'}`} />
+                    )}
+                    {isAdjusted && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* PC・タブレット用: 全18カテゴリ切り替えグリッド (hidden sm:grid) */}
+          {/* PC・タブレット用: 全部位切り替えグリッド (hidden sm:grid)（口・眉・表情は除外） */}
           <div className="hidden sm:grid sm:grid-cols-6 xl:grid-cols-9 gap-1.5">
-            {AVATAR_LAYERS.map((category) => {
+            {AVATAR_LAYERS.filter((cat) => cat !== 'face_mouth').map((category) => {
               const Icon = CATEGORY_ICONS[category];
               const meta = CATEGORY_META[category];
               const isSelectedTab = category === activeCategory;
