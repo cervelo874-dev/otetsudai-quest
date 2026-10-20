@@ -15,9 +15,11 @@ import {
   Download,
   FlipHorizontal,
   FlipVertical,
+  Hand,
   Layers,
   Link2,
   Loader2,
+  Maximize2,
   Move,
   Pause,
   Pencil,
@@ -25,8 +27,10 @@ import {
   Play,
   Plus,
   RotateCcw,
+  RotateCw,
   Save,
   Scissors,
+  Shield,
   Shirt,
   Sliders,
   Sparkles,
@@ -2203,45 +2207,87 @@ export function AvatarCloset({
 
         {/* 持ち物（ステッキ・剣など）選択時の「持ち物本体の角度・サイズ・位置 ＆ 持ち方 ＆ 前後レイヤー」調整パネル */}
         {(activeCategory === 'hand_item' || (rightTab === 'adjust' && currentHandItems.length > 0)) && (
-          <div className="flex flex-col gap-3 rounded-xl border border-zinc-200/80 bg-zinc-50/50 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-900">
-                <Sparkles className="h-3.5 w-3.5 text-zinc-500" />
-                持ち物の角度・位置・サイズ微調整 ＆ 上下動アニメーション
-              </span>
-              {/* 右手 / 左手 切り替え（アバター本人にとっての右・左） */}
-              <div className="flex items-center gap-0.5 rounded-lg bg-zinc-100 p-0.5 border border-zinc-200/80">
-                {(
-                  [
-                    { id: 'right', label: '右手(向かって左)に持つ' },
-                    { id: 'left', label: '左手(向かって右)に持つ' },
-                  ] as const
-                ).map((sideOpt) => {
-                  const currentSide = handItemAdjustment.holdHandSide ?? 'right';
-                  const active = currentSide === sideOpt.id;
-                  return (
-                    <button
-                      key={sideOpt.id}
-                      type="button"
-                      onClick={() => updateHandItemAdjustment({ holdHandSide: sideOpt.id })}
-                      className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
-                        active
-                          ? 'bg-white text-zinc-900 shadow-2xs font-semibold'
-                          : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60'
-                      }`}
-                    >
-                      {sideOpt.label}
-                    </button>
-                  );
-                })}
+          <div className="flex flex-col gap-2.5 rounded-xl border border-zinc-200/80 bg-zinc-50/50 p-2.5">
+            {/* 上部ヘッダー：持ち手（右手/左手）＆ 🎈 浮遊アニメーションON/OFF（1行に集約） */}
+            <div className="flex items-center justify-between gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Sparkles className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+                <span className="text-xs font-bold text-zinc-900 truncate">
+                  持ち物調整
+                </span>
+                {activeHandItem && (
+                  <span className="text-[10px] text-zinc-500 font-mono truncate max-w-[90px] sm:max-w-[140px]">
+                    ({activeHandItem.name})
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                {/* 右手 / 左手 切り替え */}
+                <div className="flex items-center gap-0.5 rounded-lg bg-zinc-100 p-0.5 border border-zinc-200/80">
+                  <button
+                    type="button"
+                    onClick={() => updateHandItemAdjustment({ holdHandSide: 'right' })}
+                    className={`rounded-md px-2 py-1 text-[11px] font-medium transition ${
+                      (handItemAdjustment.holdHandSide ?? 'right') === 'right'
+                        ? 'bg-white text-zinc-900 shadow-2xs font-bold'
+                        : 'text-zinc-600 hover:text-zinc-900'
+                    }`}
+                    title="右手（向かって左）に持つ"
+                  >
+                    ✋ 右手
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateHandItemAdjustment({ holdHandSide: 'left' })}
+                    className={`rounded-md px-2 py-1 text-[11px] font-medium transition ${
+                      handItemAdjustment.holdHandSide === 'left'
+                        ? 'bg-white text-zinc-900 shadow-2xs font-bold'
+                        : 'text-zinc-600 hover:text-zinc-900'
+                    }`}
+                    title="左手（向かって右）に持つ"
+                  >
+                    左手 ✋
+                  </button>
+                </div>
+
+                {/* 🎈 浮遊 ON / OFF トグル（コンパクトかつ直感的） */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateHandItemAdjustment({ bobbing: !Boolean(handItemAdjustment.bobbing) })
+                  }
+                  className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition border shadow-2xs active:scale-95 ${
+                    handItemAdjustment.bobbing
+                      ? 'bg-zinc-900 text-white border-zinc-900'
+                      : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                  }`}
+                  title={
+                    handItemAdjustment.bobbing
+                      ? '上下フワフワ浮遊: ON（タップで固定）'
+                      : '上下フワフワ浮遊: OFF（タップで浮遊）'
+                  }
+                >
+                  <span className="text-xs">🎈</span>
+                  <span>浮遊</span>
+                  <span
+                    className={`rounded px-1 text-[9px] font-bold ${
+                      handItemAdjustment.bobbing
+                        ? 'bg-white/20 text-white'
+                        : 'bg-zinc-100 text-zinc-500'
+                    }`}
+                  >
+                    {handItemAdjustment.bobbing ? 'ON' : 'OFF'}
+                  </span>
+                </button>
               </div>
             </div>
 
             {/* 複数装備中の持ち物一覧セレクター ＆ 個別はずす */}
             {currentHandItems.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-white p-2 border border-zinc-200/80 shadow-2xs">
-                <span className="text-[11px] font-semibold text-zinc-700 shrink-0">
-                  調整対象（{currentHandItems.length}個装備中）:
+              <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-white p-1.5 border border-zinc-200/80 shadow-2xs">
+                <span className="text-[10px] font-semibold text-zinc-500 shrink-0">
+                  選択中 ({currentHandItems.length}):
                 </span>
                 <div className="flex flex-wrap gap-1">
                   {currentHandItems.map((item, idx) => {
@@ -2251,7 +2297,7 @@ export function AvatarCloset({
                     return (
                       <div
                         key={item.id}
-                        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition border ${
+                        className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs transition border ${
                           isSelected
                             ? 'bg-zinc-900 text-white border-zinc-900 shadow-2xs font-medium'
                             : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100'
@@ -2262,7 +2308,7 @@ export function AvatarCloset({
                           onClick={() => setSelectedHandItemId(item.id)}
                           className="flex items-center gap-1"
                         >
-                          <span className="truncate max-w-[120px]">{item.name}</span>
+                          <span className="truncate max-w-[100px] text-[11px]">{item.name}</span>
                         </button>
                         <button
                           type="button"
@@ -2271,7 +2317,7 @@ export function AvatarCloset({
                             setSelectedHandItemId(item.id);
                             updateHandItemAdjustment({ bobbing: !isBobbing }, item.id);
                           }}
-                          className={`rounded px-1.5 py-0.2 text-[9px] font-semibold transition active:scale-95 ${
+                          className={`rounded px-1 py-0.2 text-[9px] font-semibold transition active:scale-95 ${
                             isBobbing
                               ? isSelected
                                 ? 'bg-zinc-700 text-zinc-100'
@@ -2282,7 +2328,7 @@ export function AvatarCloset({
                           }`}
                           title={isBobbing ? '上下浮遊: ON（タップでOFF）' : '上下浮遊: OFF（タップでON）'}
                         >
-                          {isBobbing ? '浮遊 ON' : '固定'}
+                          🎈 {isBobbing ? 'ON' : 'OFF'}
                         </button>
                         <button
                           type="button"
@@ -2297,7 +2343,7 @@ export function AvatarCloset({
                               };
                             });
                           }}
-                          className={`ml-0.5 rounded p-0.5 text-[10px] leading-none transition ${
+                          className={`ml-0.5 rounded p-0.5 text-[9px] leading-none transition ${
                             isSelected ? 'text-zinc-400 hover:text-white' : 'text-zinc-400 hover:text-zinc-700'
                           }`}
                           title="この持ち物をはずす"
@@ -2311,355 +2357,295 @@ export function AvatarCloset({
               </div>
             )}
 
-            {/* ★「上下にふわふわ動かす（浮遊アニメーション）」ON / OFF トグルスイッチ */}
-            <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-lg bg-white p-2.5 border border-zinc-200/80 shadow-2xs">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-lg shrink-0">🎈</span>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-zinc-900">
-                      上下にふわふわ動かす（浮遊アニメーション）
-                    </span>
-                    <span
-                      className={`rounded px-1.5 py-0.2 text-[9px] font-semibold ${
-                        handItemAdjustment.bobbing
-                          ? 'bg-zinc-900 text-white'
-                          : 'bg-zinc-100 text-zinc-500 border border-zinc-200'
-                      }`}
-                    >
-                      {handItemAdjustment.bobbing ? 'ON' : 'OFF'}
+            {/* 持ち物本体の角度・サイズ・位置 (X/Y)・左右反転・リセット */}
+            <div className="flex flex-col gap-2 rounded-xl bg-white p-2.5 border border-zinc-200/80 shadow-2xs">
+              {/* 角度コントロール */}
+              <div className="flex flex-col gap-1 rounded-lg bg-zinc-50/70 p-2 border border-zinc-200/60">
+                <div className="flex items-center justify-between gap-1 text-xs">
+                  <div className="flex items-center gap-1 font-semibold text-zinc-800">
+                    <RotateCw className="h-3.5 w-3.5 text-zinc-600" />
+                    <span>角度</span>
+                    <span className="font-mono text-[11px] font-bold text-zinc-900 bg-white border border-zinc-200 px-1.5 py-0.2 rounded">
+                      {handItemAdjustment.rotation > 0 ? `+${handItemAdjustment.rotation}` : handItemAdjustment.rotation}°
                     </span>
                   </div>
-                  <p className="text-[10px] text-zinc-500 truncate">
-                    {activeHandItem ? `「${activeHandItem.name}」` : '選択中の持ち物'}
-                    {handItemAdjustment.bobbing ? '：上下にフワフワ浮遊します' : '：静止（固定）します'}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  updateHandItemAdjustment({ bobbing: !Boolean(handItemAdjustment.bobbing) })
-                }
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium shadow-2xs transition active:scale-95 ${
-                  handItemAdjustment.bobbing
-                    ? 'bg-zinc-900 text-white hover:bg-zinc-800'
-                    : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-50'
-                }`}
-              >
-                <span>{handItemAdjustment.bobbing ? '動かす (ON)' : '静止する (OFF)'}</span>
-              </button>
-            </div>
-
-            {/* ★常時表示：持ち物本体（ステッキ・剣など）の角度・サイズ・位置 (X/Y)・反転コントロール */}
-            <div className="flex flex-col gap-3 rounded-xl bg-white p-3 border border-zinc-200/80 shadow-2xs">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="rounded-md bg-zinc-900 px-2 py-0.5 text-[11px] font-medium text-white">
-                    持ち物本体
-                  </span>
-                  <span className="text-xs font-semibold text-zinc-900">
-                    ステッキ・持ち物の角度・サイズ・位置を微調整
-                  </span>
-                </div>
-                <span className="text-[10px] text-zinc-500">
-                  💡 左プレビュー上でドラッグ移動 ／ Shift+ホイールで角度回転も可能
-                </span>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                {/* 左カラム：持ち物本体の角度（Rotation）＆ サイズ（Scale）＆ 反転 */}
-                <div className="flex flex-col gap-2.5 rounded-lg bg-zinc-50/70 p-2.5 border border-zinc-200/60">
-                  <div className="flex flex-wrap items-center justify-between gap-1">
-                    <span className="text-xs font-semibold text-zinc-900">
-                      角度 (Rotation)
-                    </span>
-                    <div className="flex flex-wrap gap-1">
-                      {[-90, -45, -20, 0, 20, 45, 90].map((deg) => (
-                        <button
-                          key={deg}
-                          type="button"
-                          onClick={() => updateHandItemAdjustment({ rotation: deg })}
-                          className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-medium transition ${
-                            handItemAdjustment.rotation === deg
-                              ? 'bg-zinc-900 text-white shadow-2xs'
-                              : 'bg-white text-zinc-600 border border-zinc-200/80 hover:bg-zinc-100'
-                          }`}
-                        >
-                          {deg > 0 ? `+${deg}°` : `${deg}°`}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <label className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between text-xs font-medium text-zinc-600">
-                      <span>回転角度スライダー</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateHandItemAdjustment({
-                              rotation: Math.max(-180, handItemAdjustment.rotation - 5),
-                            })
-                          }
-                          className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-700 border border-zinc-200 hover:bg-zinc-100"
-                          title="反時計回りに5°回転"
-                        >
-                          -5°
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateHandItemAdjustment({
-                              rotation: Math.max(-180, handItemAdjustment.rotation - 1),
-                            })
-                          }
-                          className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-700 border border-zinc-200 hover:bg-zinc-100"
-                          title="反時計回りに1°回転"
-                        >
-                          -1°
-                        </button>
-                        <span className="min-w-[86px] text-right font-mono text-zinc-900">
-                          {handItemAdjustment.rotation > 0
-                            ? `+${handItemAdjustment.rotation}`
-                            : handItemAdjustment.rotation}
-                          ° (実角:{solvedRig.effectiveAdjustments.hand_item?.rotation ?? 0}°)
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateHandItemAdjustment({
-                              rotation: Math.min(180, handItemAdjustment.rotation + 1),
-                            })
-                          }
-                          className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-700 border border-zinc-200 hover:bg-zinc-100"
-                          title="時計回りに1°回転"
-                        >
-                          +1°
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateHandItemAdjustment({
-                              rotation: Math.min(180, handItemAdjustment.rotation + 5),
-                            })
-                          }
-                          className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-700 border border-zinc-200 hover:bg-zinc-100"
-                          title="時計回りに5°回転"
-                        >
-                          +5°
-                        </button>
-                      </div>
-                    </div>
-                    <input
-                      type="range"
-                      min={-180}
-                      max={180}
-                      step={1}
-                      value={handItemAdjustment.rotation}
-                      onChange={(e) =>
-                        updateHandItemAdjustment({ rotation: Number(e.target.value) })
-                      }
-                      className="w-full accent-zinc-900"
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-1">
-                    <div className="flex justify-between text-xs font-medium text-zinc-600">
-                      <span>サイズ倍率 (Scale)</span>
-                      <span className="font-mono text-zinc-900">
-                        {Math.round(handItemAdjustment.scale * 100)}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0.4}
-                      max={2.0}
-                      step={0.01}
-                      value={handItemAdjustment.scale}
-                      onChange={(e) =>
-                        updateHandItemAdjustment({ scale: Number(e.target.value) })
-                      }
-                      className="w-full accent-zinc-900"
-                    />
-                  </label>
-
-                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {/* クイックステップ＆プリセットボタン */}
+                  <div className="flex items-center gap-0.5">
                     <button
                       type="button"
                       onClick={() =>
-                        updateHandItemAdjustment({ flipX: !handItemAdjustment.flipX })
+                        updateHandItemAdjustment({
+                          rotation: Math.max(-180, handItemAdjustment.rotation - 5),
+                        })
                       }
-                      className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
-                        handItemAdjustment.flipX
-                          ? 'bg-zinc-900 text-white'
-                          : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-zinc-100'
-                      }`}
+                      className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-700 border border-zinc-200 hover:bg-zinc-100"
+                      title="反時計回りに5°"
                     >
-                      <FlipHorizontal className="h-3 w-3" />
-                      持ち物を左右反転
+                      -5°
                     </button>
                     <button
                       type="button"
-                      onClick={resetHandItemMainAdjustment}
-                      className="ml-auto flex items-center gap-1 rounded-md bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 border border-zinc-200 hover:bg-zinc-100"
+                      onClick={() => updateHandItemAdjustment({ rotation: 0 })}
+                      className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-700 border border-zinc-200 hover:bg-zinc-100"
+                      title="角度を0°に戻す"
                     >
-                      <RotateCcw className="h-3 w-3" />
-                      持ち物の角度・位置をリセット
+                      0°
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateHandItemAdjustment({
+                          rotation: Math.min(180, handItemAdjustment.rotation + 5),
+                        })
+                      }
+                      className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-700 border border-zinc-200 hover:bg-zinc-100"
+                      title="時計回りに5°"
+                    >
+                      +5°
+                    </button>
+                    {[-45, 45].map((deg) => (
+                      <button
+                        key={deg}
+                        type="button"
+                        onClick={() => updateHandItemAdjustment({ rotation: deg })}
+                        className={`hidden xs:inline-block rounded px-1.5 py-0.5 font-mono text-[10px] transition ${
+                          handItemAdjustment.rotation === deg
+                            ? 'bg-zinc-900 text-white font-bold'
+                            : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-100'
+                        }`}
+                        title={`${deg}°に設定`}
+                      >
+                        {deg > 0 ? `+${deg}°` : `${deg}°`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min={-180}
+                  max={180}
+                  step={1}
+                  value={handItemAdjustment.rotation}
+                  onChange={(e) =>
+                    updateHandItemAdjustment({ rotation: Number(e.target.value) })
+                  }
+                  className="w-full accent-zinc-900 h-1.5"
+                />
+              </div>
+
+              {/* サイズ倍率 (1行インライン) */}
+              <div className="flex items-center gap-2 rounded-lg bg-zinc-50/70 px-2 py-1.5 border border-zinc-200/60">
+                <div className="flex items-center gap-1 text-xs font-semibold text-zinc-800 shrink-0 min-w-[56px]">
+                  <Maximize2 className="h-3.5 w-3.5 text-zinc-600" />
+                  <span>サイズ</span>
+                </div>
+                <input
+                  type="range"
+                  min={0.4}
+                  max={2.0}
+                  step={0.01}
+                  value={handItemAdjustment.scale}
+                  onChange={(e) =>
+                    updateHandItemAdjustment({ scale: Number(e.target.value) })
+                  }
+                  className="flex-1 accent-zinc-900 h-1.5"
+                />
+                <span className="font-mono text-xs font-bold text-zinc-900 min-w-[42px] text-right bg-white border border-zinc-200 px-1 py-0.2 rounded">
+                  {Math.round(handItemAdjustment.scale * 100)}%
+                </span>
+              </div>
+
+              {/* 位置調整 (X / Y スライダー ＋ ミニステップ) */}
+              <div className="flex flex-col gap-1.5 rounded-lg bg-zinc-50/70 p-2 border border-zinc-200/60">
+                {/* X 位置 */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-xs font-semibold text-zinc-800 shrink-0 min-w-[56px]">
+                    <ArrowRight className="h-3.5 w-3.5 text-zinc-600" />
+                    <span>位置 X</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={-180}
+                    max={180}
+                    step={1}
+                    value={handItemAdjustment.dx}
+                    onChange={(e) =>
+                      updateHandItemAdjustment({ dx: Number(e.target.value) })
+                    }
+                    className="flex-1 accent-zinc-900 h-1.5"
+                  />
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateHandItemAdjustment({ dx: handItemAdjustment.dx - 1 })
+                      }
+                      className="rounded bg-white p-0.5 text-zinc-600 border border-zinc-200 hover:bg-zinc-100"
+                      title="左へ1px"
+                    >
+                      <ArrowLeft className="h-2.5 w-2.5" />
+                    </button>
+                    <span className="font-mono text-xs font-bold text-zinc-900 min-w-[42px] text-center bg-white border border-zinc-200 px-1 py-0.2 rounded">
+                      {handItemAdjustment.dx > 0 ? `+${handItemAdjustment.dx}` : handItemAdjustment.dx}px
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateHandItemAdjustment({ dx: handItemAdjustment.dx + 1 })
+                      }
+                      className="rounded bg-white p-0.5 text-zinc-600 border border-zinc-200 hover:bg-zinc-100"
+                      title="右へ1px"
+                    >
+                      <ArrowRight className="h-2.5 w-2.5" />
                     </button>
                   </div>
                 </div>
 
-                {/* 右カラム：持ち物本体の位置（X / Y）微調整 */}
-                <div className="flex flex-col gap-2.5 rounded-lg bg-zinc-50/70 p-2.5 border border-zinc-200/60">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-zinc-900">
-                      位置微調整 (X / Y)
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateHandItemAdjustment({ dx: handItemAdjustment.dx - 1 })
-                        }
-                        className="rounded bg-white p-1 text-zinc-600 border border-zinc-200 hover:bg-zinc-100"
-                        title="持ち物を左へ1px"
-                      >
-                        <ArrowLeft className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateHandItemAdjustment({ dy: handItemAdjustment.dy - 1 })
-                        }
-                        className="rounded bg-white p-1 text-zinc-600 border border-zinc-200 hover:bg-zinc-100"
-                        title="持ち物を上へ1px"
-                      >
-                        <ArrowUp className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateHandItemAdjustment({ dy: handItemAdjustment.dy + 1 })
-                        }
-                        className="rounded bg-white p-1 text-zinc-600 border border-zinc-200 hover:bg-zinc-100"
-                        title="持ち物を下へ1px"
-                      >
-                        <ArrowDown className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateHandItemAdjustment({ dx: handItemAdjustment.dx + 1 })
-                        }
-                        className="rounded bg-white p-1 text-zinc-600 border border-zinc-200 hover:bg-zinc-100"
-                        title="持ち物を右へ1px"
-                      >
-                        <ArrowRight className="h-3 w-3" />
-                      </button>
-                    </div>
+                {/* Y 位置 */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-xs font-semibold text-zinc-800 shrink-0 min-w-[56px]">
+                    <ArrowDown className="h-3.5 w-3.5 text-zinc-600" />
+                    <span>位置 Y</span>
                   </div>
-
-                  <label className="flex flex-col gap-1">
-                    <div className="flex justify-between text-xs font-medium text-zinc-600">
-                      <span>持ち物 横位置 (X)</span>
-                      <span className="font-mono text-zinc-900">
-                        {handItemAdjustment.dx > 0
-                          ? `+${handItemAdjustment.dx}`
-                          : handItemAdjustment.dx}
-                        px
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={-180}
-                      max={180}
-                      step={1}
-                      value={handItemAdjustment.dx}
-                      onChange={(e) =>
-                        updateHandItemAdjustment({ dx: Number(e.target.value) })
+                  <input
+                    type="range"
+                    min={-180}
+                    max={180}
+                    step={1}
+                    value={handItemAdjustment.dy}
+                    onChange={(e) =>
+                      updateHandItemAdjustment({ dy: Number(e.target.value) })
+                    }
+                    className="flex-1 accent-zinc-900 h-1.5"
+                  />
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateHandItemAdjustment({ dy: handItemAdjustment.dy - 1 })
                       }
-                      className="w-full accent-zinc-900"
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-1">
-                    <div className="flex justify-between text-xs font-medium text-zinc-600">
-                      <span>持ち物 縦位置 (Y)</span>
-                      <span className="font-mono text-zinc-900">
-                        {handItemAdjustment.dy > 0
-                          ? `+${handItemAdjustment.dy}`
-                          : handItemAdjustment.dy}
-                        px
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={-180}
-                      max={180}
-                      step={1}
-                      value={handItemAdjustment.dy}
-                      onChange={(e) =>
-                        updateHandItemAdjustment({ dy: Number(e.target.value) })
+                      className="rounded bg-white p-0.5 text-zinc-600 border border-zinc-200 hover:bg-zinc-100"
+                      title="上へ1px"
+                    >
+                      <ArrowUp className="h-2.5 w-2.5" />
+                    </button>
+                    <span className="font-mono text-xs font-bold text-zinc-900 min-w-[42px] text-center bg-white border border-zinc-200 px-1 py-0.2 rounded">
+                      {handItemAdjustment.dy > 0 ? `+${handItemAdjustment.dy}` : handItemAdjustment.dy}px
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateHandItemAdjustment({ dy: handItemAdjustment.dy + 1 })
                       }
-                      className="w-full accent-zinc-900"
-                    />
-                  </label>
+                      className="rounded bg-white p-0.5 text-zinc-600 border border-zinc-200 hover:bg-zinc-100"
+                      title="下へ1px"
+                    >
+                      <ArrowDown className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
                 </div>
+              </div>
+
+              {/* 左右反転 ＆ リセット（1行横並び） */}
+              <div className="flex items-center justify-between gap-2 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateHandItemAdjustment({ flipX: !handItemAdjustment.flipX })
+                  }
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition border ${
+                    handItemAdjustment.flipX
+                      ? 'bg-zinc-900 text-white border-zinc-900'
+                      : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                  }`}
+                  title="持ち物を左右反転します"
+                >
+                  <FlipHorizontal className="h-3.5 w-3.5" />
+                  <span>左右反転</span>
+                  <span
+                    className={`rounded px-1 py-0.2 text-[9px] font-bold ${
+                      handItemAdjustment.flipX
+                        ? 'bg-white/20 text-white'
+                        : 'bg-zinc-100 text-zinc-500'
+                    }`}
+                  >
+                    {handItemAdjustment.flipX ? 'ON' : 'OFF'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={resetHandItemMainAdjustment}
+                  className="inline-flex items-center gap-1 rounded-md bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 border border-zinc-200 hover:bg-zinc-100 transition"
+                  title="角度・位置・サイズを初期値に戻す"
+                >
+                  <RotateCcw className="h-3 w-3 text-zinc-400" />
+                  <span>位置リセット</span>
+                </button>
               </div>
             </div>
 
-            {/* ★【新機能】アイテムごとのレイヤー階層（前後関係・Z階層）選択 */}
-            <div className="flex flex-col gap-2 rounded-xl bg-white p-3 border border-zinc-200/80 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-zinc-900">
-                  レイヤー位置（アバターとの前後関係）
+            {/* レイヤー階層（アバターとの前後関係・5分割ボタン） */}
+            <div className="flex flex-col gap-1.5 rounded-xl bg-white p-2.5 border border-zinc-200/80 shadow-2xs">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-xs font-bold text-zinc-900 shrink-0">
+                  レイヤー位置（前後関係）
                 </span>
-                <span className="text-[10px] text-zinc-500 font-mono">
-                  {activeHandItem?.name ? `「${activeHandItem.name}」` : '現在の持ち物'}
-                </span>
+                {(() => {
+                  const currentPlacement =
+                    handItemAdjustment.layerPlacement ??
+                    (handItemAdjustment.handHoldModeOverride === 'in_front'
+                      ? 'in_front_arm'
+                      : 'behind_arm');
+                  const currentMeta = {
+                    back_lowest: '最背面（羽・マント・オーラ等）',
+                    behind_body: '背中（リュック・弓矢等）',
+                    behind_arm: '手の奥・握る（剣・ステッキ等）',
+                    in_front_arm: '手の前・抱える（盾・本・ぬいぐるみ等）',
+                    front_highest: '最前面（前面エフェクト・魔法陣等）',
+                  }[currentPlacement];
+                  return (
+                    <span className="text-[10px] font-medium text-zinc-600 truncate max-w-[200px]">
+                      {currentMeta}
+                    </span>
+                  );
+                })()}
               </div>
 
-              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-5">
+              {/* 5分割ボタン（スマホでも1行横並び） */}
+              <div className="grid grid-cols-5 gap-1">
                 {(
                   [
                     {
-                      id: 'behind_arm',
-                      label: '手の奥 (握る)',
-                      sub: '剣・ステッキ・ほうき',
-                      badge: '推奨',
-                    },
-                    {
-                      id: 'in_front_arm',
-                      label: '手の前 (抱える)',
-                      sub: '盾・ぬいぐるみ・本',
-                      badge: '標準',
+                      id: 'back_lowest',
+                      label: '最背面',
+                      icon: Layers,
+                      desc: '羽・マント・オーラ',
                     },
                     {
                       id: 'behind_body',
-                      label: '体の奥 (背中)',
-                      sub: '弓矢・リュック',
-                      badge: null,
+                      label: '背中',
+                      icon: User,
+                      desc: '弓矢・リュック',
                     },
                     {
-                      id: 'back_lowest',
-                      label: '最背面 (羽・マント)',
-                      sub: '大きな翼・オーラ',
-                      badge: null,
+                      id: 'behind_arm',
+                      label: '手の奥',
+                      icon: Hand,
+                      desc: '剣・ステッキ (握る)',
+                    },
+                    {
+                      id: 'in_front_arm',
+                      label: '手の前',
+                      icon: Shield,
+                      desc: '盾・本 (抱える)',
                     },
                     {
                       id: 'front_highest',
-                      label: '最前面 (突き出し)',
-                      sub: '手前エフェクト・魔法陣',
-                      badge: null,
+                      label: '最前面',
+                      icon: Sparkles,
+                      desc: 'エフェクト・魔法陣',
                     },
-                  ] as {
-                    id: ItemLayerPlacement;
-                    label: string;
-                    sub: string;
-                    badge: string | null;
-                  }[]
+                  ] as const
                 ).map((layerOpt) => {
                   const currentPlacement =
                     handItemAdjustment.layerPlacement ??
@@ -2667,6 +2653,7 @@ export function AvatarCloset({
                       ? 'in_front_arm'
                       : 'behind_arm');
                   const isActive = currentPlacement === layerOpt.id;
+                  const IconComp = layerOpt.icon;
 
                   return (
                     <button
@@ -2679,34 +2666,20 @@ export function AvatarCloset({
                             layerOpt.id === 'in_front_arm' ? 'in_front' : 'behind_hand',
                         })
                       }
-                      className={`flex flex-col items-start rounded-lg p-2 text-left transition border ${
+                      className={`flex flex-col items-center justify-center rounded-lg py-1.5 px-0.5 text-center transition border ${
                         isActive
-                          ? 'border-zinc-900 bg-zinc-900 text-white shadow-2xs ring-1 ring-zinc-900'
-                          : 'border-zinc-200/80 bg-zinc-50/50 text-zinc-700 hover:bg-zinc-100 hover:border-zinc-300'
+                          ? 'border-zinc-900 bg-zinc-900 text-white shadow-2xs'
+                          : 'border-zinc-200/80 bg-zinc-50/60 text-zinc-700 hover:bg-zinc-100 hover:border-zinc-300'
                       }`}
+                      title={`${layerOpt.label}: ${layerOpt.desc}`}
                     >
-                      <div className="flex w-full items-center justify-between gap-1">
-                        <span className="text-[11px] font-bold leading-tight">
-                          {layerOpt.label}
-                        </span>
-                        {layerOpt.badge && (
-                          <span
-                            className={`rounded px-1 py-0.2 text-[8px] font-semibold uppercase ${
-                              isActive
-                                ? 'bg-zinc-800 text-zinc-300'
-                                : 'bg-zinc-200 text-zinc-600'
-                            }`}
-                          >
-                            {layerOpt.badge}
-                          </span>
-                        )}
-                      </div>
-                      <span
-                        className={`mt-0.5 text-[9px] leading-tight ${
-                          isActive ? 'text-zinc-300' : 'text-zinc-500'
+                      <IconComp
+                        className={`h-4 w-4 shrink-0 ${
+                          isActive ? 'text-white' : 'text-zinc-600'
                         }`}
-                      >
-                        {layerOpt.sub}
+                      />
+                      <span className="mt-0.5 text-[10px] font-bold leading-tight truncate w-full">
+                        {layerOpt.label}
                       </span>
                     </button>
                   );
@@ -3246,16 +3219,16 @@ export function AvatarCloset({
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              {/* 十字キー＆X/Yスライダー */}
-              <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-3.5 shadow-sm">
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {/* 位置オフセット（X/Yスライダー ＋ ミニステップ） */}
+              <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-2.5 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-zinc-700">位置オフセット</span>
-                  <div className="flex items-center gap-1">
+                  <span className="text-xs font-bold text-zinc-800">位置オフセット</span>
+                  <div className="flex items-center gap-0.5">
                     <button
                       type="button"
                       onClick={() => updateActiveAdjustment({ dx: currentAdjustment.dx - 1 })}
-                      className="rounded border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition"
+                      className="rounded border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 transition"
                       title="左へ1px"
                     >
                       <ArrowLeft className="h-3 w-3" />
@@ -3263,7 +3236,7 @@ export function AvatarCloset({
                     <button
                       type="button"
                       onClick={() => updateActiveAdjustment({ dy: currentAdjustment.dy - 1 })}
-                      className="rounded border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition"
+                      className="rounded border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 transition"
                       title="上へ1px"
                     >
                       <ArrowUp className="h-3 w-3" />
@@ -3271,7 +3244,7 @@ export function AvatarCloset({
                     <button
                       type="button"
                       onClick={() => updateActiveAdjustment({ dy: currentAdjustment.dy + 1 })}
-                      className="rounded border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition"
+                      className="rounded border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 transition"
                       title="下へ1px"
                     >
                       <ArrowDown className="h-3 w-3" />
@@ -3279,7 +3252,7 @@ export function AvatarCloset({
                     <button
                       type="button"
                       onClick={() => updateActiveAdjustment({ dx: currentAdjustment.dx + 1 })}
-                      className="rounded border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition"
+                      className="rounded border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 transition"
                       title="右へ1px"
                     >
                       <ArrowRight className="h-3 w-3" />
@@ -3287,10 +3260,11 @@ export function AvatarCloset({
                   </div>
                 </div>
 
-                <label className="flex flex-col gap-1.5">
-                  <div className="flex justify-between text-xs font-medium text-zinc-600">
-                    <span>横移動 (X)</span>
-                    <span className="font-mono text-zinc-900">{currentAdjustment.dx}px</span>
+                {/* X 位置 */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-xs font-semibold text-zinc-700 shrink-0 min-w-[54px]">
+                    <ArrowRight className="h-3 w-3 text-zinc-500" />
+                    <span>位置 X</span>
                   </div>
                   <input
                     type="range"
@@ -3299,14 +3273,18 @@ export function AvatarCloset({
                     step={1}
                     value={currentAdjustment.dx}
                     onChange={(e) => updateActiveAdjustment({ dx: Number(e.target.value) })}
-                    className="w-full accent-zinc-900"
+                    className="flex-1 accent-zinc-900 h-1.5"
                   />
-                </label>
+                  <span className="font-mono text-xs font-bold text-zinc-900 min-w-[44px] text-right bg-zinc-50 border border-zinc-200 px-1 py-0.2 rounded">
+                    {currentAdjustment.dx > 0 ? `+${currentAdjustment.dx}` : currentAdjustment.dx}px
+                  </span>
+                </div>
 
-                <label className="flex flex-col gap-1.5">
-                  <div className="flex justify-between text-xs font-medium text-zinc-600">
-                    <span>縦移動 (Y)</span>
-                    <span className="font-mono text-zinc-900">{currentAdjustment.dy}px</span>
+                {/* Y 位置 */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-xs font-semibold text-zinc-700 shrink-0 min-w-[54px]">
+                    <ArrowDown className="h-3 w-3 text-zinc-500" />
+                    <span>位置 Y</span>
                   </div>
                   <input
                     type="range"
@@ -3315,19 +3293,21 @@ export function AvatarCloset({
                     step={1}
                     value={currentAdjustment.dy}
                     onChange={(e) => updateActiveAdjustment({ dy: Number(e.target.value) })}
-                    className="w-full accent-zinc-900"
+                    className="flex-1 accent-zinc-900 h-1.5"
                   />
-                </label>
+                  <span className="font-mono text-xs font-bold text-zinc-900 min-w-[44px] text-right bg-zinc-50 border border-zinc-200 px-1 py-0.2 rounded">
+                    {currentAdjustment.dy > 0 ? `+${currentAdjustment.dy}` : currentAdjustment.dy}px
+                  </span>
+                </div>
               </div>
 
               {/* 拡大縮小・回転・反転・トップス前面表示 */}
-              <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-3.5 shadow-sm">
-                <label className="flex flex-col gap-1.5">
-                  <div className="flex justify-between text-xs font-medium text-zinc-600">
-                    <span>サイズ倍率 (Scale)</span>
-                    <span className="font-mono text-zinc-900">
-                      {Math.round(currentAdjustment.scale * 100)}%
-                    </span>
+              <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-2.5 shadow-sm">
+                {/* サイズ倍率 */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-xs font-semibold text-zinc-700 shrink-0 min-w-[54px]">
+                    <Maximize2 className="h-3 w-3 text-zinc-500" />
+                    <span>サイズ</span>
                   </div>
                   <input
                     type="range"
@@ -3336,14 +3316,18 @@ export function AvatarCloset({
                     step={0.01}
                     value={currentAdjustment.scale}
                     onChange={(e) => updateActiveAdjustment({ scale: Number(e.target.value) })}
-                    className="w-full accent-zinc-900"
+                    className="flex-1 accent-zinc-900 h-1.5"
                   />
-                </label>
+                  <span className="font-mono text-xs font-bold text-zinc-900 min-w-[44px] text-right bg-zinc-50 border border-zinc-200 px-1 py-0.2 rounded">
+                    {Math.round(currentAdjustment.scale * 100)}%
+                  </span>
+                </div>
 
-                <label className="flex flex-col gap-1.5">
-                  <div className="flex justify-between text-xs font-medium text-zinc-600">
-                    <span>回転角度 (Rotation)</span>
-                    <span className="font-mono text-zinc-900">{currentAdjustment.rotation}°</span>
+                {/* 回転角度 */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-xs font-semibold text-zinc-700 shrink-0 min-w-[54px]">
+                    <RotateCw className="h-3 w-3 text-zinc-500" />
+                    <span>角度</span>
                   </div>
                   <input
                     type="range"
@@ -3352,15 +3336,18 @@ export function AvatarCloset({
                     step={1}
                     value={currentAdjustment.rotation}
                     onChange={(e) => updateActiveAdjustment({ rotation: Number(e.target.value) })}
-                    className="w-full accent-zinc-900"
+                    className="flex-1 accent-zinc-900 h-1.5"
                   />
-                </label>
+                  <span className="font-mono text-xs font-bold text-zinc-900 min-w-[44px] text-right bg-zinc-50 border border-zinc-200 px-1 py-0.2 rounded">
+                    {currentAdjustment.rotation > 0 ? `+${currentAdjustment.rotation}` : currentAdjustment.rotation}°
+                  </span>
+                </div>
 
-                <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-zinc-100">
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-zinc-100">
                   <button
                     type="button"
                     onClick={() => updateActiveAdjustment({ flipX: !currentAdjustment.flipX })}
-                    className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition ${
                       currentAdjustment.flipX
                         ? 'bg-zinc-900 text-white shadow-sm'
                         : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
@@ -3376,7 +3363,7 @@ export function AvatarCloset({
                       onClick={() =>
                         updateActiveAdjustment({ aboveTops: !currentAdjustment.aboveTops })
                       }
-                      className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition ${
                         currentAdjustment.aboveTops
                           ? 'bg-zinc-900 text-white shadow-sm'
                           : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
