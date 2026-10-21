@@ -1649,6 +1649,41 @@ export function PartCalibrationStudio({
             <span>{tool === 'erase' ? '消しゴム中' : '消しゴム'}</span>
           </button>
 
+          {/* 靴（shoes）専用の反転ペア作成ワンボタン */}
+          {category === 'shoes' && (
+            <>
+              <button
+                type="button"
+                disabled={!hasPartLoaded}
+                onClick={() => {
+                  if (tool === 'erase') setTool('move');
+                  void handleExecuteMirrorPair('auto');
+                }}
+                className={`inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold transition shadow-sm ${
+                  activePairParts
+                    ? 'bg-emerald-600 text-white ring-1 ring-emerald-500 hover:bg-emerald-700'
+                    : 'bg-blue-600 text-white ring-1 ring-blue-500 hover:bg-blue-700 disabled:opacity-40'
+                }`}
+                title="消しゴムで片方を消した後、このボタンを押すと向かって左＝右足、向かって右＝左足の反転ペアをワンクリックで作成します"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>{activePairParts ? '反転ペア済' : '反転ペア'}</span>
+              </button>
+
+              {activePairParts && (
+                <button
+                  type="button"
+                  onClick={handleSwapShoesPair}
+                  className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2 sm:px-2.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold text-indigo-700 shadow-sm hover:bg-indigo-100 transition"
+                  title="向かって左と向かって右の靴を入れ替えます"
+                >
+                  <FlipHorizontal className="h-3.5 w-3.5" />
+                  <span>左右入替</span>
+                </button>
+              )}
+            </>
+          )}
+
           <button
             type="button"
             disabled={!hasPartLoaded}
@@ -1730,17 +1765,33 @@ export function PartCalibrationStudio({
             }`}
           >
             <span className="truncate">
-              {tool === 'erase' && '【消しゴム中】ドラッグで消去。再クリックで解除'}
+              {tool === 'erase' && (category === 'shoes' ? '【消しゴム中】片方を消して「反転ペア作成」を押してください' : '【消しゴム中】ドラッグで消去。再クリックで解除')}
               {tool === 'pick' && '【スポイト中】透明にしたい色をクリック'}
             </span>
-            <button
-              type="button"
-              onClick={() => setTool('move')}
-              className="flex shrink-0 items-center gap-1 rounded-lg bg-white/20 px-2 py-0.5 text-[11px] font-extrabold text-white hover:bg-white/30"
-            >
-              <Check className="h-3 w-3" />
-              解除
-            </button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {tool === 'erase' && category === 'shoes' && hasPartLoaded && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTool('move');
+                    void handleExecuteMirrorPair('auto');
+                  }}
+                  className="flex items-center gap-1 rounded-lg bg-white px-2 sm:px-2.5 py-0.5 text-[11px] font-extrabold text-rose-700 shadow-sm hover:bg-rose-50 transition active:scale-95"
+                  title="片足を消し終わったらここを押して、向かって左＝右足、向かって右＝左足の反転ペアを作成します"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  <span>反転ペア作成</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setTool('move')}
+                className="flex items-center gap-1 rounded-lg bg-white/20 px-2 py-0.5 text-[11px] font-extrabold text-white hover:bg-white/30"
+              >
+                <Check className="h-3 w-3" />
+                完了
+              </button>
+            </div>
           </div>
         )}
         {/* 512x512 ステージ本体 */}
@@ -1828,15 +1879,37 @@ export function PartCalibrationStudio({
               }
 
               if (layer === category) {
-                elements.push(
-                  <canvas
-                    key="editing-part-canvas"
-                    ref={stagePartCanvasRef}
-                    width={S}
-                    height={S}
-                    className="pointer-events-none absolute inset-0 h-full w-full"
-                  />,
-                );
+                // 靴（shoes）で反転ペアが作成済み、かつ消しゴム中ではない場合はステージ上に両足プレビューを表示
+                if (category === 'shoes' && activePairParts && tool !== 'erase') {
+                  elements.push(
+                    <Fragment key="shoes-pair-preview">
+                      <img
+                        key="shoes-preview-right"
+                        src={activePairParts.rightSrc}
+                        alt="右足用（向かって左）"
+                        draggable={false}
+                        className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+                      />
+                      <img
+                        key="shoes-preview-left"
+                        src={activePairParts.leftSrc}
+                        alt="左足用（向かって右）"
+                        draggable={false}
+                        className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+                      />
+                    </Fragment>,
+                  );
+                } else {
+                  elements.push(
+                    <canvas
+                      key="editing-part-canvas"
+                      ref={stagePartCanvasRef}
+                      width={S}
+                      height={S}
+                      className="pointer-events-none absolute inset-0 h-full w-full"
+                    />,
+                  );
+                }
               }
 
               return <Fragment key={layer}>{elements}</Fragment>;
