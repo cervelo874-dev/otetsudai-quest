@@ -186,8 +186,8 @@ export function AvatarMaker({
   // 親がアバター工房で登録した自作パーツを含む全パーツ一覧を購読
   const { parts: catalogParts } = usePartCatalog();
 
-  // 現在選択中の大カテゴリタブ
-  const [activeTabId, setActiveTabId] = useState<string>('tops');
+  // 現在選択中の大カテゴリタブ（先頭の「かみがた」から開始）
+  const [activeTabId, setActiveTabId] = useState<string>(CHILD_CATEGORIES[0].id);
   const activeTab = useMemo(
     () => CHILD_CATEGORIES.find((t) => t.id === activeTabId) ?? CHILD_CATEGORIES[0],
     [activeTabId],
@@ -371,6 +371,13 @@ export function AvatarMaker({
           // 服をはずした場合、セットされていた腕もはずす（素体の腕に戻す）
           next.arm_left = null;
           next.arm_right = null;
+          // 手足の服専用微調整（aboveTopsやオフセット）も安全に初期化
+          setDraftAdjustments((prevAdj) => {
+            const nextAdj = { ...prevAdj };
+            delete nextAdj.arm_left;
+            delete nextAdj.arm_right;
+            return nextAdj;
+          });
         } else {
           next.tops = part;
           const isOnePiece = isDressOrOnePiecePart(part);
@@ -440,6 +447,13 @@ export function AvatarMaker({
           next.bottoms = null;
           next.leg_left = null;
           next.leg_right = null;
+          // 足専用微調整も安全に初期化
+          setDraftAdjustments((prevAdj) => {
+            const nextAdj = { ...prevAdj };
+            delete nextAdj.leg_left;
+            delete nextAdj.leg_right;
+            return nextAdj;
+          });
         } else {
           next.bottoms = part;
           // ボトムスにセット記憶された脚・足（linkedParts）があれば自動で一緒に装備

@@ -10,21 +10,32 @@ import {
   Sun,
   Sword,
   User,
-  type LucideIcon,
 } from 'lucide-react';
 import type { AvatarCategory } from '../types';
 
 export type CategoryIconComponent = React.ComponentType<{ className?: string }>;
 
-/** カスタム生成した透過PNGアイコンを表示するラッパー */
+/**
+ * カスタム生成した透過PNGアイコンを表示するラッパー
+ * - mask-image + bg-current を使用することで、親要素の文字色（text-white, text-zinc-700等）に
+ *   LucideのSVGアイコンと全く同じように完全追従します。
+ */
 function createCustomIcon(src: string, alt: string): CategoryIconComponent {
   const IconComponent: CategoryIconComponent = ({ className = 'h-3.5 w-3.5' }) =>
-    React.createElement('img', {
-      src,
-      alt,
-      draggable: false,
-      className: `${className} object-contain inline-block align-middle select-none pointer-events-none brightness-90 contrast-125`,
-      loading: 'lazy',
+    React.createElement('span', {
+      role: 'img',
+      'aria-label': alt,
+      className: `${className} inline-block align-middle select-none pointer-events-none bg-current shrink-0`,
+      style: {
+        maskImage: `url("${src}")`,
+        WebkitMaskImage: `url("${src}")`,
+        maskSize: 'contain',
+        WebkitMaskSize: 'contain',
+        maskRepeat: 'no-repeat',
+        WebkitMaskRepeat: 'no-repeat',
+        maskPosition: 'center',
+        WebkitMaskPosition: 'center',
+      },
     });
   IconComponent.displayName = `CustomIcon(${alt})`;
   return IconComponent;

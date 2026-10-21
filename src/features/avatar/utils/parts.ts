@@ -380,7 +380,8 @@ export function isDressOrOnePiecePart(part: AvatarPart | null | undefined): bool
 /**
  * パーツ選択サムネイル（カード）内で、透過PNGパーツを枠の中心に大きくセンタリング表示するためのCSSスタイルを計算
  */
-export function getPartThumbnailStyle(part: AvatarPart): CSSProperties {
+export function getPartThumbnailStyle(part: AvatarPart | null | undefined): CSSProperties {
+  if (!part) return {};
   const meta = CATEGORY_META[part.category];
   const bounds = part.rig?.bounds;
 
@@ -395,18 +396,22 @@ export function getPartThumbnailStyle(part: AvatarPart): CSSProperties {
     bounds.width > 0 &&
     bounds.height > 0
   ) {
-    cx = bounds.centerX;
-    cy = bounds.centerY;
+    if (Number.isFinite(bounds.centerX)) cx = bounds.centerX;
+    if (Number.isFinite(bounds.centerY)) cy = bounds.centerY;
     const maxDim = Math.max(bounds.width, bounds.height);
     if (Number.isFinite(maxDim) && maxDim > 0) {
       scale = Math.min(3.2, Math.max(1.15, (AVATAR_CANVAS_SIZE * 0.72) / maxDim));
     }
   } else if (meta?.targetSpec) {
     const maxDim = Math.max(meta.targetSpec.targetWidth, meta.targetSpec.targetHeight);
-    if (maxDim > 0) {
+    if (Number.isFinite(maxDim) && maxDim > 0) {
       scale = Math.min(3.0, Math.max(1.15, (AVATAR_CANVAS_SIZE * 0.75) / maxDim));
     }
   }
+
+  if (!Number.isFinite(scale) || scale <= 0) scale = 1.35;
+  if (!Number.isFinite(cx)) cx = 256;
+  if (!Number.isFinite(cy)) cy = 256;
 
   // キャンバス中心(256, 256)とパーツ中心(cx, cy)のズレを打ち消す移動量（%）
   const tx = ((256 - cx) / 512) * 100 * scale;
