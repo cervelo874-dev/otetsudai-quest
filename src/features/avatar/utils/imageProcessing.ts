@@ -439,17 +439,16 @@ export async function createMirroredPair(
   const originalDataUrl = sourceCanvas.toDataURL('image/png');
   const mirroredDataUrl = mirrorCanvas.toDataURL('image/png');
 
+  // 向かって左側が右の靴（rightSrc）、向かって右側が左の靴（leftSrc）になるよう設定
   if (detectedSide === 'right') {
-    // 残された足が右足（画面左側）の場合：右足は元画像、左足は水平反転画像
+    return {
+      rightSrc: mirroredDataUrl,
+      leftSrc: originalDataUrl,
+    };
+  } else {
     return {
       rightSrc: originalDataUrl,
       leftSrc: mirroredDataUrl,
-    };
-  } else {
-    // 残された足が左足（画面右側）の場合：左足は元画像、右足は水平反転画像
-    return {
-      leftSrc: originalDataUrl,
-      rightSrc: mirroredDataUrl,
     };
   }
 }

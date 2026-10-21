@@ -3220,6 +3220,30 @@ export function AvatarCloset({
                       </button>
                     );
                   })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const curShoes = draft.shoes;
+                      if (!curShoes || typeof curShoes !== 'object' || !curShoes.pairParts) return;
+                      const swappedShoes: AvatarPart = {
+                        ...curShoes,
+                        pairParts: {
+                          ...curShoes.pairParts,
+                          leftSrc: curShoes.pairParts.rightSrc,
+                          rightSrc: curShoes.pairParts.leftSrc,
+                        },
+                      };
+                      setDraft((prev) => ({
+                        ...prev,
+                        shoes: swappedShoes,
+                      }));
+                    }}
+                    className="flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition"
+                    title="向かって左（右足）と向かって右（左足）の靴画像を入れ替えます"
+                  >
+                    <FlipHorizontal className="h-3 w-3" />
+                    <span>⇄ 左右入替</span>
+                  </button>
                 </div>
               </div>
             )}

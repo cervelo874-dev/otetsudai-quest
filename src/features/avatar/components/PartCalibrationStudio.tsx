@@ -512,29 +512,6 @@ export function PartCalibrationStudio({
     );
   }, [oppositeCategory, oppositeReferencePart, showToast, transform.flipX, transform.flipY]);
 
-  // ==================== 靴（shoes）の片足反転ペア生成 ====================
-  const handleExecuteMirrorPair = useCallback(
-    async (sourceSide: 'auto' | 'right' | 'left' = 'auto') => {
-      const canvas = compositedPartCanvasRef.current;
-      if (!canvas) return;
-      try {
-        const mirrored = await createMirroredPair(canvas, sourceSide);
-        setActivePairParts({
-          leftSrc: mirrored.leftSrc,
-          rightSrc: mirrored.rightSrc,
-          originalSrc: canvas.toDataURL('image/png'),
-        });
-        showToast(
-          'ok',
-          '片足から水平反転して両足ペア（右足・左足）を作成しました！',
-        );
-      } catch (err) {
-        showToast('err', `ペア作成に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    },
-    [showToast],
-  );
-
   // ==================== 画像の読み込み ====================
   const loadPartSource = useCallback(
     async (
@@ -1334,6 +1311,44 @@ export function PartCalibrationStudio({
     drawPartWithTransform(ctx, finalCanvas, transform);
     return outCanvas;
   };
+
+  // ==================== 靴（shoes）の片足反転ペア生成 ＆ 左右入れ替え ====================
+  const handleExecuteMirrorPair = useCallback(
+    async (sourceSide: 'auto' | 'right' | 'left' = 'auto') => {
+      const canvas = renderNormalized512Canvas();
+      if (!canvas) {
+        showToast('err', '先にパーツ画像を読み込んでください');
+        return;
+      }
+      try {
+        const mirrored = await createMirroredPair(canvas, sourceSide);
+        setActivePairParts({
+          leftSrc: mirrored.leftSrc,
+          rightSrc: mirrored.rightSrc,
+          originalSrc: canvas.toDataURL('image/png'),
+        });
+        showToast(
+          'ok',
+          '向かって左側を「右の靴」、右側を「左の靴」として反転ペアを作成しました！',
+        );
+      } catch (err) {
+        showToast('err', `ペア作成に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [renderNormalized512Canvas, showToast],
+  );
+
+  const handleSwapShoesPair = useCallback(() => {
+    setActivePairParts((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        leftSrc: prev.rightSrc,
+        rightSrc: prev.leftSrc,
+      };
+    });
+    showToast('ok', '向かって左（右足）と向かって右（左足）の靴を入れ替えました！');
+  }, [showToast]);
 
   const exportFileName = `${category}_${sanitizeFileName(partName || 'part')}.png`;
 
@@ -2322,15 +2337,15 @@ export function PartCalibrationStudio({
                       <div className="mt-2.5 flex flex-col gap-2 rounded-xl bg-blue-50/60 p-2.5 ring-1 ring-blue-200/70">
                         <div className="flex items-center justify-around gap-2">
                           <div className="flex flex-col items-center gap-1">
-                            <span className="text-[11px] font-bold text-slate-600">右足 (向かって左)</span>
+                            <span className="text-[11px] font-bold text-blue-900">向かって左（右足用）</span>
                             <div className="h-16 w-16 overflow-hidden rounded-lg bg-white/90 p-1 shadow-inner ring-1 ring-slate-200">
-                              <img src={activePairParts.rightSrc} alt="右足" className="h-full w-full object-contain" />
+                              <img src={activePairParts.rightSrc} alt="向かって左（右足用）" className="h-full w-full object-contain" />
                             </div>
                           </div>
                           <div className="flex flex-col items-center gap-1">
-                            <span className="text-[11px] font-bold text-slate-600">左足 (向かって右)</span>
+                            <span className="text-[11px] font-bold text-blue-900">向かって右（左足用）</span>
                             <div className="h-16 w-16 overflow-hidden rounded-lg bg-white/90 p-1 shadow-inner ring-1 ring-slate-200">
-                              <img src={activePairParts.leftSrc} alt="左足" className="h-full w-full object-contain" />
+                              <img src={activePairParts.leftSrc} alt="向かって右（左足用）" className="h-full w-full object-contain" />
                             </div>
                           </div>
                         </div>
@@ -2338,10 +2353,19 @@ export function PartCalibrationStudio({
                         <div className="flex flex-wrap items-center justify-end gap-1.5 pt-1 border-t border-blue-200/60">
                           <button
                             type="button"
+                            onClick={handleSwapShoesPair}
+                            className="flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700 shadow-sm ring-1 ring-indigo-300 hover:bg-indigo-100"
+                            title="向かって左と向かって右の靴を入れ替えます"
+                          >
+                            <FlipHorizontal className="h-3 w-3" />
+                            ⇄ 左右の靴を入れ替える
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => void handleExecuteMirrorPair('auto')}
                             className="rounded-lg bg-white px-2.5 py-1 text-[11px] font-bold text-blue-700 shadow-sm ring-1 ring-blue-300 hover:bg-blue-50"
                           >
-                            現在の消しゴム状態で再生成
+                            現在の状態で再生成
                           </button>
                           <button
                             type="button"
@@ -2362,17 +2386,17 @@ export function PartCalibrationStudio({
                           disabled={!hasPartLoaded}
                           onClick={() => void handleExecuteMirrorPair('auto')}
                           className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-40"
-                          title="現在の片足を水平反転して、左右両足のセットを作成します"
+                          title="現在の片足を水平反転して、向かって左＝右足、向かって右＝左足のセットを作成します"
                         >
                           <Sparkles className="h-4 w-4" />
-                          片足から反転ペアを作成（自動判定）
+                          片足から反転ペアを作成（向かって左＝右足 / 右＝左足）
                         </button>
                         <button
                           type="button"
                           disabled={!hasPartLoaded}
                           onClick={() => void handleExecuteMirrorPair('right')}
                           className="flex items-center gap-1 rounded-xl bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100 disabled:opacity-40"
-                          title="画面左側の足を右足として反転ペアを作成します"
+                          title="向かって左側の足を右足として反転ペアを作成します"
                         >
                           右足基準で反転
                         </button>
@@ -2381,7 +2405,7 @@ export function PartCalibrationStudio({
                           disabled={!hasPartLoaded}
                           onClick={() => void handleExecuteMirrorPair('left')}
                           className="flex items-center gap-1 rounded-xl bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100 disabled:opacity-40"
-                          title="画面右側の足を左足として反転ペアを作成します"
+                          title="向かって右側の足を左足として反転ペアを作成します"
                         >
                           左足基準で反転
                         </button>
