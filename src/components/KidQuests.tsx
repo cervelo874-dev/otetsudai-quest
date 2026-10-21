@@ -62,42 +62,42 @@ export function KidQuests({
                   : 'border-slate-100 bg-white hover:border-amber-200 shadow-md'
             }`}
           >
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-3xl shadow-inner">
+            <div className="flex items-center gap-3 w-full sm:w-auto min-w-0 flex-1">
+              <span className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-2xl sm:text-3xl shadow-inner border border-amber-200/60">
                 {quest.icon}
               </span>
 
-              <div className="flex flex-col">
-                <span className="text-lg font-black text-slate-800">
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-base sm:text-lg font-black text-slate-800 break-words leading-tight">
                   {quest.title}
                 </span>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="flex items-center gap-1 text-sm font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="inline-flex items-center gap-1 text-xs sm:text-sm font-black text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
                     <span>🪙</span>
-                    <span>+{reward} コイン</span>
+                    <span className="whitespace-nowrap">+{reward} コイン</span>
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="mt-3 sm:mt-0 w-full sm:w-auto flex justify-end">
+            <div className="mt-3 sm:mt-0 w-full sm:w-auto flex justify-center sm:justify-end shrink-0">
               {isDoneToday ? (
-                <div className="flex items-center gap-1.5 rounded-2xl bg-emerald-100 px-5 py-3 font-black text-emerald-800 text-base">
-                  <CheckCircle2 size={22} className="text-emerald-600" />
-                  <span>きょうは かんりょう！💮</span>
+                <div className="flex items-center justify-center gap-1.5 rounded-2xl bg-emerald-100/90 border-2 border-emerald-300 px-5 py-2.5 sm:py-3 font-black text-emerald-800 text-sm sm:text-base w-full sm:w-auto shadow-xs">
+                  <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
+                  <span className="whitespace-nowrap">きょうは かんりょう！💮</span>
                 </div>
               ) : isSubmitted ? (
-                <div className="flex items-center gap-2 rounded-2xl bg-amber-100 px-5 py-3 font-black text-amber-900 text-base animate-pulse">
-                  <Clock size={20} className="text-amber-700" />
-                  <span>おうちのひとに ほうこくちゅう…💌</span>
+                <div className="flex items-center justify-center gap-2 rounded-2xl bg-amber-100/90 border-2 border-amber-300 px-5 py-2.5 sm:py-3 font-black text-amber-900 text-sm sm:text-base w-full sm:w-auto animate-pulse shadow-xs">
+                  <Clock size={18} className="text-amber-700 shrink-0" />
+                  <span className="whitespace-nowrap">おうちのひとに ほうこくちゅう…💌</span>
                 </div>
               ) : (
                 <button
                   onClick={(e) => handleDone(quest, e)}
-                  className="btn-pop flex items-center justify-center gap-2 w-full sm:w-auto rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-7 py-3 text-lg font-black text-white shadow-[0_5px_0_#0f766e] active:shadow-none"
+                  className="btn-pop flex items-center justify-center gap-2 w-full sm:w-auto rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-6 sm:px-7 py-2.5 sm:py-3 text-base sm:text-lg font-black text-white shadow-[0_4px_0_#0f766e] active:translate-y-1 active:shadow-none hover:brightness-105 transition"
                 >
-                  <Sparkles size={20} />
-                  <span>できた！✨</span>
+                  <Sparkles size={18} className="animate-spin-slow shrink-0" />
+                  <span className="whitespace-nowrap">できた！✨</span>
                 </button>
               )}
             </div>

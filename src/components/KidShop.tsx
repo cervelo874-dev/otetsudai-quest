@@ -46,15 +46,15 @@ export function KidShop({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* ガチャバナー */}
-      <div className="flex items-center justify-between rounded-3xl bg-gradient-to-r from-pink-400 via-rose-400 to-amber-400 p-4 text-white shadow-md">
-        <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/30 text-3xl shadow-inner">
+      {/* ガチャバナー（スマホで潰れないレスポンシブ配置） */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-3xl bg-gradient-to-r from-pink-400 via-rose-400 to-amber-400 p-4 text-white shadow-md">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/30 text-3xl shadow-inner">
             🎰
           </span>
-          <div>
-            <div className="text-lg font-black">ごほうびガチャ</div>
-            <div className="text-xs font-bold text-pink-100">
+          <div className="min-w-0">
+            <div className="text-base sm:text-lg font-black truncate">ごほうびガチャ</div>
+            <div className="text-xs font-bold text-pink-100 line-clamp-1">
               1にち1かい むりょう！レアアイテムが あたるかも！？
             </div>
           </div>
@@ -64,13 +64,13 @@ export function KidShop({
             sound.tap();
             onOpenGacha();
           }}
-          className="btn-pop rounded-2xl bg-white px-4 py-2 text-sm font-black text-rose-600 shadow-[0_4px_0_#fda4af]"
+          className="btn-pop shrink-0 rounded-2xl bg-white px-5 py-2.5 text-sm font-black text-rose-600 shadow-[0_4px_0_#fda4af] hover:bg-rose-50 text-center whitespace-nowrap active:translate-y-1 active:shadow-none"
         >
           まわす！✨
         </button>
       </div>
 
-      {/* カテゴリ切り替え */}
+      {/* カテゴリ切り替え（あつ森風ピル型タブ） */}
       <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
         {categories.map((c) => (
           <button
@@ -79,14 +79,14 @@ export function KidShop({
               sound.tap();
               setFilter(c.key);
             }}
-            className={`btn-pop flex items-center gap-1.5 shrink-0 rounded-2xl px-4 py-2 text-sm font-black transition-all ${
+            className={`btn-pop flex items-center gap-1.5 shrink-0 rounded-2xl px-4 py-2 text-xs sm:text-sm font-black transition-all ${
               filter === c.key
-                ? 'bg-amber-500 text-white shadow-[0_4px_0_#b45309]'
+                ? 'bg-amber-500 text-white shadow-[0_3px_0_#b45309]'
                 : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
             <span>{c.icon}</span>
-            <span>{c.label}</span>
+            <span className="whitespace-nowrap">{c.label}</span>
           </button>
         ))}
       </div>
@@ -99,45 +99,54 @@ export function KidShop({
             item.avatarItemId &&
             child.ownedItems.includes(item.avatarItemId);
           const canAfford = child.coins >= item.price;
+          const neededCoins = item.price - child.coins;
 
           return (
             <div
               key={item.id}
-              className="card flex flex-col justify-between p-4 border-2 border-slate-100 hover:border-amber-200"
+              className="card flex flex-col justify-between p-4 border-2 border-slate-100 hover:border-amber-200 shadow-sm"
             >
               <div className="flex items-start gap-3">
                 <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-3xl shadow-inner border border-amber-100">
                   {item.icon}
                 </span>
-                <div className="flex flex-col">
-                  <span className="text-base font-black text-slate-800">
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-base font-black text-slate-800 break-words leading-tight">
                     {item.name}
                   </span>
-                  <div className="mt-1 flex items-center gap-1 text-sm font-black text-amber-600">
+                  <div className="mt-1.5 flex items-center gap-1 text-sm font-black text-amber-600">
                     <span>🪙</span>
                     <span>{item.price} コイン</span>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4 pt-2 border-t border-slate-100 flex justify-end">
+              <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                <div className="text-xs text-slate-400 font-bold">
+                  {item.category === 'tablet' && `💻 ${item.minutes}ぷん`}
+                  {item.category === 'real' && '🎁 おてわたし'}
+                  {item.category === 'avatar' && '👕 きせかえ'}
+                </div>
+
                 {isOwnedAvatar ? (
-                  <div className="flex items-center gap-1 rounded-xl bg-slate-100 px-4 py-2 text-xs font-black text-slate-500">
-                    <Check size={16} />
-                    <span>もっているよ</span>
+                  <div className="flex items-center gap-1 rounded-xl bg-slate-100 px-3.5 py-1.5 text-xs font-black text-slate-500">
+                    <Check size={15} />
+                    <span className="whitespace-nowrap">もっているよ</span>
                   </div>
                 ) : (
                   <button
                     onClick={() => handleBuy(item)}
                     disabled={!canAfford}
-                    className={`btn-pop flex items-center gap-1.5 rounded-xl px-5 py-2 text-sm font-black shadow-md ${
+                    className={`btn-pop flex items-center gap-1.5 rounded-xl px-4 sm:px-5 py-2 text-xs sm:text-sm font-black transition ${
                       canAfford
-                        ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow-[0_3px_0_#c2410c] active:shadow-none'
-                        : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                        ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow-[0_3px_0_#c2410c] active:translate-y-0.5 active:shadow-none'
+                        : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none'
                     }`}
                   >
-                    <ShoppingCart size={16} />
-                    <span>{canAfford ? 'かう！' : 'コイン不足'}</span>
+                    <ShoppingCart size={15} />
+                    <span className="whitespace-nowrap">
+                      {canAfford ? 'かう！' : `あと${neededCoins}🪙`}
+                    </span>
                   </button>
                 )}
               </div>

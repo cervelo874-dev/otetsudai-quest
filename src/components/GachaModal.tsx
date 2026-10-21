@@ -8,7 +8,7 @@ import { burst } from '../effects';
 import { toast } from './ui';
 import { GachaMachineVisual } from './GachaMachineVisual';
 import { GameAvatar2D } from './Avatar';
-import { Sparkles, Coins, RefreshCw, Star, Check } from 'lucide-react';
+import { Sparkles, Coins, RefreshCw, Star, Check, X } from 'lucide-react';
 
 export function GachaModal({
   child,
@@ -149,13 +149,13 @@ export function GachaModal({
 
   return (
     <div className="flex flex-col items-center max-w-md mx-auto w-full">
-      {/* ヘッダー情報バー */}
+      {/* ヘッダー情報バー（閉じるボタンを独自統合し被りを解消） */}
       <div className="w-full flex items-center justify-between border-b pb-2.5 mb-3">
-        <h3 className="text-xl font-black text-amber-950 flex items-center gap-2">
-          <span className="text-2xl">🎰</span>
-          <span>ごほうびガチャ</span>
+        <h3 className="text-lg sm:text-xl font-black text-amber-950 flex items-center gap-1.5 shrink-0">
+          <span className="text-xl sm:text-2xl">🎰</span>
+          <span className="whitespace-nowrap">ごほうびガチャ</span>
         </h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {/* ほしのかけら */}
           <button
             type="button"
@@ -164,16 +164,29 @@ export function GachaModal({
               setActiveTab('exchange');
             }}
             title="ほしのかけら交換所へ"
-            className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-100 to-yellow-100 px-3 py-1 font-black text-amber-950 text-xs shadow-sm border border-amber-300 hover:scale-105 transition-transform"
+            className="flex items-center gap-1 sm:gap-1.5 rounded-full bg-gradient-to-r from-amber-100 to-yellow-100 px-2.5 py-1 font-black text-amber-950 text-xs shadow-xs border border-amber-300 hover:scale-105 transition-transform"
           >
-            <span className="text-amber-500 text-sm">🌟</span>
-            <span>{child.starShards ?? 0} こ</span>
+            <span className="text-amber-500 text-xs sm:text-sm">🌟</span>
+            <span className="whitespace-nowrap">{child.starShards ?? 0} こ</span>
           </button>
           {/* コイン */}
-          <div className="flex items-center gap-1 rounded-full bg-yellow-100 px-3 py-1 font-black text-yellow-950 text-xs shadow-sm border border-yellow-300">
+          <div className="flex items-center gap-1 rounded-full bg-yellow-100 px-2.5 py-1 font-black text-yellow-950 text-xs shadow-xs border border-yellow-300">
             <span>🪙</span>
             <span>{child.coins}</span>
           </div>
+          {/* 押しやすい閉じるボタン */}
+          <button
+            type="button"
+            onClick={() => {
+              sound.tap();
+              onClose();
+            }}
+            className="btn-pop ml-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition"
+            title="とじる"
+            aria-label="とじる"
+          >
+            <X size={18} strokeWidth={2.5} />
+          </button>
         </div>
       </div>
 
@@ -595,8 +608,8 @@ export function GachaModal({
             ))}
           </div>
 
-          {/* アイテム一覧：実際のSVGイラストプレビューを表示 */}
-          <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+          {/* アイテム一覧：実際のSVGイラストプレビューを表示（スマホ1列・タブレット2列で押し潰れ防止） */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1">
             {filteredItems.map((item) => {
               const isOwned = child.ownedItems.includes(item.id);
               const cost = getShardCost(item.rarity);

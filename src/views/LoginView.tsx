@@ -105,41 +105,41 @@ export function LoginView({
           </p>
         </div>
 
-        {/* こどもアバター一覧（何人でも中央揃えでバランス良く配置） */}
-        <div className="my-8 flex flex-wrap justify-center gap-6">
+        {/* こどもアバター一覧（Switch風ユーザー選択カード・弾む立体感） */}
+        <div className="my-6 sm:my-8 flex flex-wrap justify-center gap-5 sm:gap-6">
           {childrenList.map((child) => (
             <button
               key={child.id}
               onClick={() => handleChildClick(child)}
-              className="btn-pop group relative flex flex-col items-center rounded-3xl bg-white p-6 shadow-[0_10px_0_rgba(0,0,0,0.06)] border-4 border-amber-200/60 hover:border-amber-400 hover:shadow-xl transition-all w-full sm:w-[260px] max-w-sm"
+              className="btn-pop group relative flex flex-col items-center rounded-[32px] bg-white p-5 sm:p-6 shadow-[0_8px_0_#fde68a] border-4 border-amber-300/80 hover:border-amber-400 hover:shadow-[0_12px_0_#fde68a] hover:-translate-y-1 transition-all w-full sm:w-[260px] max-w-sm"
             >
               <div className="relative">
                 <Avatar
                   config={child.avatar}
-                  size={140}
+                  size={130}
                   rounded="rounded-3xl shadow-lg group-hover:scale-105 transition-transform"
                 />
-                <span className="absolute -bottom-2 -right-2 rounded-full bg-amber-400 px-3 py-1 text-xs font-black text-amber-950 shadow-md">
+                <span className="absolute -bottom-2 -right-2 rounded-full bg-amber-400 px-3 py-1 text-xs font-black text-amber-950 shadow-md border-2 border-white">
                   {child.age}さい
                 </span>
               </div>
 
-              <div className="mt-4 text-2xl font-black text-slate-800">
+              <div className="mt-4 text-2xl font-black text-slate-800 tracking-wide">
                 {child.name}
               </div>
 
-              <div className="mt-2 flex items-center gap-3">
-                <span className="flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">
+              <div className="mt-2 flex items-center gap-2.5">
+                <span className="flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800 shadow-xs border border-amber-200">
                   <span>🪙</span>
                   <span>{child.coins}</span>
                 </span>
-                <span className="flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1 text-xs font-black text-rose-800">
+                <span className="flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1 text-xs font-black text-rose-800 shadow-xs border border-rose-200">
                   <span>🔥</span>
                   <span>{child.streak}日</span>
                 </span>
               </div>
 
-              <div className="mt-5 w-full rounded-2xl bg-gradient-to-r from-sky-400 to-indigo-500 py-3 text-sm font-black text-white shadow-[0_4px_0_#3730a3]">
+              <div className="mt-5 w-full rounded-2xl bg-gradient-to-r from-sky-400 to-indigo-500 py-3 text-sm font-black text-white shadow-[0_4px_0_#3730a3] group-hover:brightness-105 transition">
                 タップして はいる！✨
               </div>
             </button>
@@ -161,9 +161,9 @@ export function LoginView({
         </button>
       </div>
 
-      {/* ---------------- 初回ウェルカム・セットアップモーダル ---------------- */}
-      <Modal open={showSetupModal} onClose={() => {}}>
-        <div className="p-4 sm:p-6 text-center max-w-sm mx-auto">
+      {/* ---------------- 初回ウェルカム・セットアップモーダル（必須初期設定のため閉じるボタン非表示） ---------------- */}
+      <Modal open={showSetupModal} onClose={() => {}} hideClose={true} className="p-5 sm:p-6 max-w-sm">
+        <div className="text-center">
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-200">
             <Rocket size={30} />
           </div>

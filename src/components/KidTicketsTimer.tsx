@@ -3,7 +3,7 @@ import type { ActiveTimer, Child, Ticket } from '../types';
 import { finishTimer, markAlarmed, redeemTicket, pauseTimer, resumeTimer } from '../actions';
 import { sound } from '../sound';
 import { burst } from '../effects';
-import { toast } from './ui';
+import { toast, Modal } from './ui';
 import { pipTimer } from '../pip';
 import { useNow, usePipActive } from '../hooks';
 import {
@@ -271,7 +271,7 @@ export function KidTicketsTimer({
 
             <button
               onClick={handleFinishTimer}
-              className={`btn-pop flex items-center justify-center gap-2 rounded-2xl px-8 py-3.5 text-lg font-black text-white shadow-lg w-full sm:w-auto ${
+              className={`btn-pop flex items-center justify-center gap-2 rounded-2xl px-6 sm:px-8 py-3.5 text-base sm:text-lg font-black text-white shadow-lg w-full sm:w-auto transition ${
                 isTimeOver
                   ? 'bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 shadow-[0_5px_0_#991b1b] animate-bounce ring-4 ring-rose-300'
                   : inBonusWindow
@@ -279,8 +279,17 @@ export function KidTicketsTimer({
                   : 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-[0_5px_0_#0f766e]'
               }`}
             >
-              <CheckCircle size={22} />
-              <span>{isTimeOver ? '⏰ おしまい！（アラームをとめる）' : 'おしまい！またね！'}</span>
+              <CheckCircle size={22} className="shrink-0" />
+              <span className="whitespace-nowrap">
+                {isTimeOver ? (
+                  <>
+                    <span className="hidden sm:inline">⏰ おしまい！（アラームをとめる）</span>
+                    <span className="sm:hidden">⏰ おしまい！（とめる）</span>
+                  </>
+                ) : (
+                  'おしまい！またね！'
+                )}
+              </span>
             </button>
           </div>
         </div>
@@ -378,14 +387,15 @@ export function KidTicketsTimer({
 
                   <button
                     onClick={() => handleUseTicket(ticket)}
-                    title="つかう"
-                    className={`btn-pop flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-md active:translate-y-0.5 active:shadow-none ${
+                    title="チケットをつかう"
+                    className={`btn-pop flex items-center gap-1 shrink-0 rounded-2xl px-3.5 py-2 text-xs font-black text-white shadow-md active:translate-y-0.5 active:shadow-none transition ${
                       isDaily
                         ? 'bg-gradient-to-r from-amber-500 to-orange-500 shadow-[0_3px_0_#9a3412]'
                         : 'bg-gradient-to-r from-amber-400 to-orange-400 shadow-[0_3px_0_#c2410c]'
                     }`}
                   >
-                    <Play size={18} fill="white" className="translate-x-0.5" />
+                    <Play size={15} fill="white" className="translate-x-0.2" />
+                    <span className="whitespace-nowrap">つかう</span>
                   </button>
                 </div>
               );
@@ -404,10 +414,14 @@ export function KidTicketsTimer({
         )}
       </div>
 
-      {/* ボーナス獲得モーダル */}
-      {bonusModal && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-900/70 p-4 backdrop-blur-sm">
-          <div className="animate-popin relative flex max-w-sm w-full flex-col items-center rounded-3xl bg-white p-6 text-center shadow-2xl">
+      {/* ボーナス獲得モーダル（共通Modalコンポーネント化） */}
+      <Modal
+        open={Boolean(bonusModal)}
+        onClose={() => setBonusModal(null)}
+        className="max-w-sm p-5 sm:p-6 text-center"
+      >
+        {bonusModal && (
+          <div className="flex flex-col items-center">
             <span className="text-5xl mb-2 animate-bounce">
               {bonusModal.bonus ? '🌟' : '👋'}
             </span>
@@ -456,13 +470,13 @@ export function KidTicketsTimer({
                 sound.tap();
                 setBonusModal(null);
               }}
-              className="btn-pop w-full rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 py-3 text-base font-black text-white shadow-[0_4px_0_#3730a3]"
+              className="btn-pop mt-2 w-full rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 py-3.5 text-base font-black text-white shadow-[0_4px_0_#3730a3]"
             >
               わかった！✨
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

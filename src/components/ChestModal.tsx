@@ -3,7 +3,7 @@ import type { Chest } from '../types';
 import { openChest } from '../actions';
 import { sound } from '../sound';
 import { burst } from '../effects';
-import { Sparkles, ArrowRight, Check } from 'lucide-react';
+import { Sparkles, ArrowRight, Check, X } from 'lucide-react';
 
 export function ChestModal({
   chests,
@@ -32,9 +32,14 @@ export function ChestModal({
   const openTimeoutRef = useRef<number | null>(null);
   const countIntervalRef = useRef<number | null>(null);
 
-  // アンマウント時のタイマークリーンアップ
+  // アンマウント時のタイマークリーンアップ ＆ ESCキーでの安全な閉じる対応
   useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
     return () => {
+      window.removeEventListener('keydown', onKey);
       if (openTimeoutRef.current !== null) {
         window.clearTimeout(openTimeoutRef.current);
       }
@@ -42,7 +47,7 @@ export function ChestModal({
         window.clearInterval(countIntervalRef.current);
       }
     };
-  }, []);
+  }, [onClose]);
 
   if (chests.length === 0) return null;
   const currentChest = chests[0];
@@ -108,8 +113,24 @@ export function ChestModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/75 p-4 backdrop-blur-md">
-      <div className="relative flex max-w-sm sm:max-w-md w-full flex-col items-center rounded-3xl bg-gradient-to-b from-amber-100 via-amber-50 to-orange-100 p-5 sm:p-6 text-center shadow-2xl border-4 border-amber-300 max-h-[90vh] overflow-y-auto no-scrollbar">
+    <div
+      className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/75 p-4 backdrop-blur-md"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex max-w-sm sm:max-w-md w-full flex-col items-center rounded-3xl bg-gradient-to-b from-amber-100 via-amber-50 to-orange-100 p-5 sm:p-6 text-center shadow-2xl border-4 border-amber-300 max-h-[90vh] overflow-y-auto no-scrollbar"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 右上の閉じる（あとであける）ボタン */}
+        <button
+          onClick={onClose}
+          className="btn-pop absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/10 text-amber-950 hover:bg-black/20 transition"
+          title="あとであける"
+          aria-label="とじる"
+        >
+          <X size={18} strokeWidth={2.5} />
+        </button>
+
         {!openedResult ? (
           <>
             <div className="text-xl font-black text-amber-900 flex items-center gap-1.5">
@@ -165,22 +186,22 @@ export function ChestModal({
                 <span className="text-xl font-black text-amber-800">コイン</span>
               </div>
 
-              {/* 所持コイン ビフォーアフター カウントアップメーター */}
-              <div className="mt-3.5 flex w-full items-center justify-between rounded-xl bg-amber-50 px-3.5 py-2.5 border border-amber-200">
-                <div className="text-left">
+              {/* 所持コイン ビフォーアフター カウントアップメーター（スマホ折り返し防止） */}
+              <div className="mt-3.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 rounded-xl bg-amber-50 px-3.5 py-2.5 border border-amber-200 w-full">
+                <div className="text-left flex items-center justify-between sm:block">
                   <span className="text-[11px] font-bold text-slate-500 block">持っているコイン</span>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-sm font-bold text-slate-400 line-through">
                       🪙 {beforeCoins}
                     </span>
                     <ArrowRight size={14} className="text-amber-600" />
-                    <span className={`text-lg font-black text-amber-700 transition-all ${countingFinished ? 'scale-110 text-amber-600 animate-pulse' : ''}`}>
+                    <span className={`text-base sm:text-lg font-black text-amber-700 transition-all ${countingFinished ? 'scale-110 text-amber-600 animate-pulse' : ''}`}>
                       🪙 {displayCoins}
                     </span>
                   </div>
                 </div>
 
-                <div className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700 flex items-center gap-1">
+                <div className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700 flex items-center justify-center gap-1 shrink-0">
                   <Check size={14} strokeWidth={3} />
                   <span>+{openedResult.coins} 増えたよ！</span>
                 </div>

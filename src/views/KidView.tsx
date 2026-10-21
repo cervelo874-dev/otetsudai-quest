@@ -47,21 +47,30 @@ export function KidView({
   const rank = getRank(currentChild.totalQuests);
   const streak = displayStreak(currentChild);
 
-  const tabs: { key: 'quests' | 'shop' | 'tickets'; label: string; icon: string; count?: number }[] = [
+  const tabs: {
+    key: 'quests' | 'shop' | 'tickets';
+    label: string;
+    shortLabel: string;
+    icon: string;
+    count?: number;
+  }[] = [
     {
       key: 'quests',
       label: 'おてつだい',
+      shortLabel: 'おてつだい',
       icon: '⚔️',
       count: state.quests.filter((q) => q.assignedTo.includes(currentChild.id)).length,
     },
     {
       key: 'shop',
       label: 'ごほうびショップ',
+      shortLabel: 'ショップ',
       icon: '🏪',
     },
     {
       key: 'tickets',
       label: 'もちもの＆じかん',
+      shortLabel: 'もちもの',
       icon: '🎟️',
       count: state.tickets.filter((t) => t.childId === currentChild.id && t.status === 'owned').length,
     },
@@ -78,95 +87,123 @@ export function KidView({
         />
       )}
 
-      {/* マイページ ヘッダーカード */}
+      {/* マイページ ヘッダーカード（スマホでの縦伸びを解消し、スマートな2段レイアウトへ最適化） */}
       <div
         className={`card relative overflow-hidden bg-gradient-to-r ${themeOf(
           currentChild.color
-        )} p-5 sm:p-6 text-white shadow-lg border-4 border-white mb-6`}
+        )} p-4 sm:p-6 text-white shadow-lg border-4 border-white mb-5 sm:mb-6`}
       >
-        <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-6">
-          {/* アバター＆きせかえボタン */}
-          <div className="relative group shrink-0">
-            <button
-              onClick={() => {
-                sound.tap();
-                setShowAvatarMaker(true);
-              }}
-              className="btn-pop block"
-              title="きせかえをする"
-            >
-              <Avatar
-                child={currentChild}
-                config={currentChild.avatar}
-                size={110}
-                rounded="rounded-3xl shadow-xl border-4 border-white"
-              />
-              <span className="absolute -bottom-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-amber-400 text-slate-900 shadow-md">
-                <Shirt size={16} />
-              </span>
-            </button>
-          </div>
-
-          {/* 子ども情報ステータス */}
-          <div className="flex-1 text-center sm:text-left min-w-0">
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-              <h2 className="text-2xl sm:text-3xl font-black drop-shadow-sm truncate">
-                {currentChild.name}
-              </h2>
-              <span className="rounded-full bg-white/30 px-3 py-0.5 text-xs font-black backdrop-blur-sm">
-                {currentChild.age}さい
-              </span>
-            </div>
-
-            {/* ランク称号 */}
-            <div className="mt-2 inline-flex items-center gap-1.5 rounded-2xl bg-black/20 px-3 py-1 text-xs font-black backdrop-blur-sm">
-              <Award size={16} className="text-yellow-300" />
-              <span>しょうごう：{rank.name}</span>
-            </div>
-
-            {/* コイン・ほしのかけら・連続達成メーター */}
-            <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
-              {/* コイン */}
-              <div className="flex items-center gap-1.5 rounded-2xl bg-white/95 px-3.5 py-1.5 font-black text-amber-800 shadow-sm">
-                <span className="text-xl">🪙</span>
-                <span className="text-xl sm:text-2xl text-amber-600">
-                  {currentChild.coins}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6">
+          {/* 上段（スマホ時）: アバター ＆ 名前・称号 ＆ ガチャマシン */}
+          <div className="flex items-center justify-between sm:justify-start gap-3 sm:gap-6 w-full sm:w-auto">
+            {/* アバター＆きせかえボタン */}
+            <div className="relative group shrink-0">
+              <button
+                onClick={() => {
+                  sound.tap();
+                  setShowAvatarMaker(true);
+                }}
+                className="btn-pop block"
+                title="きせかえをする"
+              >
+                <Avatar
+                  child={currentChild}
+                  config={currentChild.avatar}
+                  size={84}
+                  rounded="rounded-2xl sm:rounded-3xl shadow-lg border-3 sm:border-4 border-white"
+                  className="sm:w-[100px] sm:h-[100px]"
+                />
+                <span className="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-amber-400 text-slate-900 shadow-md">
+                  <Shirt size={15} />
                 </span>
-                <span className="text-xs text-amber-900">コイン</span>
+              </button>
+            </div>
+
+            {/* 子ども情報ステータス */}
+            <div className="flex-1 min-w-0 text-left">
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl sm:text-3xl font-black drop-shadow-xs truncate">
+                  {currentChild.name}
+                </h2>
+                <span className="rounded-full bg-white/30 px-2 py-0.5 text-[11px] sm:text-xs font-black backdrop-blur-xs whitespace-nowrap shrink-0">
+                  {currentChild.age}さい
+                </span>
               </div>
 
-              {/* 🌟 ほしのかけら（タップで交換所へ直行！） */}
+              {/* ランク称号 */}
+              <div className="mt-1 sm:mt-1.5 inline-flex items-center gap-1 rounded-xl bg-black/20 px-2.5 py-0.5 text-[11px] sm:text-xs font-black backdrop-blur-xs max-w-full truncate">
+                <Award size={14} className="text-yellow-300 shrink-0" />
+                <span className="truncate">しょうごう：{rank.name}</span>
+              </div>
+            </div>
+
+            {/* スマホ用ガチャマシンボタン（右上に配置） */}
+            <div className="sm:hidden flex flex-col items-center shrink-0">
               <button
                 type="button"
                 onClick={() => {
                   sound.tap();
-                  setGachaTab('exchange');
+                  setGachaTab('spin');
                   setShowGacha(true);
                 }}
-                className="btn-pop flex items-center gap-1.5 rounded-2xl bg-gradient-to-r from-amber-100 to-yellow-100 px-3 py-1.5 font-black text-amber-950 shadow-sm border border-amber-300 hover:scale-105 transition-all"
-                title="ほしのかけら交換所をひらく"
+                className="btn-pop group relative flex flex-col items-center focus:outline-none"
+                title="ごほうびガチャをまわす！"
               >
-                <span className="text-xl text-amber-500">🌟</span>
-                <span className="text-base sm:text-lg text-amber-600">
-                  {currentChild.starShards ?? 0}
-                </span>
-                <span className="text-xs text-amber-900">こ</span>
-                <span className="text-[10px] bg-amber-400/90 text-amber-950 px-1.5 py-0.5 rounded-full ml-0.5 font-bold">
-                  つかう➔
-                </span>
+                <div className="flex items-center gap-0.5 rounded-full bg-yellow-400 px-2 py-0.5 text-[10px] font-black text-amber-950 shadow-sm border border-white mb-0.5">
+                  <span>🎰</span>
+                  <span>ガチャ</span>
+                </div>
+                <GachaMachineVisual
+                  size="sm"
+                  isFree={isFreeGacha}
+                  className="w-12 h-14"
+                />
               </button>
-
-              {/* 連続記録 */}
-              <div className="flex items-center gap-1 rounded-2xl bg-white/95 px-3 py-1.5 font-black text-rose-600 shadow-sm">
-                <Flame size={18} className="text-rose-500" />
-                <span className="text-base sm:text-lg">{streak}日</span>
-                <span className="text-xs text-slate-500">れんぞく！</span>
-              </div>
             </div>
           </div>
 
-          {/* 反対側の空いているスペース（右側）に日本のガチャマシンを配置！ */}
-          <div className="sm:ml-auto flex flex-col items-center shrink-0 pt-2 sm:pt-0">
+          {/* 下段（スマホ時）/ 中央（PC時）: コイン・ほしのかけら・連続達成メーター */}
+          <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 sm:gap-2.5 w-full sm:flex-1">
+            {/* コイン */}
+            <div className="flex-1 sm:flex-none flex items-center justify-center gap-1 sm:gap-1.5 rounded-2xl bg-white/95 px-3 py-1.5 font-black text-amber-800 shadow-xs">
+              <span className="text-lg sm:text-xl">🪙</span>
+              <span className="text-base sm:text-2xl text-amber-600">
+                {currentChild.coins}
+              </span>
+              <span className="text-[11px] sm:text-xs text-amber-900">コイン</span>
+            </div>
+
+            {/* 🌟 ほしのかけら（タップで交換所へ直行！） */}
+            <button
+              type="button"
+              onClick={() => {
+                sound.tap();
+                setGachaTab('exchange');
+                setShowGacha(true);
+              }}
+              className="flex-1 sm:flex-none btn-pop flex items-center justify-center gap-1 rounded-2xl bg-gradient-to-r from-amber-100 to-yellow-100 px-3 py-1.5 font-black text-amber-950 shadow-xs border border-amber-300 hover:scale-105 transition-all"
+              title="ほしのかけら交換所をひらく"
+            >
+              <span className="text-base sm:text-xl text-amber-500">🌟</span>
+              <span className="text-sm sm:text-lg text-amber-600">
+                {currentChild.starShards ?? 0}
+              </span>
+              <span className="text-[11px] sm:text-xs text-amber-900">こ</span>
+              <span className="text-[9px] sm:text-[10px] bg-amber-400 text-amber-950 px-1 py-0.2 rounded-full font-bold whitespace-nowrap">
+                つかう➔
+              </span>
+            </button>
+
+            {/* 連続記録 */}
+            <div className="flex-1 sm:flex-none flex items-center justify-center gap-1 rounded-2xl bg-white/95 px-3 py-1.5 font-black text-rose-600 shadow-xs">
+              <Flame size={16} className="text-rose-500 shrink-0" />
+              <span className="text-sm sm:text-lg">{streak}日</span>
+              <span className="text-[11px] sm:text-xs text-slate-500 whitespace-nowrap">れんぞく！</span>
+            </div>
+          </div>
+
+          {/* PC・タブレット用ガチャマシン（sm以上で右端に配置） */}
+          <div className="hidden sm:flex flex-col items-center shrink-0 ml-auto">
             <button
               type="button"
               onClick={() => {
@@ -177,13 +214,10 @@ export function KidView({
               className="btn-pop group relative flex flex-col items-center focus:outline-none"
               title="ごほうびガチャをまわす！"
             >
-              {/* マシン上部POP */}
               <div className="flex items-center gap-1 rounded-full bg-yellow-400 px-3 py-1 text-xs font-black text-amber-950 shadow-md group-hover:scale-105 transition-transform mb-1 border-2 border-white">
                 <span className="text-sm">🎰</span>
                 <span>ガチャ！</span>
               </div>
-
-              {/* 日本のガチャ自販機イラスト */}
               <GachaMachineVisual
                 size="sm"
                 isFree={isFreeGacha}
@@ -200,21 +234,21 @@ export function KidView({
               sound.tap();
               setShowChestModal(true);
             }}
-            className="btn-pop mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-yellow-400 py-2.5 font-black text-amber-950 shadow-md animate-bounce"
+            className="btn-pop mt-3 sm:mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-yellow-400 py-2.5 font-black text-amber-950 shadow-md animate-bounce"
           >
-            <Gift size={20} />
-            <span>まだ あけていない たからばこが {myChests.length}こ あるよ！タップしてあけよう！</span>
+            <Gift size={18} />
+            <span className="text-xs sm:text-sm">まだ あけていない たからばこが {myChests.length}こ あるよ！タップしてあけよう！</span>
           </button>
         )}
       </div>
 
       {/* 親からの連絡・差し戻し通知 */}
-      <div className="mb-5">
+      <div className="mb-4 sm:mb-5">
         <KidNotices notices={state.notices} childId={currentChild.id} />
       </div>
 
-      {/* タブ切り替えボタン */}
-      <div className="flex gap-2 sm:gap-3 mb-6">
+      {/* タブ切り替えボタン（Switch/あつ森風ぽってりピル型・スマホ短縮ラベル対応） */}
+      <div className="flex gap-2 sm:gap-3 mb-5 sm:mb-6">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -222,17 +256,20 @@ export function KidView({
               sound.tap();
               setActiveTab(tab.key);
             }}
-            className={`btn-pop flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-2xl sm:rounded-3xl py-3 px-2 text-center font-black transition-all ${
+            className={`btn-pop flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-2xl sm:rounded-3xl py-2.5 sm:py-3 px-1.5 sm:px-2 text-center font-black transition-all ${
               activeTab === tab.key
-                ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow-[0_5px_0_#c2410c]'
-                : 'bg-white text-slate-600 hover:bg-slate-100 shadow-[0_4px_0_#cbd5e1] border border-slate-200'
+                ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow-[0_4px_0_#c2410c]'
+                : 'bg-white text-slate-600 hover:bg-slate-100 shadow-[0_3px_0_#cbd5e1] border border-slate-200'
             }`}
           >
-            <span className="text-2xl">{tab.icon}</span>
-            <span className="text-xs sm:text-base">{tab.label}</span>
+            <span className="text-xl sm:text-2xl">{tab.icon}</span>
+            <span className="text-xs sm:text-base whitespace-nowrap">
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.shortLabel}</span>
+            </span>
             {typeof tab.count === 'number' && tab.count > 0 && (
               <span
-                className={`hidden sm:inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black ${
+                className={`inline-flex h-4 min-w-4 sm:h-5 sm:min-w-5 px-1 items-center justify-center rounded-full text-[9px] sm:text-[10px] font-black shrink-0 ${
                   activeTab === tab.key ? 'bg-white text-amber-700' : 'bg-slate-200 text-slate-700'
                 }`}
               >
@@ -291,11 +328,12 @@ export function KidView({
         />
       </Modal>
 
-      {/* ガチャモーダル */}
+      {/* ガチャモーダル（独自ヘッダーで閉じるボタンを持つためhideClose=true） */}
       <Modal
         open={showGacha}
         onClose={() => setShowGacha(false)}
-        className="max-w-md"
+        className="max-w-md p-4 sm:p-6"
+        hideClose={true}
       >
         <GachaModal
           child={currentChild}

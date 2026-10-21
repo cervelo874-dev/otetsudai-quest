@@ -344,11 +344,11 @@ export function ParentView({ state }: { state: AppState }) {
         </div>
       </div>
 
-      {/* クラウドリアルタイム同期＆家族のあいことばカード */}
-      <div className="mb-5 rounded-2xl bg-white border border-slate-200 p-3 sm:p-4 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      {/* クラウドリアルタイム同期＆家族のあいことばカード（レスポンシブ整理） */}
+      <div className="mb-5 rounded-2xl bg-white border border-slate-200 p-3 sm:p-4 shadow-xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           {/* 通信状態バッジ */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {syncStatus === 'connected' ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">
                 <span className="relative flex h-2 w-2">
@@ -356,7 +356,7 @@ export function ParentView({ state }: { state: AppState }) {
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
                 <Wifi size={14} />
-                <span>🟢 クラウドリアルタイム接続中</span>
+                <span>🟢 クラウド接続中</span>
               </span>
             ) : syncStatus === 'connecting' ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800">
@@ -376,7 +376,7 @@ export function ParentView({ state }: { state: AppState }) {
               </span>
             )}
 
-            <span className="text-xs text-slate-500 hidden sm:inline">
+            <span className="text-xs text-slate-500 hidden md:inline">
               {syncStatus === 'connected'
                 ? '他端末と双方向リアルタイム同期中'
                 : !isSupabaseConfigured
@@ -385,8 +385,8 @@ export function ParentView({ state }: { state: AppState }) {
             </span>
           </div>
 
-          {/* あいことば（ルームID） */}
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          {/* あいことば（ルームID） ＆ タブレット招待 */}
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
             {isEditingRoomId ? (
               <form onSubmit={handleSaveRoomId} className="flex items-center gap-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-48">
@@ -402,7 +402,7 @@ export function ParentView({ state }: { state: AppState }) {
                 </div>
                 <button
                   type="submit"
-                  className="btn-pop rounded-xl bg-indigo-600 px-3 py-1 text-xs font-black text-white hover:bg-indigo-700"
+                  className="btn-pop rounded-xl bg-indigo-600 px-3 py-1 text-xs font-black text-white hover:bg-indigo-700 whitespace-nowrap"
                 >
                   保存
                 </button>
@@ -412,41 +412,43 @@ export function ParentView({ state }: { state: AppState }) {
                     setRoomIdInput(getRoomId());
                     setIsEditingRoomId(false);
                   }}
-                  className="btn-pop rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 hover:bg-slate-200"
+                  className="btn-pop rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 hover:bg-slate-200 whitespace-nowrap"
                 >
                   取消
                 </button>
               </form>
             ) : (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <div className="flex items-center gap-1 rounded-xl bg-slate-50 border border-slate-200 px-2.5 py-1 text-xs">
-                  <Key size={13} className="text-amber-500" />
-                  <span className="text-slate-500">あいことば:</span>
-                  <span className="font-mono font-black text-slate-800">{getRoomId()}</span>
+              <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-end">
+                <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1 rounded-xl bg-slate-50 border border-slate-200 px-2.5 py-1 text-xs">
+                    <Key size={13} className="text-amber-500" />
+                    <span className="text-slate-500">合言葉:</span>
+                    <span className="font-mono font-black text-slate-800">{getRoomId()}</span>
+                  </div>
+                  <button
+                    onClick={handleCopyRoomId}
+                    title="あいことばをコピー"
+                    className="btn-pop rounded-xl bg-slate-100 p-1.5 text-slate-600 hover:bg-slate-200"
+                  >
+                    <Copy size={13} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRoomIdInput(getRoomId());
+                      setIsEditingRoomId(true);
+                    }}
+                    className="btn-pop rounded-xl bg-indigo-50 border border-indigo-200 px-2 py-1 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 whitespace-nowrap"
+                  >
+                    変更
+                  </button>
                 </div>
-                <button
-                  onClick={handleCopyRoomId}
-                  title="あいことばをコピー"
-                  className="btn-pop rounded-xl bg-slate-100 p-1.5 text-slate-600 hover:bg-slate-200"
-                >
-                  <Copy size={13} />
-                </button>
-                <button
-                  onClick={() => {
-                    setRoomIdInput(getRoomId());
-                    setIsEditingRoomId(true);
-                  }}
-                  className="btn-pop rounded-xl bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100"
-                >
-                  合言葉を変更
-                </button>
                 <button
                   onClick={() => {
                     sound.tap();
                     setShowQrModal(true);
                   }}
                   title="タブレット招待用QRコード・URL"
-                  className="btn-pop flex items-center gap-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-3 py-1 text-xs font-black text-white shadow-sm hover:from-emerald-600 hover:to-teal-700"
+                  className="btn-pop flex items-center gap-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-3 py-1 text-xs font-black text-white shadow-xs hover:from-emerald-600 hover:to-teal-700 whitespace-nowrap"
                 >
                   <QrCode size={13} />
                   <span>📱 タブレット招待</span>
@@ -513,7 +515,7 @@ export function ParentView({ state }: { state: AppState }) {
         );
       })()}
 
-      {/* タブナビゲーション */}
+      {/* タブナビゲーション（Switch風ぽってりピル型） */}
       <div className="flex gap-2 overflow-x-auto pb-1 mb-6 no-scrollbar">
         {tabs.map((t) => (
           <button
@@ -522,16 +524,16 @@ export function ParentView({ state }: { state: AppState }) {
               sound.tap();
               setActiveTab(t.key);
             }}
-            className={`btn-pop flex items-center gap-2 shrink-0 rounded-2xl px-4 py-2.5 text-sm font-black transition-all ${
+            className={`btn-pop flex items-center gap-1.5 sm:gap-2 shrink-0 rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-black transition-all ${
               activeTab === t.key
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                ? 'bg-indigo-600 text-white shadow-[0_3px_0_#3730a3]'
+                : 'bg-white text-slate-600 hover:bg-slate-100 shadow-[0_2px_0_#e2e8f0] border border-slate-200'
             }`}
           >
-            <span>{t.icon}</span>
-            <span>{t.label}</span>
+            <span className="text-base sm:text-lg">{t.icon}</span>
+            <span className="whitespace-nowrap">{t.label}</span>
             {typeof t.count === 'number' && t.count > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs text-white">
+              <span className="flex h-4 min-w-4 sm:h-5 sm:min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] sm:text-xs text-white">
                 {t.count}
               </span>
             )}
@@ -602,14 +604,14 @@ export function ParentView({ state }: { state: AppState }) {
                       </div>
                     </div>
 
-                    <div className="mt-3 sm:mt-0 flex items-center gap-2 w-full sm:w-auto">
+                    <div className="mt-3 sm:mt-0 flex items-center gap-2 w-full sm:w-auto shrink-0">
                       <button
                         onClick={() => {
                           sound.tap();
                           rejectSubmission(sub.id);
                           toast('もう一度やってみようと伝えました', '💪');
                         }}
-                        className="btn-pop flex-1 sm:flex-none flex items-center justify-center gap-1 rounded-xl bg-slate-200 px-4 py-2.5 text-xs font-black text-slate-700 hover:bg-slate-300"
+                        className="btn-pop flex-1 sm:flex-none flex items-center justify-center gap-1 rounded-xl bg-slate-200 px-3 sm:px-4 py-2.5 text-xs font-black text-slate-700 hover:bg-slate-300 whitespace-nowrap"
                       >
                         <RotateCcw size={15} />
                         <span>もう一度</span>
@@ -621,10 +623,13 @@ export function ParentView({ state }: { state: AppState }) {
                           approveSubmission(sub.id);
                           toast(`${child.name}の報告を承認しました！🎁`, '✅');
                         }}
-                        className="btn-pop flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-5 py-2.5 text-xs sm:text-sm font-black text-white shadow-[0_3px_0_#047857]"
+                        className="btn-pop flex-1 sm:flex-none flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-black text-white shadow-[0_3px_0_#047857] whitespace-nowrap hover:bg-emerald-600"
                       >
-                        <Check size={17} strokeWidth={3} />
-                        <span>ありがとう！（承認）</span>
+                        <Check size={16} strokeWidth={3} />
+                        <span>
+                          <span className="hidden sm:inline">ありがとう！（承認）</span>
+                          <span className="sm:hidden">承認する！✨</span>
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -934,8 +939,8 @@ export function ParentView({ state }: { state: AppState }) {
                   </div>
 
                   <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
-                    {/* 上下ボタン */}
-                    <div className="flex items-center bg-slate-100 rounded-xl p-0.5 mr-1">
+                    {/* 上下ボタン（PC・タブレット表示・スマホではドラッグハンドルでスリム化） */}
+                    <div className="hidden sm:flex items-center bg-slate-100 rounded-xl p-0.5 mr-1">
                       <button
                         onClick={() => questSortable.moveUp(index)}
                         disabled={index === 0}
@@ -1088,8 +1093,8 @@ export function ParentView({ state }: { state: AppState }) {
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {/* 上下ボタン */}
-                      <div className="flex items-center bg-slate-100 rounded-xl p-0.5 mr-1">
+                      {/* 上下ボタン（PC・タブレット表示・スマホではドラッグハンドルでスリム化） */}
+                      <div className="hidden sm:flex items-center bg-slate-100 rounded-xl p-0.5 mr-1">
                         <button
                           onClick={() => shopSortable.moveUp(index)}
                           disabled={index === 0}

@@ -82,9 +82,9 @@ export function PinPad({
 
   return (
     <div className="w-full">
-      <div className="text-center">
-        <div className="text-2xl font-black text-slate-700">{title}</div>
-        {subtitle && <div className="mt-1 text-base font-bold text-slate-400">{subtitle}</div>}
+      <div className="text-center px-6">
+        <div className="text-xl sm:text-2xl font-black text-slate-700 leading-tight">{title}</div>
+        {subtitle && <div className="mt-1 text-sm sm:text-base font-bold text-slate-400">{subtitle}</div>}
       </div>
       <div className={`my-5 flex justify-center gap-4 ${err ? 'animate-errshake' : ''}`}>
         {[0, 1, 2, 3].map((i) => (
