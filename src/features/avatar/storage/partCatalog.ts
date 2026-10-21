@@ -89,9 +89,11 @@ export async function listCatalogParts(): Promise<AvatarPart[]> {
 
 /** パーツをカタログに保存・更新 */
 export async function saveCatalogPart(part: AvatarPart): Promise<AvatarPart> {
+  const now = Date.now();
   const normalized: AvatarPart = {
     ...part,
-    createdAt: part.createdAt ?? Date.now(),
+    createdAt: part.createdAt ?? now,
+    updatedAt: part.updatedAt ?? now,
   };
   try {
     const db = await openPartDatabase();

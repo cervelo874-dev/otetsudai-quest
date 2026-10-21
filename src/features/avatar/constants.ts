@@ -372,3 +372,31 @@ export const DEFAULT_PROPORTION_GUIDE: ProportionGuideConfig = {
   bottomY: 468,
   centerX: 256,
 };
+
+/**
+ * UI表示用の自然な着せ替えカテゴリ並び順（頭・顔 → お洋服 → 小物 → 背景）
+ * （Z-index順の AVATAR_LAYERS とは異なり、ユーザーの思考順に最適化）
+ */
+export const AVATAR_UI_ORDER: AvatarCategory[] = [
+  // 1. 顔・髪（頭周り）
+  'hair_front',
+  'hair_back',
+  'face_eyes',
+  'body',
+  // 2. お洋服（服・ズボン・くつ・手足）
+  'tops',
+  'bottoms',
+  'shoes',
+  'arm_left',
+  'arm_right',
+  'leg_left',
+  'leg_right',
+  // 3. 小物（あたま・もちもの・ペット）
+  'hat_glasses',
+  'hand_item',
+  'pet',
+  // 4. 背景・エフェクト
+  'background',
+  'front_effect',
+  'back_effect',
+];

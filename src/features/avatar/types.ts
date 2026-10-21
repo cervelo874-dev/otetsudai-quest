@@ -205,6 +205,8 @@ export interface AvatarPart {
   rig?: PartRigMetadata;
   /** 作成日時（ミリ秒） */
   createdAt?: number;
+  /** 更新日時（ミリ秒・手足セット登録や名称変更時） */
+  updatedAt?: number;
   /** 親アプリ側で自由に利用できるメタデータ */
   meta?: Record<string, unknown>;
   /**

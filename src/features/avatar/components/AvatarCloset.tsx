@@ -62,6 +62,7 @@ import type {
 } from '../types';
 import {
   AVATAR_CANVAS_SIZE,
+  AVATAR_UI_ORDER,
   CATEGORY_META,
   DEFAULT_AVATAR_LAYER_ORDER,
   FACE_CROP,
@@ -71,6 +72,7 @@ import {
   createEmptyEquippedMap,
   getEquippedSignature,
   getLayerAdjustment,
+  getPartThumbnailStyle,
   hasCustomAdjustment,
   isDressOrOnePiecePart,
   normalizeEquippedParts,
@@ -161,7 +163,7 @@ const CATEGORY_GROUPS: CategoryGroup[] = [
     id: 'face_hair',
     label: '顔・髪',
     icon: User,
-    categories: ['face_eyes', 'hair_front', 'hair_back', 'body'],
+    categories: ['hair_front', 'hair_back', 'face_eyes', 'body'],
   },
   {
     id: 'clothes',
@@ -1019,6 +1021,7 @@ export function AvatarCloset({
 
     const updatedTops: AvatarPart = {
       ...currentTopsPart,
+      updatedAt: Date.now(),
       linkedParts: {
         ...currentLinked,
         isOnePiece: false,
@@ -1063,6 +1066,7 @@ export function AvatarCloset({
 
     const updatedBottoms: AvatarPart = {
       ...currentBottomsPart,
+      updatedAt: Date.now(),
       linkedParts: {
         ...(currentBottomsPart.linkedParts || {}),
         leg_left: currentLegLeftKey,
@@ -1102,6 +1106,7 @@ export function AvatarCloset({
 
     const updatedTops: AvatarPart = {
       ...currentTopsPart,
+      updatedAt: Date.now(),
       linkedParts: {
         ...(currentTopsPart.linkedParts || {}),
         isOnePiece: true,
@@ -1144,6 +1149,7 @@ export function AvatarCloset({
     if (!currentTopsPart) return;
     const updatedTops: AvatarPart = {
       ...currentTopsPart,
+      updatedAt: Date.now(),
       linkedParts: undefined,
     };
     try {
@@ -1161,6 +1167,7 @@ export function AvatarCloset({
     if (!currentBottomsPart) return;
     const updatedBottoms: AvatarPart = {
       ...currentBottomsPart,
+      updatedAt: Date.now(),
       linkedParts: undefined,
     };
     try {
@@ -1936,9 +1943,9 @@ export function AvatarCloset({
             </div>
           </div>
 
-          {/* PC・タブレット用: 全部位切り替えグリッド (hidden sm:grid)（口・眉・表情は除外） */}
+          {/* PC・タブレット用: 全部位切り替えグリッド (hidden sm:grid)（自然な着せ替え順・口眉表情は除外） */}
           <div className="hidden sm:grid sm:grid-cols-6 xl:grid-cols-9 gap-1.5">
-            {AVATAR_LAYERS.filter((cat) => cat !== 'face_mouth').map((category) => {
+            {AVATAR_UI_ORDER.filter((cat) => cat !== 'face_mouth').map((category) => {
               const Icon = CATEGORY_ICONS[category];
               const meta = CATEGORY_META[category];
               const isSelectedTab = category === activeCategory;
@@ -2778,7 +2785,9 @@ export function AvatarCloset({
                           src={part.src}
                           alt={part.name}
                           draggable={false}
-                          className="h-full w-full object-contain transition duration-200 group-hover:scale-105"
+                          style={getPartThumbnailStyle(part)}
+                          className="h-full w-full object-contain transition duration-200 group-hover:scale-105 select-none pointer-events-none"
+                          loading="lazy"
                         />
                         {part.rig?.bounds && (
                           <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded bg-zinc-900/70 backdrop-blur-sm px-1.5 py-0.5 font-mono text-[9px] text-zinc-200">

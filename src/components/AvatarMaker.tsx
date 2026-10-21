@@ -7,6 +7,7 @@ import { toast } from './ui';
 import {
   AvatarRenderer,
   getLayerAdjustment,
+  getPartThumbnailStyle,
   isDressOrOnePiecePart,
   resolveChildEquippedParts,
   resolvePartKey,
@@ -17,6 +18,8 @@ import {
   type EquippedParts,
   type EquippedPartMap,
   type LayerAdjustmentMap,
+  checkNewCloudItems,
+  importCloudPartsToLocal,
 } from '../features/avatar';
 import {
   X,
@@ -44,6 +47,7 @@ interface ChildCategoryTab {
   label: string;
   icon: LucideIcon;
   emoji: string;
+  iconSrc?: string;
   color: string;
   bgLight: string;
   categories: AvatarCategory[];
@@ -52,37 +56,11 @@ interface ChildCategoryTab {
 
 const CHILD_CATEGORIES: ChildCategoryTab[] = [
   {
-    id: 'tops',
-    label: 'ふく',
-    icon: Shirt,
-    emoji: '👕',
-    color: 'text-sky-600',
-    bgLight: 'bg-sky-50',
-    categories: ['tops'],
-  },
-  {
-    id: 'bottoms',
-    label: 'ズボン',
-    icon: Scissors,
-    emoji: '👖',
-    color: 'text-indigo-600',
-    bgLight: 'bg-indigo-50',
-    categories: ['bottoms'],
-  },
-  {
-    id: 'shoes',
-    label: 'くつ',
-    icon: Footprints,
-    emoji: '👟',
-    color: 'text-emerald-600',
-    bgLight: 'bg-emerald-50',
-    categories: ['shoes'],
-  },
-  {
     id: 'hair',
     label: 'かみがた',
     icon: Waves,
     emoji: '💇',
+    iconSrc: '/avatar-icons/kids/hair.png',
     color: 'text-amber-600',
     bgLight: 'bg-amber-50',
     categories: ['hair_front', 'hair_back'],
@@ -92,10 +70,51 @@ const CHILD_CATEGORIES: ChildCategoryTab[] = [
     ],
   },
   {
+    id: 'face',
+    label: 'おかお',
+    icon: Smile,
+    emoji: '😊',
+    iconSrc: '/avatar-icons/kids/face.png',
+    color: 'text-pink-600',
+    bgLight: 'bg-pink-50',
+    categories: ['face_eyes'],
+  },
+  {
+    id: 'tops',
+    label: 'ふく',
+    icon: Shirt,
+    emoji: '👕',
+    iconSrc: '/avatar-icons/kids/tops.png',
+    color: 'text-sky-600',
+    bgLight: 'bg-sky-50',
+    categories: ['tops'],
+  },
+  {
+    id: 'bottoms',
+    label: 'ズボン',
+    icon: Scissors,
+    emoji: '👖',
+    iconSrc: '/avatar-icons/kids/bottoms.png',
+    color: 'text-indigo-600',
+    bgLight: 'bg-indigo-50',
+    categories: ['bottoms'],
+  },
+  {
+    id: 'shoes',
+    label: 'くつ',
+    icon: Footprints,
+    emoji: '👟',
+    iconSrc: '/avatar-icons/kids/shoes.png',
+    color: 'text-emerald-600',
+    bgLight: 'bg-emerald-50',
+    categories: ['shoes'],
+  },
+  {
     id: 'hat_glasses',
     label: 'あたま',
     icon: Crown,
     emoji: '👑',
+    iconSrc: '/avatar-icons/kids/hat_glasses.png',
     color: 'text-rose-600',
     bgLight: 'bg-rose-50',
     categories: ['hat_glasses'],
@@ -105,6 +124,7 @@ const CHILD_CATEGORIES: ChildCategoryTab[] = [
     label: 'もちもの',
     icon: Sword,
     emoji: '🗡️',
+    iconSrc: '/avatar-icons/kids/hand_item.png',
     color: 'text-purple-600',
     bgLight: 'bg-purple-50',
     categories: ['hand_item'],
@@ -114,24 +134,17 @@ const CHILD_CATEGORIES: ChildCategoryTab[] = [
     label: 'ペット',
     icon: Cat,
     emoji: '🐾',
+    iconSrc: '/avatar-icons/kids/pet.png',
     color: 'text-orange-600',
     bgLight: 'bg-orange-50',
     categories: ['pet'],
-  },
-  {
-    id: 'face',
-    label: 'おかお',
-    icon: Smile,
-    emoji: '😊',
-    color: 'text-pink-600',
-    bgLight: 'bg-pink-50',
-    categories: ['face_eyes'],
   },
   {
     id: 'bg',
     label: 'はいけい',
     icon: ImageIcon,
     emoji: '🌈',
+    iconSrc: '/avatar-icons/kids/bg.png',
     color: 'text-teal-600',
     bgLight: 'bg-teal-50',
     categories: ['background', 'front_effect', 'back_effect'],
@@ -144,78 +157,9 @@ const CHILD_CATEGORIES: ChildCategoryTab[] = [
 
 import { memo } from 'react';
 
-/** パーツごとにクローズアップ表示するためのサムネイルコンポーネント (高速化のためmemo化) */
+/** パーツごとに枠の中心に大きくクローズアップ表示するためのサムネイルコンポーネント (高速化のためmemo化) */
 const PartThumbnail = memo(function PartThumbnail({ part }: { part: AvatarPart }) {
-  const bounds = part.rig?.bounds;
-
-  // バウンディングボックスまたはカテゴリからズーム＆パンを算出
-  let scale = 1.3;
-  let translateX = 0;
-  let translateY = 0;
-
-  if (
-    bounds &&
-    typeof bounds.width === 'number' &&
-    typeof bounds.height === 'number' &&
-    bounds.width > 0 &&
-    bounds.height > 0
-  ) {
-    const maxDim = Math.max(bounds.width, bounds.height);
-    if (Number.isFinite(maxDim) && maxDim > 0) {
-      scale = Math.min(3.2, Math.max(1.1, (512 * 0.72) / maxDim));
-      translateX = ((256 - bounds.centerX) / 512) * 100;
-      translateY = ((256 - bounds.centerY) / 512) * 100;
-      if (!Number.isFinite(translateX)) translateX = 0;
-      if (!Number.isFinite(translateY)) translateY = 0;
-    }
-  } else {
-    // カテゴリ別のセンタリング位置
-    switch (part.category) {
-      case 'tops':
-        scale = 1.9;
-        translateY = -8;
-        break;
-      case 'bottoms':
-        scale = 2.4;
-        translateY = -28;
-        break;
-      case 'shoes':
-        scale = 2.8;
-        translateY = -42;
-        break;
-      case 'hair_front':
-      case 'hair_back':
-        scale = 2.0;
-        translateY = 22;
-        break;
-      case 'hat_glasses':
-        scale = 2.2;
-        translateY = 28;
-        break;
-      case 'hand_item':
-        scale = 2.2;
-        translateX = -14;
-        translateY = -14;
-        break;
-      case 'pet':
-        scale = 2.0;
-        translateX = 22;
-        translateY = -28;
-        break;
-      case 'face_eyes':
-      case 'face_mouth':
-        scale = 3.0;
-        translateY = 18;
-        break;
-      case 'body':
-        scale = 1.3;
-        translateY = 0;
-        break;
-      default:
-        scale = 1.0;
-        break;
-    }
-  }
+  const style = useMemo(() => getPartThumbnailStyle(part), [part]);
 
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-white/80 p-1">
@@ -223,10 +167,7 @@ const PartThumbnail = memo(function PartThumbnail({ part }: { part: AvatarPart }
         src={part.src}
         alt={part.name}
         className="pointer-events-none select-none h-full w-full object-contain transition-transform duration-200 group-hover:scale-110"
-        style={{
-          transform: `translate(${translateX}%, ${translateY}%) scale(${scale})`,
-          transformOrigin: 'center center',
-        }}
+        style={style}
         loading="lazy"
       />
     </div>
@@ -334,6 +275,24 @@ export function AvatarMaker({
       return changed ? next : prev;
     });
   }, [initialEquippedParts, child.avatarStudio?.adjustments]);
+
+  // マウント時：別端末で更新・作成された手足セットや自作パーツをクラウドから自動チェック＆反映
+  useEffect(() => {
+    let isCancelled = false;
+    void (async () => {
+      try {
+        const detected = await checkNewCloudItems();
+        if (!isCancelled && detected && detected.newCount > 0) {
+          await importCloudPartsToLocal(detected.allCloudParts);
+        }
+      } catch (err) {
+        console.warn('Kids avatar studio cloud sync error:', err);
+      }
+    })();
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
 
   // カテゴリ変更時にサブカテゴリを初期化
   const handleSelectTab = (tabId: string) => {
@@ -462,6 +421,14 @@ export function AvatarMaker({
                 : null;
               next.bottoms = bottomsPart;
             }
+
+            // 手足の位置・角度・服より前面表示などの微調整設定（adjustments）も連動
+            if (part.linkedParts.adjustments) {
+              setDraftAdjustments((prevAdj) => ({
+                ...prevAdj,
+                ...part.linkedParts!.adjustments,
+              }));
+            }
           }
         }
         return next;
@@ -488,6 +455,14 @@ export function AvatarMaker({
                 ? catalogParts.find((p) => p.id === part.linkedParts!.leg_right) ?? null
                 : null;
               next.leg_right = legRight;
+            }
+
+            // 脚・足の位置・サイズなどの微調整設定も連動
+            if (part.linkedParts.adjustments) {
+              setDraftAdjustments((prevAdj) => ({
+                ...prevAdj,
+                ...part.linkedParts!.adjustments,
+              }));
             }
           }
         }
@@ -762,13 +737,22 @@ export function AvatarMaker({
                     key={tab.id}
                     type="button"
                     onClick={() => handleSelectTab(tab.id)}
-                    className={`btn-pop flex shrink-0 items-center gap-1.5 rounded-2xl px-3.5 py-2 text-xs sm:text-sm font-black transition-all ${
+                    className={`btn-pop flex shrink-0 items-center gap-1.5 rounded-2xl px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-black transition-all ${
                       isActive
                         ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-md shadow-amber-200 ring-2 ring-amber-300 ring-offset-1 scale-105'
                         : 'bg-white text-slate-700 hover:bg-amber-50 border-2 border-slate-200/90 shadow-sm'
                     }`}
                   >
-                    <span className="text-base sm:text-lg">{tab.emoji}</span>
+                    {tab.iconSrc ? (
+                      <img
+                        src={tab.iconSrc}
+                        alt={tab.label}
+                        className="h-6 w-6 sm:h-7 sm:w-7 object-contain shrink-0 drop-shadow-xs select-none pointer-events-none"
+                        draggable={false}
+                      />
+                    ) : (
+                      <span className="text-base sm:text-lg">{tab.emoji}</span>
+                    )}
                     <span className="whitespace-nowrap">{tab.label}</span>
                   </button>
                 );

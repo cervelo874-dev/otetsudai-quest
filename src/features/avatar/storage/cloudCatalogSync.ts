@@ -97,8 +97,15 @@ export async function checkNewCloudItems(): Promise<NewPartsDetectedDetail | nul
     const local = localIdMap.get(cp.id);
     if (!local) {
       newParts.push(cp);
-    } else if (cp.createdAt && local.createdAt && cp.createdAt > local.createdAt) {
-      newParts.push(cp);
+    } else {
+      const cloudTime = Math.max(cp.updatedAt ?? 0, cp.createdAt ?? 0);
+      const localTime = Math.max(local.updatedAt ?? 0, local.createdAt ?? 0);
+      const hasLinkedPartsDiff =
+        JSON.stringify(cp.linkedParts ?? null) !== JSON.stringify(local.linkedParts ?? null);
+
+      if (cloudTime > localTime || (cloudTime >= localTime && hasLinkedPartsDiff)) {
+        newParts.push(cp);
+      }
     }
   }
 

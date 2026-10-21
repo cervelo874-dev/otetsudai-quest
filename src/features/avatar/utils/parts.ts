@@ -376,3 +376,44 @@ export function isDressOrOnePiecePart(part: AvatarPart | null | undefined): bool
 
   return false;
 }
+
+/**
+ * パーツ選択サムネイル（カード）内で、透過PNGパーツを枠の中心に大きくセンタリング表示するためのCSSスタイルを計算
+ */
+export function getPartThumbnailStyle(part: AvatarPart): CSSProperties {
+  const meta = CATEGORY_META[part.category];
+  const bounds = part.rig?.bounds;
+
+  let scale = 1.35;
+  let cx = meta?.targetSpec?.defaultCenter?.x ?? 256;
+  let cy = meta?.targetSpec?.defaultCenter?.y ?? 256;
+
+  if (
+    bounds &&
+    typeof bounds.width === 'number' &&
+    typeof bounds.height === 'number' &&
+    bounds.width > 0 &&
+    bounds.height > 0
+  ) {
+    cx = bounds.centerX;
+    cy = bounds.centerY;
+    const maxDim = Math.max(bounds.width, bounds.height);
+    if (Number.isFinite(maxDim) && maxDim > 0) {
+      scale = Math.min(3.2, Math.max(1.15, (AVATAR_CANVAS_SIZE * 0.72) / maxDim));
+    }
+  } else if (meta?.targetSpec) {
+    const maxDim = Math.max(meta.targetSpec.targetWidth, meta.targetSpec.targetHeight);
+    if (maxDim > 0) {
+      scale = Math.min(3.0, Math.max(1.15, (AVATAR_CANVAS_SIZE * 0.75) / maxDim));
+    }
+  }
+
+  // キャンバス中心(256, 256)とパーツ中心(cx, cy)のズレを打ち消す移動量（%）
+  const tx = ((256 - cx) / 512) * 100 * scale;
+  const ty = ((256 - cy) / 512) * 100 * scale;
+
+  return {
+    transform: `translate(${tx.toFixed(2)}%, ${ty.toFixed(2)}%) scale(${scale.toFixed(2)})`,
+    transformOrigin: 'center center',
+  };
+}
