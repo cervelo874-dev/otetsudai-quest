@@ -1,4 +1,4 @@
-import { memo, useMemo, type CSSProperties, type MouseEventHandler } from 'react';
+import { memo, useMemo, Fragment, type CSSProperties, type MouseEventHandler } from 'react';
 import { AVATAR_LAYERS } from '../types';
 import type {
   AvatarCategory,
@@ -9,11 +9,12 @@ import type {
   LayerAdjustment,
   LayerAdjustmentMap,
 } from '../types';
-import { FACE_CROP, FULL_CROP, SIZE_PRESET_PX } from '../constants';
+import { DEFAULT_LAYER_ADJUSTMENT, FACE_CROP, FULL_CROP, SIZE_PRESET_PX } from '../constants';
 import {
   adjustmentToLayerStyle,
   createSleeveMaskStyle,
   cropToStageStyle,
+  getEffectivePairAdjustment,
   getOrderedCharacterBodyLayers,
   resolveAvatarLayerOrder,
   resolvePartSrc,
@@ -156,6 +157,40 @@ export const AvatarRenderer = memo(function AvatarRenderer({
   const renderSingleLayer = (category: AvatarCategory) => {
     const rawSrc = getLayerSrc(category);
     if (!rawSrc) return null;
+
+    // 靴カテゴリかつ左右ペア分割パーツ (pairParts) を持つ場合、左右別々に描画
+    if (category === 'shoes') {
+      const partVal = equippedParts.shoes;
+      const partObj = typeof partVal === 'object' && partVal !== null ? partVal : null;
+      if (partObj && partObj.pairParts) {
+        const baseAdj = solvedRig.effectiveAdjustments.shoes ?? { ...DEFAULT_LAYER_ADJUSTMENT };
+        const leftAdj = getEffectivePairAdjustment(baseAdj, 'left');
+        const rightAdj = getEffectivePairAdjustment(baseAdj, 'right');
+
+        return (
+          <Fragment key="shoes-pair">
+            {/* 右足（向かって左） */}
+            <LayerImg
+              key="shoes-pair-right"
+              src={partObj.pairParts.rightSrc}
+              category="shoes"
+              adjustment={rightAdj}
+              customPivot={solvedRig.customPivots.shoes}
+              highlighted={highlightLayer === 'shoes'}
+            />
+            {/* 左足（向かって右） */}
+            <LayerImg
+              key="shoes-pair-left"
+              src={partObj.pairParts.leftSrc}
+              category="shoes"
+              adjustment={leftAdj}
+              customPivot={solvedRig.customPivots.shoes}
+              highlighted={highlightLayer === 'shoes'}
+            />
+          </Fragment>
+        );
+      }
+    }
 
     // シルエット自動カッティング済みの 512x512 ワールド座標画像がある場合は（変形適用済みのため adjustment=undefined で）描画
     const clippedWorldSrc =

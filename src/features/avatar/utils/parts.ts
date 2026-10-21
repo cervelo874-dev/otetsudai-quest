@@ -57,13 +57,36 @@ export function getLayerAdjustment(
     gripFlipY: Boolean(custom.gripFlipY),
     bodyClipMode: custom.bodyClipMode,
     bodyClipInsetPx: custom.bodyClipInsetPx,
+    bobbing: custom.bobbing,
+    pairAdjustments: custom.pairAdjustments,
+  };
+}
+
+/**
+ * 左右ペアパーツ（靴など）のベース微調整と左右個別オフセットを合成した LayerAdjustment を返す
+ * - side: 'left'（アバターの左足 / 向かって右）または 'right'（アバターの右足 / 向かって左）
+ */
+export function getEffectivePairAdjustment(
+  baseAdj: LayerAdjustment,
+  side: 'left' | 'right',
+): LayerAdjustment {
+  const pairAdj = baseAdj.pairAdjustments?.[side];
+  if (!pairAdj) return baseAdj;
+
+  return {
+    ...baseAdj,
+    dx: baseAdj.dx + (pairAdj.dx ?? 0),
+    dy: baseAdj.dy + (pairAdj.dy ?? 0),
+    scale: baseAdj.scale * (pairAdj.scale ?? 1),
+    rotation: baseAdj.rotation + (pairAdj.rotation ?? 0),
+    flipX: pairAdj.flipX !== undefined ? pairAdj.flipX : baseAdj.flipX,
   };
 }
 
 /** 微調整がデフォルトから変更されているか判定 */
 export function hasCustomAdjustment(adj: LayerAdjustment | undefined): boolean {
   if (!adj) return false;
-  return (
+  const hasBaseCustom =
     Math.abs(adj.dx) > 0.01 ||
     Math.abs(adj.dy) > 0.01 ||
     Math.abs(adj.scale - 1) > 0.001 ||
@@ -81,8 +104,37 @@ export function hasCustomAdjustment(adj: LayerAdjustment | undefined): boolean {
     Boolean(adj.gripFlipX) ||
     Boolean(adj.gripFlipY) ||
     Boolean(adj.bodyClipMode && adj.bodyClipMode !== 'auto') ||
-    (adj.bodyClipInsetPx !== undefined && Math.abs(adj.bodyClipInsetPx - 2) > 0.01)
-  );
+    (adj.bodyClipInsetPx !== undefined && Math.abs(adj.bodyClipInsetPx - 2) > 0.01);
+
+  if (hasBaseCustom) return true;
+
+  if (adj.pairAdjustments?.left) {
+    const l = adj.pairAdjustments.left;
+    if (
+      Math.abs(l.dx ?? 0) > 0.01 ||
+      Math.abs(l.dy ?? 0) > 0.01 ||
+      Math.abs((l.scale ?? 1) - 1) > 0.001 ||
+      Math.abs(l.rotation ?? 0) > 0.05 ||
+      Boolean(l.flipX)
+    ) {
+      return true;
+    }
+  }
+
+  if (adj.pairAdjustments?.right) {
+    const r = adj.pairAdjustments.right;
+    if (
+      Math.abs(r.dx ?? 0) > 0.01 ||
+      Math.abs(r.dy ?? 0) > 0.01 ||
+      Math.abs((r.scale ?? 1) - 1) > 0.001 ||
+      Math.abs(r.rotation ?? 0) > 0.05 ||
+      Boolean(r.flipX)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /** 現在の装備状態＋微調整状態の比較用シグネチャ文字列を生成 */
@@ -94,7 +146,10 @@ export function getEquippedSignature(
   if (!adjustments) return eqSig;
   const adjSig = AVATAR_LAYERS.map((category) => {
     const a = getLayerAdjustment(adjustments, category);
-    return `${category}@${a.dx},${a.dy},${a.scale},${a.rotation},${a.flipX ? 1 : 0},${a.aboveTops ? 1 : 0},${a.sleeveModeOverride ?? ''},${a.handHoldModeOverride ?? ''},${a.holdHandSide ?? ''},${a.gripHandPose ?? ''},${a.gripDx ?? 0},${a.gripDy ?? 0},${a.gripScale ?? 1},${a.gripRotation ?? 0},${a.gripFlipX ? 1 : 0},${a.gripFlipY ? 1 : 0},${a.bodyClipMode ?? ''},${a.bodyClipInsetPx ?? ''}`;
+    const pairSig = a.pairAdjustments
+      ? `[${a.pairAdjustments.left?.dx ?? 0},${a.pairAdjustments.left?.dy ?? 0},${a.pairAdjustments.left?.scale ?? 1},${a.pairAdjustments.left?.rotation ?? 0},${a.pairAdjustments.left?.flipX ? 1 : 0}|${a.pairAdjustments.right?.dx ?? 0},${a.pairAdjustments.right?.dy ?? 0},${a.pairAdjustments.right?.scale ?? 1},${a.pairAdjustments.right?.rotation ?? 0},${a.pairAdjustments.right?.flipX ? 1 : 0}]`
+      : '';
+    return `${category}@${a.dx},${a.dy},${a.scale},${a.rotation},${a.flipX ? 1 : 0},${a.aboveTops ? 1 : 0},${a.sleeveModeOverride ?? ''},${a.handHoldModeOverride ?? ''},${a.holdHandSide ?? ''},${a.gripHandPose ?? ''},${a.gripDx ?? 0},${a.gripDy ?? 0},${a.gripScale ?? 1},${a.gripRotation ?? 0},${a.gripFlipX ? 1 : 0},${a.gripFlipY ? 1 : 0},${a.bodyClipMode ?? ''},${a.bodyClipInsetPx ?? ''}${pairSig}`;
   }).join('|');
   return `${eqSig}##${adjSig}`;
 }

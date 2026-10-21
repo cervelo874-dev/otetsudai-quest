@@ -365,3 +365,120 @@ export function getTransformedBoundingCorners(
     };
   });
 }
+
+/** 画像要素を非同期ロードするユーティリティ */
+function loadHelperImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = (e) => reject(new Error('画像の読み込みに失敗しました'));
+    img.src = src;
+  });
+}
+
+/**
+ * 左右つながっている靴や手袋等の画像を、境界比率（splitRatioX）で「左側（キャラの右足）」と「右側（キャラの左足）」に分離
+ * - rightSrc: 画面左側（アバターの右足）
+ * - leftSrc: 画面右側（アバターの左足）
+ */
+export async function slicePairImage(
+  source: HTMLCanvasElement | HTMLImageElement | string,
+  splitRatioX = 0.5,
+): Promise<{ leftSrc: string; rightSrc: string }> {
+  let sourceCanvas: HTMLCanvasElement;
+
+  if (typeof source === 'string') {
+    const img = await loadHelperImage(source);
+    sourceCanvas = createOffscreenCanvas(img.width || AVATAR_CANVAS_SIZE, img.height || AVATAR_CANVAS_SIZE);
+    sourceCanvas.getContext('2d')!.drawImage(img, 0, 0);
+  } else if (source instanceof HTMLImageElement) {
+    sourceCanvas = createOffscreenCanvas(source.width || AVATAR_CANVAS_SIZE, source.height || AVATAR_CANVAS_SIZE);
+    sourceCanvas.getContext('2d')!.drawImage(source, 0, 0);
+  } else {
+    sourceCanvas = source;
+  }
+
+  const w = sourceCanvas.width;
+  const h = sourceCanvas.height;
+  const splitPx = Math.round(w * Math.max(0.05, Math.min(0.95, splitRatioX)));
+
+  // 1. キャラクターの右足（画面向かって左側の領域）
+  const rightCanvas = createOffscreenCanvas(w, h);
+  const rightCtx = rightCanvas.getContext('2d')!;
+  // 左半分を描画（splitPxより右側は透明）
+  rightCtx.drawImage(
+    sourceCanvas,
+    0,
+    0,
+    splitPx,
+    h,
+    0,
+    0,
+    splitPx,
+    h,
+  );
+
+  // 2. キャラクターの左足（画面向かって右側の領域）
+  const leftCanvas = createOffscreenCanvas(w, h);
+  const leftCtx = leftCanvas.getContext('2d')!;
+  // 右半分を描画（splitPxより左側は透明）
+  leftCtx.drawImage(
+    sourceCanvas,
+    splitPx,
+    0,
+    w - splitPx,
+    h,
+    splitPx,
+    0,
+    w - splitPx,
+    h,
+  );
+
+  return {
+    rightSrc: rightCanvas.toDataURL('image/png'),
+    leftSrc: leftCanvas.toDataURL('image/png'),
+  };
+}
+
+/**
+ * 片足（左足または右足）だけ描かれたイラストから、水平反転してもう片足のペアを自動生成
+ * - sourceSide: 'right'（画面左側＝キャラ右足基準）または 'left'（画面右側＝キャラ左足基準）
+ */
+export async function createMirroredPair(
+  source: HTMLCanvasElement | HTMLImageElement | string,
+  sourceSide: 'right' | 'left' = 'right',
+  splitRatioX = 0.5,
+): Promise<{ leftSrc: string; rightSrc: string }> {
+  // まず左右にスライスして基準側を取得
+  const sliced = await slicePairImage(source, splitRatioX);
+  const baseDataUrl = sourceSide === 'right' ? sliced.rightSrc : sliced.leftSrc;
+  const baseImg = await loadHelperImage(baseDataUrl);
+
+  const w = baseImg.width || AVATAR_CANVAS_SIZE;
+  const h = baseImg.height || AVATAR_CANVAS_SIZE;
+
+  // 反転した側のキャンバスを生成
+  const mirrorCanvas = createOffscreenCanvas(w, h);
+  const mirrorCtx = mirrorCanvas.getContext('2d')!;
+  mirrorCtx.save();
+  // 中央を軸に水平反転
+  mirrorCtx.translate(w, 0);
+  mirrorCtx.scale(-1, 1);
+  mirrorCtx.drawImage(baseImg, 0, 0);
+  mirrorCtx.restore();
+
+  const mirrorDataUrl = mirrorCanvas.toDataURL('image/png');
+
+  if (sourceSide === 'right') {
+    return {
+      rightSrc: baseDataUrl,
+      leftSrc: mirrorDataUrl,
+    };
+  } else {
+    return {
+      leftSrc: baseDataUrl,
+      rightSrc: mirrorDataUrl,
+    };
+  }
+}

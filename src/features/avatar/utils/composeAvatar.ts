@@ -6,6 +6,7 @@ import type {
   AvatarCategory,
   CropRect,
   EquippedParts,
+  LayerAdjustment,
   LayerAdjustmentMap,
 } from '../types';
 import {
@@ -15,6 +16,7 @@ import {
   FULL_CROP,
 } from '../constants';
 import {
+  getEffectivePairAdjustment,
   getLayerAdjustment,
   getOrderedCharacterBodyLayers,
   hasCustomAdjustment,
@@ -100,12 +102,24 @@ export async function renderAvatarToCanvas(
     }
   }
 
-  const loadedImages = await Promise.all(
-    activeLayers.map(async (item) => ({
-      category: item.category,
-      img: await loadAvatarImage(item.src),
-    })),
-  );
+  const shoesPartVal = equippedParts.shoes;
+  const shoesPartObj = typeof shoesPartVal === 'object' && shoesPartVal !== null ? shoesPartVal : null;
+  const shoesPairData = !excluded.has('shoes') ? shoesPartObj?.pairParts : undefined;
+
+  const [loadedImages, pairShoesImages] = await Promise.all([
+    Promise.all(
+      activeLayers.map(async (item) => ({
+        category: item.category,
+        img: await loadAvatarImage(item.src),
+      })),
+    ),
+    shoesPairData
+      ? Promise.all([
+          loadAvatarImage(shoesPairData.leftSrc),
+          loadAvatarImage(shoesPairData.rightSrc),
+        ]).then(([left, right]) => ({ left, right }))
+      : Promise.resolve(null),
+  ]);
 
   const imageMap: Partial<Record<AvatarCategory, HTMLImageElement>> = {};
   for (const { category, img } of loadedImages) {
@@ -156,6 +170,28 @@ export async function renderAvatarToCanvas(
 
     const adj = getLayerAdjustment(solved.effectiveAdjustments, category);
     const pivot = solved.customPivots[category] ?? CATEGORY_META[category].pivot;
+
+    // 靴カテゴリかつ左右ペア分割パーツ (pairParts) を持つ場合、左右別々に描画
+    if (category === 'shoes' && pairShoesImages) {
+      const rightAdj = getEffectivePairAdjustment(adj, 'right');
+      const leftAdj = getEffectivePairAdjustment(adj, 'left');
+
+      const drawShoe = (shoeImg: HTMLImageElement, shoeAdj: LayerAdjustment) => {
+        ctx.save();
+        ctx.translate(pivot.x + shoeAdj.dx, pivot.y + shoeAdj.dy);
+        ctx.rotate((shoeAdj.rotation * Math.PI) / 180);
+        ctx.scale(shoeAdj.scale * (shoeAdj.flipX ? -1 : 1), shoeAdj.scale);
+        ctx.translate(-pivot.x, -pivot.y);
+        ctx.drawImage(shoeImg, 0, 0, AVATAR_CANVAS_SIZE, AVATAR_CANVAS_SIZE);
+        ctx.restore();
+      };
+
+      // 右足（向かって左）
+      drawShoe(pairShoesImages.right, rightAdj);
+      // 左足（向かって右）
+      drawShoe(pairShoesImages.left, leftAdj);
+      continue;
+    }
     const sleeveMask =
       category === 'arm_left' || category === 'arm_right'
         ? solved.armSleeveMasks[category]

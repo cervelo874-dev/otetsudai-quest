@@ -219,6 +219,22 @@ export interface AvatarPart {
     /** このトップスがワンピース・ドレスであるか（trueの場合のみズボンを自動で非装着にする） */
     isOnePiece?: boolean;
   };
+  /**
+   * 靴や手袋等で、画像上つながっているものを左右に分離したペアパーツ情報
+   */
+  pairParts?: PairPartData;
+}
+
+/** 靴や手袋等の左右ペア分割パーツデータ */
+export interface PairPartData {
+  /** 左側（キャラの左足 / 向かって右）画像URLまたはDataURL */
+  leftSrc: string;
+  /** 右側（キャラの右足 / 向かって左）画像URLまたはDataURL */
+  rightSrc: string;
+  /** 分割元の元画像URLまたはDataURL（任意） */
+  originalSrc?: string;
+  /** 分割位置比率（0.1〜0.9、デフォルト: 0.5） */
+  splitRatio?: number;
 }
 
 /**
@@ -266,6 +282,13 @@ export interface LayerAdjustment {
   bodyClipInsetPx?: number;
   /** 上下にふわふわ浮遊動（ボビング）アニメーションを行うか（初期値 false） */
   bobbing?: boolean;
+  /**
+   * 左右ペアパーツ（靴など）における左側・右側の個別オフセット調整
+   */
+  pairAdjustments?: {
+    left?: Partial<LayerAdjustment>;
+    right?: Partial<LayerAdjustment>;
+  };
 }
 
 /** 全レイヤーの微調整マップ */

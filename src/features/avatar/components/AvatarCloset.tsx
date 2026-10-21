@@ -63,6 +63,7 @@ import {
   AVATAR_UI_ORDER,
   CATEGORY_META,
   DEFAULT_AVATAR_LAYER_ORDER,
+  DEFAULT_LAYER_ADJUSTMENT,
   FACE_CROP,
   FULL_CROP,
 } from '../constants';
@@ -459,6 +460,31 @@ export function AvatarCloset({
   const currentAdjustment = getLayerAdjustment(draftAdjustments, activeCategory);
   const isCurrentAdjusted = hasCustomAdjustment(currentAdjustment);
 
+  // 靴（shoes）の左右ペアパーツ情報 ＆ 選択モード
+  const [shoesPairMode, setShoesPairMode] = useState<'both' | 'left' | 'right'>('both');
+  const currentShoesPart = draft.shoes;
+  const hasShoesPair = Boolean(
+    typeof currentShoesPart === 'object' && currentShoesPart !== null && currentShoesPart.pairParts,
+  );
+
+  // 現在操作対象の微調整（持ち物または靴の左右ペアが選ばれている場合は個別調整を参照）
+  const activeAdjustment = useMemo(() => {
+    if (activeCategory === 'shoes' && hasShoesPair && shoesPairMode !== 'both') {
+      const shoesAdj = getLayerAdjustment(draftAdjustments, 'shoes');
+      const sideAdj = shoesAdj.pairAdjustments?.[shoesPairMode];
+      return {
+        ...DEFAULT_LAYER_ADJUSTMENT,
+        ...sideAdj,
+        dx: sideAdj?.dx ?? 0,
+        dy: sideAdj?.dy ?? 0,
+        scale: sideAdj?.scale ?? 1,
+        rotation: sideAdj?.rotation ?? 0,
+        flipX: Boolean(sideAdj?.flipX),
+      };
+    }
+    return currentAdjustment;
+  }, [activeCategory, hasShoesPair, shoesPairMode, draftAdjustments, currentAdjustment]);
+
   // 複数持ち物リストの取得と現在編集中の持ち物
   const currentHandItems: AvatarPart[] = useMemo(() => {
     if (Array.isArray(draft.hand_items) && draft.hand_items.length > 0) {
@@ -589,6 +615,32 @@ export function AvatarCloset({
   // 現在のカテゴリの微調整を更新
   const updateActiveAdjustment = (patch: Partial<LayerAdjustment>) => {
     setDraftAdjustments((prev) => {
+      // 靴かつ左右ペアパーツで片足が選択されている場合、その足の個別オフセットを更新
+      if (activeCategory === 'shoes' && hasShoesPair && shoesPairMode !== 'both') {
+        const curShoes = getLayerAdjustment(prev, 'shoes');
+        const curPairs = curShoes.pairAdjustments ?? {};
+        const curSide = curPairs[shoesPairMode] ?? { dx: 0, dy: 0, scale: 1, rotation: 0, flipX: false };
+        const nextSide: Partial<LayerAdjustment> = {
+          ...curSide,
+          ...patch,
+          dx: patch.dx !== undefined ? round1(patch.dx) : (curSide.dx ?? 0),
+          dy: patch.dy !== undefined ? round1(patch.dy) : (curSide.dy ?? 0),
+          scale: patch.scale !== undefined ? Number(patch.scale.toFixed(3)) : (curSide.scale ?? 1),
+          rotation: patch.rotation !== undefined ? round1(patch.rotation) : (curSide.rotation ?? 0),
+          flipX: patch.flipX !== undefined ? patch.flipX : Boolean(curSide.flipX),
+        };
+        return {
+          ...prev,
+          shoes: {
+            ...curShoes,
+            pairAdjustments: {
+              ...curPairs,
+              [shoesPairMode]: nextSide,
+            },
+          },
+        };
+      }
+
       const current = getLayerAdjustment(prev, activeCategory);
       const next: LayerAdjustment = {
         ...current,
@@ -659,6 +711,18 @@ export function AvatarCloset({
 
   const resetActiveAdjustment = () => {
     setDraftAdjustments((prev) => {
+      if (activeCategory === 'shoes' && hasShoesPair && shoesPairMode !== 'both') {
+        const curShoes = getLayerAdjustment(prev, 'shoes');
+        const curPairs = { ...(curShoes.pairAdjustments ?? {}) };
+        delete curPairs[shoesPairMode];
+        return {
+          ...prev,
+          shoes: {
+            ...curShoes,
+            pairAdjustments: curPairs,
+          },
+        };
+      }
       const next = { ...prev };
       delete next[activeCategory];
       return next;
@@ -689,8 +753,8 @@ export function AvatarCloset({
         target: 'part',
         startX: e.clientX,
         startY: e.clientY,
-        origDx: currentAdjustment.dx,
-        origDy: currentAdjustment.dy,
+        origDx: activeAdjustment.dx,
+        origDy: activeAdjustment.dy,
       };
     }
   };
@@ -733,7 +797,7 @@ export function AvatarCloset({
     activeCategory,
     currentEquippedInActive,
     hasHandItem: Boolean(draft.hand_item),
-    currentAdjustment,
+    currentAdjustment: activeAdjustment,
     handItemAdjustment,
     updateActiveAdjustment,
     updateHandItemAdjustment,
@@ -743,7 +807,7 @@ export function AvatarCloset({
     activeCategory,
     currentEquippedInActive,
     hasHandItem: Boolean(draft.hand_item),
-    currentAdjustment,
+    currentAdjustment: activeAdjustment,
     handItemAdjustment,
     updateActiveAdjustment,
     updateHandItemAdjustment,
@@ -3124,6 +3188,42 @@ export function AvatarCloset({
               </div>
             )}
 
+            {/* 靴の左右ペア切り替えピル */}
+            {activeCategory === 'shoes' && hasShoesPair && (
+              <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-lg border border-blue-200 bg-blue-50/60 p-2.5 shadow-sm">
+                <div className="flex items-center gap-2 text-xs font-bold text-blue-900">
+                  <Scissors className="h-4 w-4 text-blue-600" />
+                  <span>靴の調整対象:</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1">
+                  {(
+                    [
+                      { id: 'both', label: '👟 両足一括', desc: '両足をまとめて調整' },
+                      { id: 'right', label: '👟 右足 (向かって左)', desc: 'キャラの右足を個別調整' },
+                      { id: 'left', label: '👟 左足 (向かって右)', desc: 'キャラの左足を個別調整' },
+                    ] as { id: 'both' | 'left' | 'right'; label: string; desc: string }[]
+                  ).map((m) => {
+                    const isSelected = shoesPairMode === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setShoesPairMode(m.id)}
+                        className={`rounded-md px-2.5 py-1 text-xs font-bold transition ${
+                          isSelected
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'border border-blue-200 bg-white text-blue-800 hover:bg-blue-100/70'
+                        }`}
+                        title={m.desc}
+                      >
+                        {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {!currentEquippedInActive && (
               <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
                 ※現在「{CATEGORY_META[activeCategory].label}」は「なし（未装着）」です。パーツを装着するとプレビュー上で確認しながら微調整できます。
@@ -3230,11 +3330,15 @@ export function AvatarCloset({
               {/* 位置オフセット（X/Yスライダー ＋ ミニステップ） */}
               <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-2.5 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-zinc-800">位置オフセット</span>
+                  <span className="text-xs font-bold text-zinc-800">
+                    {activeCategory === 'shoes' && hasShoesPair && shoesPairMode !== 'both'
+                      ? `${shoesPairMode === 'right' ? '右足' : '左足'}位置オフセット`
+                      : '位置オフセット'}
+                  </span>
                   <div className="flex items-center gap-0.5">
                     <button
                       type="button"
-                      onClick={() => updateActiveAdjustment({ dx: currentAdjustment.dx - 1 })}
+                      onClick={() => updateActiveAdjustment({ dx: activeAdjustment.dx - 1 })}
                       className="rounded border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 transition"
                       title="左へ1px"
                     >
@@ -3242,7 +3346,7 @@ export function AvatarCloset({
                     </button>
                     <button
                       type="button"
-                      onClick={() => updateActiveAdjustment({ dy: currentAdjustment.dy - 1 })}
+                      onClick={() => updateActiveAdjustment({ dy: activeAdjustment.dy - 1 })}
                       className="rounded border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 transition"
                       title="上へ1px"
                     >
@@ -3250,7 +3354,7 @@ export function AvatarCloset({
                     </button>
                     <button
                       type="button"
-                      onClick={() => updateActiveAdjustment({ dy: currentAdjustment.dy + 1 })}
+                      onClick={() => updateActiveAdjustment({ dy: activeAdjustment.dy + 1 })}
                       className="rounded border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 transition"
                       title="下へ1px"
                     >
@@ -3258,7 +3362,7 @@ export function AvatarCloset({
                     </button>
                     <button
                       type="button"
-                      onClick={() => updateActiveAdjustment({ dx: currentAdjustment.dx + 1 })}
+                      onClick={() => updateActiveAdjustment({ dx: activeAdjustment.dx + 1 })}
                       className="rounded border border-zinc-200 bg-white p-1 text-zinc-600 hover:bg-zinc-100 transition"
                       title="右へ1px"
                     >
@@ -3278,12 +3382,12 @@ export function AvatarCloset({
                     min={-180}
                     max={180}
                     step={1}
-                    value={currentAdjustment.dx}
+                    value={activeAdjustment.dx}
                     onChange={(e) => updateActiveAdjustment({ dx: Number(e.target.value) })}
                     className="flex-1 accent-zinc-900 h-1.5"
                   />
                   <span className="font-mono text-xs font-bold text-zinc-900 min-w-[44px] text-right bg-zinc-50 border border-zinc-200 px-1 py-0.2 rounded">
-                    {currentAdjustment.dx > 0 ? `+${currentAdjustment.dx}` : currentAdjustment.dx}px
+                    {activeAdjustment.dx > 0 ? `+${activeAdjustment.dx}` : activeAdjustment.dx}px
                   </span>
                 </div>
 
@@ -3298,12 +3402,12 @@ export function AvatarCloset({
                     min={-180}
                     max={180}
                     step={1}
-                    value={currentAdjustment.dy}
+                    value={activeAdjustment.dy}
                     onChange={(e) => updateActiveAdjustment({ dy: Number(e.target.value) })}
                     className="flex-1 accent-zinc-900 h-1.5"
                   />
                   <span className="font-mono text-xs font-bold text-zinc-900 min-w-[44px] text-right bg-zinc-50 border border-zinc-200 px-1 py-0.2 rounded">
-                    {currentAdjustment.dy > 0 ? `+${currentAdjustment.dy}` : currentAdjustment.dy}px
+                    {activeAdjustment.dy > 0 ? `+${activeAdjustment.dy}` : activeAdjustment.dy}px
                   </span>
                 </div>
               </div>
@@ -3321,12 +3425,12 @@ export function AvatarCloset({
                     min={0.4}
                     max={2.0}
                     step={0.01}
-                    value={currentAdjustment.scale}
+                    value={activeAdjustment.scale}
                     onChange={(e) => updateActiveAdjustment({ scale: Number(e.target.value) })}
                     className="flex-1 accent-zinc-900 h-1.5"
                   />
                   <span className="font-mono text-xs font-bold text-zinc-900 min-w-[44px] text-right bg-zinc-50 border border-zinc-200 px-1 py-0.2 rounded">
-                    {Math.round(currentAdjustment.scale * 100)}%
+                    {Math.round(activeAdjustment.scale * 100)}%
                   </span>
                 </div>
 
@@ -3341,37 +3445,37 @@ export function AvatarCloset({
                     min={-180}
                     max={180}
                     step={1}
-                    value={currentAdjustment.rotation}
+                    value={activeAdjustment.rotation}
                     onChange={(e) => updateActiveAdjustment({ rotation: Number(e.target.value) })}
                     className="flex-1 accent-zinc-900 h-1.5"
                   />
                   <span className="font-mono text-xs font-bold text-zinc-900 min-w-[44px] text-right bg-zinc-50 border border-zinc-200 px-1 py-0.2 rounded">
-                    {currentAdjustment.rotation > 0 ? `+${currentAdjustment.rotation}` : currentAdjustment.rotation}°
+                    {activeAdjustment.rotation > 0 ? `+${activeAdjustment.rotation}` : activeAdjustment.rotation}°
                   </span>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-zinc-100">
                   <button
                     type="button"
-                    onClick={() => updateActiveAdjustment({ flipX: !currentAdjustment.flipX })}
+                    onClick={() => updateActiveAdjustment({ flipX: !activeAdjustment.flipX })}
                     className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition ${
-                      currentAdjustment.flipX
+                      activeAdjustment.flipX
                         ? 'bg-zinc-900 text-white shadow-sm'
                         : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
                     }`}
                   >
                     <FlipHorizontal className="h-3.5 w-3.5" />
-                    <span>左右反転: {currentAdjustment.flipX ? 'ON' : 'OFF'}</span>
+                    <span>左右反転: {activeAdjustment.flipX ? 'ON' : 'OFF'}</span>
                   </button>
 
                   {PROMOTABLE_TO_ABOVE_TOPS.includes(activeCategory) && (
                     <button
                       type="button"
                       onClick={() =>
-                        updateActiveAdjustment({ aboveTops: !currentAdjustment.aboveTops })
+                        updateActiveAdjustment({ aboveTops: !activeAdjustment.aboveTops })
                       }
                       className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition ${
-                        currentAdjustment.aboveTops
+                        activeAdjustment.aboveTops
                           ? 'bg-zinc-900 text-white shadow-sm'
                           : 'border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
                       }`}
