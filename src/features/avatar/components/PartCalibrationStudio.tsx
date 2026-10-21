@@ -70,7 +70,6 @@ import {
   hexToRgb,
   processChromaKeyImageData,
   rgbToHex,
-  slicePairImage,
   stagePointToSourcePixel,
   type ChromaKeyColor,
 } from '../utils/imageProcessing';
@@ -382,11 +381,8 @@ export function PartCalibrationStudio({
   const [handHoldMode, setHandHoldMode] = useState<HandHoldMode>('grip_fist');
   const [naturalTiltDeg, setNaturalTiltDeg] = useState<number>(18);
 
-  // 靴（shoes）専用の左右ペアスライス＆反転ペア状態
+  // 靴（shoes）専用の反転ペア状態
   const [activePairParts, setActivePairParts] = useState<PairPartData | null>(null);
-  const [isSliceModalOpen, setIsSliceModalOpen] = useState<boolean>(false);
-  const [sliceSplitRatio, setSliceSplitRatio] = useState<number>(0.5);
-  const [isProcessingSlice, setIsProcessingSlice] = useState<boolean>(false);
 
   // トランスフォーム＆ツール状態
   const [transform, setTransform] = useState<PartTransform>(IDENTITY_TRANSFORM);
@@ -516,53 +512,27 @@ export function PartCalibrationStudio({
     );
   }, [oppositeCategory, oppositeReferencePart, showToast, transform.flipX, transform.flipY]);
 
-  // ==================== 靴（shoes）の左右ペアスライス＆反転ペア生成 ====================
-  const handleExecuteSlice = useCallback(async () => {
-    const canvas = compositedPartCanvasRef.current;
-    if (!canvas) return;
-    setIsProcessingSlice(true);
-    try {
-      const sliced = await slicePairImage(canvas, sliceSplitRatio);
-      setActivePairParts({
-        leftSrc: sliced.leftSrc,
-        rightSrc: sliced.rightSrc,
-        originalSrc: canvas.toDataURL('image/png'),
-        splitRatio: sliceSplitRatio,
-      });
-      setIsSliceModalOpen(false);
-      showToast('ok', '靴を左右ペア（左足・右足）に分割しました！');
-    } catch (err) {
-      showToast('err', `分割処理に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsProcessingSlice(false);
-    }
-  }, [sliceSplitRatio, showToast]);
-
+  // ==================== 靴（shoes）の片足反転ペア生成 ====================
   const handleExecuteMirrorPair = useCallback(
-    async (sourceSide: 'right' | 'left' = 'right') => {
+    async (sourceSide: 'auto' | 'right' | 'left' = 'auto') => {
       const canvas = compositedPartCanvasRef.current;
       if (!canvas) return;
-      setIsProcessingSlice(true);
       try {
-        const mirrored = await createMirroredPair(canvas, sourceSide, sliceSplitRatio);
+        const mirrored = await createMirroredPair(canvas, sourceSide);
         setActivePairParts({
           leftSrc: mirrored.leftSrc,
           rightSrc: mirrored.rightSrc,
           originalSrc: canvas.toDataURL('image/png'),
-          splitRatio: sliceSplitRatio,
         });
-        setIsSliceModalOpen(false);
         showToast(
           'ok',
-          `${sourceSide === 'right' ? '右足' : '左足'}を水平反転して両足ペアを作成しました！`,
+          '片足から水平反転して両足ペア（右足・左足）を作成しました！',
         );
       } catch (err) {
         showToast('err', `ペア作成に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
-      } finally {
-        setIsProcessingSlice(false);
       }
     },
-    [sliceSplitRatio, showToast],
+    [showToast],
   );
 
   // ==================== 画像の読み込み ====================
@@ -2330,22 +2300,22 @@ export function PartCalibrationStudio({
                   </div>
                 )}
 
-                {/* 靴（shoes）の場合の「左右ペア分割（スライス＆反転ペア）」設定 */}
+                {/* 靴（shoes）の場合の「片足から反転ペア作成」設定 */}
                 {category === 'shoes' && (
                   <div className="rounded-xl bg-white p-3 ring-1 ring-blue-200">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="flex items-center gap-1.5 text-xs font-extrabold text-blue-900">
-                        <Scissors className="h-4 w-4 text-blue-600" />
-                        靴の左右ペア分割 ＆ 片足反転作成
+                        <Sparkles className="h-4 w-4 text-blue-600" />
+                        靴の左右反転ペア作成
                       </span>
                       {activePairParts && (
                         <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800">
-                          ✓ 左右分離ペア登録中
+                          ✓ 両足ペア登録中
                         </span>
                       )}
                     </div>
                     <p className="mt-1 text-[11px] text-slate-500">
-                      靴が1枚の画像で繋がっている場合、左右にスライス分割するか片足から反転ペアを作成することで、クローゼットで片足ずつ位置・角度・サイズを自由に微調整できるようになります。
+                      💡 <strong>両足靴の作り方</strong>: 靴が2足つながっている場合は「消しゴムツール」で片方を消し、残った片足から「反転ペアを作成」を押すと、左右反転した綺麗な両足セットを自動生成できます。
                     </p>
 
                     {activePairParts ? (
@@ -2368,20 +2338,20 @@ export function PartCalibrationStudio({
                         <div className="flex flex-wrap items-center justify-end gap-1.5 pt-1 border-t border-blue-200/60">
                           <button
                             type="button"
-                            onClick={() => setIsSliceModalOpen(true)}
+                            onClick={() => void handleExecuteMirrorPair('auto')}
                             className="rounded-lg bg-white px-2.5 py-1 text-[11px] font-bold text-blue-700 shadow-sm ring-1 ring-blue-300 hover:bg-blue-50"
                           >
-                            スライス位置を再調整
+                            現在の消しゴム状態で再生成
                           </button>
                           <button
                             type="button"
                             onClick={() => {
                               setActivePairParts(null);
-                              showToast('ok', '左右ペア分割を解除し、単一の靴画像に戻しました');
+                              showToast('ok', '両足ペアを解除し、単一の靴画像に戻しました');
                             }}
                             className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-200"
                           >
-                            分割を解除 (1枚に戻す)
+                            ペアを解除 (1枚に戻す)
                           </button>
                         </div>
                       </div>
@@ -2390,21 +2360,30 @@ export function PartCalibrationStudio({
                         <button
                           type="button"
                           disabled={!hasPartLoaded}
-                          onClick={() => setIsSliceModalOpen(true)}
-                          className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-40"
+                          onClick={() => void handleExecuteMirrorPair('auto')}
+                          className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-40"
+                          title="現在の片足を水平反転して、左右両足のセットを作成します"
                         >
-                          <Scissors className="h-4 w-4" />
-                          左右2足にスライス分割
+                          <Sparkles className="h-4 w-4" />
+                          片足から反転ペアを作成（自動判定）
                         </button>
                         <button
                           type="button"
                           disabled={!hasPartLoaded}
                           onClick={() => void handleExecuteMirrorPair('right')}
-                          className="flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-100 disabled:opacity-40"
-                          title="画面左側の靴を水平反転して、綺麗な左右ペアを自動生成します"
+                          className="flex items-center gap-1 rounded-xl bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100 disabled:opacity-40"
+                          title="画面左側の足を右足として反転ペアを作成します"
                         >
-                          <FlipHorizontal className="h-4 w-4" />
-                          片足から反転ペアを自動生成
+                          右足基準で反転
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!hasPartLoaded}
+                          onClick={() => void handleExecuteMirrorPair('left')}
+                          className="flex items-center gap-1 rounded-xl bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100 disabled:opacity-40"
+                          title="画面右側の足を左足として反転ペアを作成します"
+                        >
+                          左足基準で反転
                         </button>
                       </div>
                     )}
@@ -3167,119 +3146,6 @@ export function PartCalibrationStudio({
           referenceOptions={studioCropReferenceOptions}
           defaultReferenceId="body"
         />
-      )}
-
-      {/* 靴の左右スライスモーダル */}
-      {isSliceModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="flex w-full max-w-lg flex-col gap-4 rounded-3xl bg-white p-5 shadow-2xl ring-1 ring-slate-900/10">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
-                  <Scissors className="h-4 w-4" />
-                </span>
-                <div>
-                  <h3 className="text-sm font-extrabold text-slate-900">靴の左右スライス分割</h3>
-                  <p className="text-[11px] text-slate-500">左右の靴の境界線を指定して2つのパーツに分離します</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsSliceModalOpen(false)}
-                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* プレビュー表示エリア */}
-            <div className="relative mx-auto flex h-64 w-64 items-center justify-center overflow-hidden rounded-2xl bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px] bg-slate-50 shadow-inner ring-1 ring-slate-200">
-              {compositedPartCanvasRef.current && (
-                <img
-                  src={compositedPartCanvasRef.current.toDataURL()}
-                  alt="分割プレビュー"
-                  className="h-full w-full object-contain"
-                />
-              )}
-              {/* スライス境界線（赤い縦破線） */}
-              <div
-                className="pointer-events-none absolute bottom-0 top-0 w-0.5 border-r-2 border-dashed border-rose-500 shadow-sm"
-                style={{ left: `${sliceSplitRatio * 100}%` }}
-              >
-                <span className="absolute -top-1 -translate-x-1/2 rounded bg-rose-500 px-1 py-0.5 font-mono text-[9px] font-bold text-white shadow">
-                  {Math.round(sliceSplitRatio * 100)}%
-                </span>
-              </div>
-              {/* 左右ラベル */}
-              <span className="pointer-events-none absolute bottom-2 left-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white">
-                アバター右足 (向かって左)
-              </span>
-              <span className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white">
-                アバター左足 (向かって右)
-              </span>
-            </div>
-
-            {/* スライダーコントロール */}
-            <div className="flex flex-col gap-2 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700">スライス分割位置（左右比率）</span>
-                <span className="font-mono text-xs font-extrabold text-blue-600">
-                  {Math.round(sliceSplitRatio * 100)}% (中央: 50%)
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0.1"
-                max="0.9"
-                step="0.01"
-                value={sliceSplitRatio}
-                onChange={(e) => setSliceSplitRatio(Number(e.target.value))}
-                className="h-2 w-full cursor-pointer accent-blue-600"
-              />
-              <div className="flex items-center justify-between text-[10px] text-slate-400">
-                <span>← 左足寄り</span>
-                <button
-                  type="button"
-                  onClick={() => setSliceSplitRatio(0.5)}
-                  className="rounded bg-white px-2 py-0.5 font-bold text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-slate-100"
-                >
-                  中央 50% にリセット
-                </button>
-                <span>右足寄り →</span>
-              </div>
-            </div>
-
-            {/* アクションボタン */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => void handleExecuteMirrorPair('right')}
-                disabled={isProcessingSlice}
-                className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100"
-                title="左半分（右足）だけを基準にして反転ペアを作ります"
-              >
-                片足から反転ペア作成
-              </button>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsSliceModalOpen(false)}
-                  className="rounded-xl bg-slate-100 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200"
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleExecuteSlice()}
-                  disabled={isProcessingSlice}
-                  className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {isProcessingSlice ? '処理中...' : 'この境界で左右分割する'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

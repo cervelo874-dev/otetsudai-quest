@@ -378,13 +378,12 @@ function loadHelperImage(src: string): Promise<HTMLImageElement> {
 }
 
 /**
- * 左右つながっている靴や手袋等の画像を、境界比率（splitRatioX）で「左側（キャラの右足）」と「右側（キャラの左足）」に分離
- * - rightSrc: 画面左側（アバターの右足）
- * - leftSrc: 画面右側（アバターの左足）
+ * 消しゴムツール等で片足だけ残された靴イラストから、水平反転して綺麗な両足ペア（PairPartData）を自動生成
+ * - sourceSide: 'auto'（不透明ピクセルの重心位置から自動判定）| 'right'（キャラ右足/画面左基準）| 'left'（キャラ左足/画面右基準）
  */
-export async function slicePairImage(
+export async function createMirroredPair(
   source: HTMLCanvasElement | HTMLImageElement | string,
-  splitRatioX = 0.5,
+  sourceSide: 'auto' | 'right' | 'left' = 'auto',
 ): Promise<{ leftSrc: string; rightSrc: string }> {
   let sourceCanvas: HTMLCanvasElement;
 
@@ -401,84 +400,56 @@ export async function slicePairImage(
 
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
-  const splitPx = Math.round(w * Math.max(0.05, Math.min(0.95, splitRatioX)));
+  const sourceCtx = sourceCanvas.getContext('2d', { willReadFrequently: true })!;
+  const imgData = sourceCtx.getImageData(0, 0, w, h);
 
-  // 1. キャラクターの右足（画面向かって左側の領域）
-  const rightCanvas = createOffscreenCanvas(w, h);
-  const rightCtx = rightCanvas.getContext('2d')!;
-  // 左半分を描画（splitPxより右側は透明）
-  rightCtx.drawImage(
-    sourceCanvas,
-    0,
-    0,
-    splitPx,
-    h,
-    0,
-    0,
-    splitPx,
-    h,
-  );
+  // 不透明ピクセル（実体）の重心Xを計算して、左右どちらの足が残っているか自動判定
+  let detectedSide: 'right' | 'left' = 'right';
+  if (sourceSide === 'auto') {
+    let sumX = 0;
+    let count = 0;
+    const data = imgData.data;
+    for (let y = 0; y < h; y += 2) {
+      for (let x = 0; x < w; x += 2) {
+        const a = data[(y * w + x) * 4 + 3];
+        if (a > 20) {
+          sumX += x;
+          count++;
+        }
+      }
+    }
+    if (count > 0) {
+      const avgX = sumX / count;
+      // 画面中央 (w / 2) より左側にあればアバター右足、右側にあればアバター左足
+      detectedSide = avgX < w / 2 ? 'right' : 'left';
+    }
+  } else {
+    detectedSide = sourceSide;
+  }
 
-  // 2. キャラクターの左足（画面向かって右側の領域）
-  const leftCanvas = createOffscreenCanvas(w, h);
-  const leftCtx = leftCanvas.getContext('2d')!;
-  // 右半分を描画（splitPxより左側は透明）
-  leftCtx.drawImage(
-    sourceCanvas,
-    splitPx,
-    0,
-    w - splitPx,
-    h,
-    splitPx,
-    0,
-    w - splitPx,
-    h,
-  );
-
-  return {
-    rightSrc: rightCanvas.toDataURL('image/png'),
-    leftSrc: leftCanvas.toDataURL('image/png'),
-  };
-}
-
-/**
- * 片足（左足または右足）だけ描かれたイラストから、水平反転してもう片足のペアを自動生成
- * - sourceSide: 'right'（画面左側＝キャラ右足基準）または 'left'（画面右側＝キャラ左足基準）
- */
-export async function createMirroredPair(
-  source: HTMLCanvasElement | HTMLImageElement | string,
-  sourceSide: 'right' | 'left' = 'right',
-  splitRatioX = 0.5,
-): Promise<{ leftSrc: string; rightSrc: string }> {
-  // まず左右にスライスして基準側を取得
-  const sliced = await slicePairImage(source, splitRatioX);
-  const baseDataUrl = sourceSide === 'right' ? sliced.rightSrc : sliced.leftSrc;
-  const baseImg = await loadHelperImage(baseDataUrl);
-
-  const w = baseImg.width || AVATAR_CANVAS_SIZE;
-  const h = baseImg.height || AVATAR_CANVAS_SIZE;
-
-  // 反転した側のキャンバスを生成
+  // キャンバス中央軸を基準に水平反転したもう片足のキャンバスを生成
   const mirrorCanvas = createOffscreenCanvas(w, h);
   const mirrorCtx = mirrorCanvas.getContext('2d')!;
   mirrorCtx.save();
-  // 中央を軸に水平反転
   mirrorCtx.translate(w, 0);
   mirrorCtx.scale(-1, 1);
-  mirrorCtx.drawImage(baseImg, 0, 0);
+  mirrorCtx.drawImage(sourceCanvas, 0, 0);
   mirrorCtx.restore();
 
-  const mirrorDataUrl = mirrorCanvas.toDataURL('image/png');
+  const originalDataUrl = sourceCanvas.toDataURL('image/png');
+  const mirroredDataUrl = mirrorCanvas.toDataURL('image/png');
 
-  if (sourceSide === 'right') {
+  if (detectedSide === 'right') {
+    // 残された足が右足（画面左側）の場合：右足は元画像、左足は水平反転画像
     return {
-      rightSrc: baseDataUrl,
-      leftSrc: mirrorDataUrl,
+      rightSrc: originalDataUrl,
+      leftSrc: mirroredDataUrl,
     };
   } else {
+    // 残された足が左足（画面右側）の場合：左足は元画像、右足は水平反転画像
     return {
-      leftSrc: baseDataUrl,
-      rightSrc: mirrorDataUrl,
+      leftSrc: originalDataUrl,
+      rightSrc: mirroredDataUrl,
     };
   }
 }
