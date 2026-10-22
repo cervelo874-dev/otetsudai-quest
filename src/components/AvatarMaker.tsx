@@ -6,10 +6,13 @@ import { burst } from '../effects';
 import { toast } from './ui';
 import {
   AvatarRenderer,
+  DEFAULT_LAYER_ADJUSTMENT,
   getLayerAdjustment,
+  getPartDefaultAdjustment,
   getPartThumbnailStyle,
   isDressOrOnePiecePart,
   resolveChildEquippedParts,
+  resolveEffectiveAdjustments,
   resolvePartKey,
   resolvePartSrc,
   usePartCatalog,
@@ -209,8 +212,8 @@ export function AvatarMaker({
 
   // 子どもがリアルタイムで試着中の装備状態
   const [draftEquipped, setDraftEquipped] = useState<EquippedParts>(initialEquippedParts);
-  const [draftAdjustments, setDraftAdjustments] = useState<LayerAdjustmentMap>(
-    () => ({ ...(child.avatarStudio?.adjustments || {}) }),
+  const [draftAdjustments, setDraftAdjustments] = useState<LayerAdjustmentMap>(() =>
+    resolveEffectiveAdjustments(initialEquippedParts, child.avatarStudio?.adjustments),
   );
   // ユーザーが手動でパーツを試着選択したかどうかのフラグ
   const hasUserInteractedRef = useRef(false);
@@ -238,7 +241,9 @@ export function AvatarMaker({
     if (!hasUserInteractedRef.current) {
       // ユーザーが手動操作する前は、IndexedDBカタログがロード完了して解決された最新の initialEquippedParts をそのまま 100% 反映！
       setDraftEquipped(initialEquippedParts);
-      setDraftAdjustments({ ...(child.avatarStudio?.adjustments || {}) });
+      setDraftAdjustments(
+        resolveEffectiveAdjustments(initialEquippedParts, child.avatarStudio?.adjustments),
+      );
       return;
     }
 
@@ -354,11 +359,23 @@ export function AvatarMaker({
           // 「はずす」：目も口もクリア（旧SVGを残さない）
           next.face_eyes = null;
           next.face_mouth = null;
+          setDraftAdjustments((prevAdj) => {
+            const nextAdj = { ...prevAdj };
+            delete nextAdj.face_eyes;
+            delete nextAdj.face_mouth;
+            return nextAdj;
+          });
         } else {
           // 表情パーツ（目・眉・口・チークが一体のイラスト表情）：
           // 装着し、旧SVGの口や残骸を完全にクリア！
           next.face_eyes = part;
           next.face_mouth = null;
+          setDraftAdjustments((prevAdj) => {
+            const nextAdj = { ...prevAdj };
+            nextAdj.face_eyes = getPartDefaultAdjustment(part);
+            delete nextAdj.face_mouth;
+            return nextAdj;
+          });
         }
         return next;
       }
@@ -374,12 +391,18 @@ export function AvatarMaker({
           // 手足の服専用微調整（aboveTopsやオフセット）も安全に初期化
           setDraftAdjustments((prevAdj) => {
             const nextAdj = { ...prevAdj };
+            delete nextAdj.tops;
             delete nextAdj.arm_left;
             delete nextAdj.arm_right;
             return nextAdj;
           });
         } else {
           next.tops = part;
+          setDraftAdjustments((prevAdj) => {
+            const nextAdj = { ...prevAdj };
+            nextAdj.tops = getPartDefaultAdjustment(part);
+            return nextAdj;
+          });
           const isOnePiece = isDressOrOnePiecePart(part);
 
           // ワンピース・ドレスの場合のみズボンを外す。
@@ -450,12 +473,18 @@ export function AvatarMaker({
           // 足専用微調整も安全に初期化
           setDraftAdjustments((prevAdj) => {
             const nextAdj = { ...prevAdj };
+            delete nextAdj.bottoms;
             delete nextAdj.leg_left;
             delete nextAdj.leg_right;
             return nextAdj;
           });
         } else {
           next.bottoms = part;
+          setDraftAdjustments((prevAdj) => {
+            const nextAdj = { ...prevAdj };
+            nextAdj.bottoms = getPartDefaultAdjustment(part);
+            return nextAdj;
+          });
           // ボトムスにセット記憶された脚・足（linkedParts）があれば自動で一緒に装備
           if (part.linkedParts) {
             if (part.linkedParts.leg_left !== undefined) {
@@ -515,10 +544,27 @@ export function AvatarMaker({
         return next;
       }
 
-      // その他の通常パーツ
+      // その他の通常パーツ（靴、かみがた、あたま、エフェクト等）
       next[currentCategory] = part;
       return next;
     });
+
+    // 選択されたパーツの固有配置（defaultAdjustment）を即座に反映
+    // 未設定パーツなら初期値にリセット（靴Aの調整が靴Bに引き継がれる汚染を防止）
+    if (part) {
+      setDraftAdjustments((prevAdj) => {
+        const nextAdj = { ...prevAdj };
+        nextAdj[currentCategory] = getPartDefaultAdjustment(part);
+        return nextAdj;
+      });
+    } else {
+      // 「はずす」を選択した場合
+      setDraftAdjustments((prevAdj) => {
+        const nextAdj = { ...prevAdj };
+        delete nextAdj[currentCategory];
+        return nextAdj;
+      });
+    }
 
     // セット記憶された手足の配置（位置情報など）があれば反映
     if (part?.linkedParts?.adjustments) {

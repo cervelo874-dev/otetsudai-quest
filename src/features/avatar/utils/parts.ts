@@ -487,3 +487,70 @@ export function getPartThumbnailStyle(part: AvatarPart | null | undefined): CSSP
     transformOrigin: 'center center',
   };
 }
+
+/**
+ * パーツに記録されている推奨配置（defaultAdjustment）を安全に取得する。
+ * 未設定の場合は標準の初期配置（DEFAULT_LAYER_ADJUSTMENT）を返す。
+ */
+export function getPartDefaultAdjustment(part: AvatarPart | null | undefined): LayerAdjustment {
+  if (!part || !part.defaultAdjustment) {
+    return { ...DEFAULT_LAYER_ADJUSTMENT };
+  }
+  return {
+    ...DEFAULT_LAYER_ADJUSTMENT,
+    ...part.defaultAdjustment,
+    pairAdjustments: part.defaultAdjustment.pairAdjustments
+      ? {
+          left: part.defaultAdjustment.pairAdjustments.left
+            ? { ...part.defaultAdjustment.pairAdjustments.left }
+            : undefined,
+          right: part.defaultAdjustment.pairAdjustments.right
+            ? { ...part.defaultAdjustment.pairAdjustments.right }
+            : undefined,
+        }
+      : undefined,
+  };
+}
+
+/**
+ * 装備中パーツ（EquippedParts）固有の defaultAdjustment をベースに敷き、
+ * ユーザー個別カスタマイズ（customAdjustments）をマージした最終的な LayerAdjustmentMap を構築する。
+ */
+export function resolveEffectiveAdjustments(
+  equipped: EquippedParts | undefined,
+  customAdjustments?: LayerAdjustmentMap,
+): LayerAdjustmentMap {
+  const result: LayerAdjustmentMap = {};
+
+  // 1. 各装備パーツが持つ defaultAdjustment をベースにセット
+  if (equipped) {
+    for (const cat of AVATAR_LAYERS) {
+      const partVal = equipped[cat];
+      if (partVal && typeof partVal === 'object' && partVal.defaultAdjustment) {
+        result[cat] = getPartDefaultAdjustment(partVal);
+      }
+    }
+  }
+
+  // 2. ユーザー個別の調整値（customAdjustments）でカスタム調整されたものを優先適用
+  if (customAdjustments) {
+    for (const cat of AVATAR_LAYERS) {
+      const customAdj = customAdjustments[cat];
+      if (customAdj && hasCustomAdjustment(customAdj)) {
+        result[cat] = {
+          ...(result[cat] ?? DEFAULT_LAYER_ADJUSTMENT),
+          ...customAdj,
+        };
+      }
+    }
+    // layerOrder や handItemAdjustments などの拡張プロパティを維持
+    if (customAdjustments.layerOrder) {
+      result.layerOrder = [...customAdjustments.layerOrder];
+    }
+    if (customAdjustments.handItemAdjustments) {
+      result.handItemAdjustments = { ...customAdjustments.handItemAdjustments };
+    }
+  }
+
+  return result;
+}

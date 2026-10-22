@@ -223,6 +223,11 @@ export interface AvatarPart {
    * 靴や手袋等で、画像上つながっているものを左右に分離したペアパーツ情報
    */
   pairParts?: PairPartData;
+  /**
+   * このパーツ専用の推奨・デフォルト配置情報（位置dx/dy, スケール, 回転, 靴の左右ペア調整など）
+   * 親画面のクローゼットで保存された配置がここに記録され、子どもが着替えた際にも完全同期されます
+   */
+  defaultAdjustment?: LayerAdjustment;
 }
 
 /** 靴や手袋等の左右ペア分割パーツデータ */

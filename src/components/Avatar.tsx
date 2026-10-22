@@ -4,6 +4,7 @@ import { sound } from '../sound';
 import {
   AvatarRenderer,
   resolveChildEquippedParts,
+  resolveEffectiveAdjustments,
   usePartCatalog,
   type EquippedParts,
 } from '../features/avatar';
@@ -59,6 +60,12 @@ export const GameAvatar2D = memo(function GameAvatar2D({
     return resolveChildEquippedParts(targetStudio ?? undefined, catalogParts);
   }, [targetStudio, catalogParts]);
 
+  // 各パーツ固有の defaultAdjustment（親がクローゼットで保存した配置）をベースに、
+  // 子どもの微調整をマージした実効調整値を算出（完全同期）
+  const effectiveAdjustments = useMemo(() => {
+    return resolveEffectiveAdjustments(equippedParts, targetStudio?.adjustments);
+  }, [equippedParts, targetStudio?.adjustments]);
+
   // パーツ変更時のキラキラポップ演出
   useEffect(() => {
     if (!sparkleTrigger) return;
@@ -92,7 +99,7 @@ export const GameAvatar2D = memo(function GameAvatar2D({
     >
       <AvatarRenderer
         equippedParts={equippedParts}
-        adjustments={targetStudio?.adjustments}
+        adjustments={effectiveAdjustments}
         size="full"
         animate={true}
         faceOnly={isFaceZoom}

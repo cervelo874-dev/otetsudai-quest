@@ -57,6 +57,8 @@ export {
   sanitizeFileName,
   isDressOrOnePiecePart,
   getPartThumbnailStyle,
+  getPartDefaultAdjustment,
+  resolveEffectiveAdjustments,
 } from './utils/parts';
 
 // 6. クロマキー透過・トランスフォーム計算ユーティリティ

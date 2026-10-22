@@ -72,10 +72,12 @@ import {
   createEmptyEquippedMap,
   getEquippedSignature,
   getLayerAdjustment,
+  getPartDefaultAdjustment,
   getPartThumbnailStyle,
   hasCustomAdjustment,
   isDressOrOnePiecePart,
   normalizeEquippedParts,
+  resolveEffectiveAdjustments,
   resolvePartKey,
   resolvePartSrc,
 } from '../utils/parts';
@@ -217,7 +219,7 @@ export function AvatarCloset({
 
   const [draft, setDraft] = useState<EquippedPartMap>(buildInitialDraft);
   const [draftAdjustments, setDraftAdjustments] = useState<LayerAdjustmentMap>(
-    () => ({ ...initialAdjustments }),
+    () => resolveEffectiveAdjustments(buildInitialDraft(), initialAdjustments),
   );
   const [activeCategory, setActiveCategory] = useState<AvatarCategory>(() => {
     const init = initialTryOnPart?.category ?? initialCategory ?? 'body';
@@ -973,15 +975,27 @@ export function AvatarCloset({
 
     setDraftAdjustments((prev) => {
       const pShoes = getLayerAdjustment(prev, 'shoes');
+      const nextShoesAdj: LayerAdjustment = {
+        ...pShoes,
+        pairAdjustments: {
+          ...(pShoes.pairAdjustments ?? {}),
+          [targetSide]: mirroredAdj,
+        },
+      };
+
+      // 靴パーツが選択されている場合、defaultAdjustment にも即時反映して保存
+      const curPart = draft.shoes;
+      if (curPart && typeof curPart === 'object' && curPart.id) {
+        void saveCatalogPart({
+          ...curPart,
+          updatedAt: Date.now(),
+          defaultAdjustment: nextShoesAdj,
+        });
+      }
+
       return {
         ...prev,
-        shoes: {
-          ...pShoes,
-          pairAdjustments: {
-            ...(pShoes.pairAdjustments ?? {}),
-            [targetSide]: mirroredAdj,
-          },
-        },
+        shoes: nextShoesAdj,
       };
     });
     showActionNotice(
@@ -989,7 +1003,7 @@ export function AvatarCloset({
         ? '左足の位置を右足へ対称コピーしました！'
         : '右足の位置を左足へ対称コピーしました！'
     );
-  }, [draftAdjustments, shoesPairMode, showActionNotice]);
+  }, [draft.shoes, draftAdjustments, shoesPairMode, showActionNotice]);
 
   // 靴の左右画像を入れ替える（アバター表示＆カタログデータを即時更新）
   const handleSwapShoesPair = async () => {
@@ -999,8 +1013,11 @@ export function AvatarCloset({
     const nextLeft = curShoes.pairParts.rightSrc;
     const nextRight = curShoes.pairParts.leftSrc;
 
+    const curShoesAdj = draftAdjustments.shoes;
     const swappedShoes: AvatarPart = {
       ...curShoes,
+      updatedAt: Date.now(),
+      defaultAdjustment: curShoesAdj ? { ...curShoesAdj } : curShoes.defaultAdjustment,
       pairParts: {
         ...curShoes.pairParts,
         leftSrc: nextLeft,
@@ -1142,6 +1159,11 @@ export function AvatarCloset({
       if (currentKey === part.id) {
         // 素体（body）は非装着にしない（絶対に消えない安全ガード）
         if (part.category === 'body') return prev;
+        setDraftAdjustments((prevAdj) => {
+          const nextAdj = { ...prevAdj };
+          delete nextAdj[part.category];
+          return nextAdj;
+        });
         return { ...prev, [part.category]: null };
       }
       const next = { ...prev, [part.category]: part };
@@ -1180,6 +1202,18 @@ export function AvatarCloset({
         }
       }
       return next;
+    });
+
+    // 選択されたパーツの固有配置（defaultAdjustment）を即座に反映
+    // 未設定パーツなら初期値にリセット（前のパーツの調整値汚染を防止）
+    setDraftAdjustments((prev) => {
+      const nextAdj = { ...prev };
+      if (part.defaultAdjustment) {
+        nextAdj[part.category] = getPartDefaultAdjustment(part);
+      } else {
+        nextAdj[part.category] = { ...DEFAULT_LAYER_ADJUSTMENT };
+      }
+      return nextAdj;
     });
 
     // セット記憶された手足の配置（位置情報など）を自動適用
@@ -1537,6 +1571,27 @@ export function AvatarCloset({
   const handleSaveClick = async () => {
     setIsSaving(true);
     try {
+      // 装着中の全パーツに現在の個別配置（defaultAdjustment）を刻み込んでカタログDBへ永続保存
+      // （靴の左右足位置・スケール・全パーツの配置がパーツ固有データとして保存され、子ども画面へ完全同期されます）
+      const savePromises: Promise<unknown>[] = [];
+      for (const cat of AVATAR_LAYERS) {
+        const partVal = draft[cat];
+        if (partVal && typeof partVal === 'object' && partVal.id) {
+          const adj = draftAdjustments[cat];
+          if (adj && (hasCustomAdjustment(adj) || partVal.defaultAdjustment)) {
+            const updatedPart: AvatarPart = {
+              ...partVal,
+              updatedAt: Date.now(),
+              defaultAdjustment: { ...adj },
+            };
+            savePromises.push(saveCatalogPart(updatedPart));
+          }
+        }
+      }
+      if (savePromises.length > 0) {
+        await Promise.allSettled(savePromises);
+      }
+
       await onSave(draft, draftAdjustments);
       setSavedNotice(true);
       if (savedNoticeTimerRef.current !== null) {
