@@ -221,6 +221,26 @@ export function AvatarCloset({
   const [draftAdjustments, setDraftAdjustments] = useState<LayerAdjustmentMap>(
     () => resolveEffectiveAdjustments(buildInitialDraft(), initialAdjustments),
   );
+
+  // パーツごとの個別調整値をセッション中に確実に保持・退避するキャッシュ
+  // （服Aを調整後にワンピースに着替え、再度服Aに戻した際にも調整サイズ・位置が100%復元されます）
+  const partAdjustmentsCacheRef = useRef<Map<string, LayerAdjustment>>(new Map());
+
+  // 初期化：ownedParts や draft 内の各パーツの defaultAdjustment をキャッシュへ読み込む
+  useEffect(() => {
+    for (const p of ownedParts) {
+      if (p.defaultAdjustment && !partAdjustmentsCacheRef.current.has(p.id)) {
+        partAdjustmentsCacheRef.current.set(p.id, { ...p.defaultAdjustment });
+      }
+    }
+    for (const cat of AVATAR_LAYERS) {
+      const p = draft[cat];
+      if (p && typeof p === 'object' && p.id && p.defaultAdjustment && !partAdjustmentsCacheRef.current.has(p.id)) {
+        partAdjustmentsCacheRef.current.set(p.id, { ...p.defaultAdjustment });
+      }
+    }
+  }, [ownedParts]);
+
   const [activeCategory, setActiveCategory] = useState<AvatarCategory>(() => {
     const init = initialTryOnPart?.category ?? initialCategory ?? 'body';
     return init === 'face_mouth' ? 'face_eyes' : init;
@@ -632,15 +652,22 @@ export function AvatarCloset({
           rotation: patch.rotation !== undefined ? round1(patch.rotation) : (curSide.rotation ?? 0),
           flipX: patch.flipX !== undefined ? patch.flipX : Boolean(curSide.flipX),
         };
+        const nextShoesAdj: LayerAdjustment = {
+          ...curShoes,
+          pairAdjustments: {
+            ...curPairs,
+            [shoesPairMode]: nextSide,
+          },
+        };
+
+        const curShoesPart = draft.shoes;
+        if (curShoesPart && typeof curShoesPart === 'object' && curShoesPart.id) {
+          partAdjustmentsCacheRef.current.set(curShoesPart.id, nextShoesAdj);
+        }
+
         return {
           ...prev,
-          shoes: {
-            ...curShoes,
-            pairAdjustments: {
-              ...curPairs,
-              [shoesPairMode]: nextSide,
-            },
-          },
+          shoes: nextShoesAdj,
         };
       }
 
@@ -653,6 +680,13 @@ export function AvatarCloset({
         scale: patch.scale !== undefined ? Number(patch.scale.toFixed(3)) : current.scale,
         rotation: patch.rotation !== undefined ? round1(patch.rotation) : current.rotation,
       };
+
+      // 装着中のパーツがあれば、セッションキャッシュへ即座に反映
+      const curPart = draft[activeCategory];
+      if (curPart && typeof curPart === 'object' && curPart.id) {
+        partAdjustmentsCacheRef.current.set(curPart.id, next);
+      }
+
       return {
         ...prev,
         [activeCategory]: next,
@@ -1130,6 +1164,27 @@ export function AvatarCloset({
 
   // パーツ選択・解除（持ち物は複数選択対応、配置維持モードがONの場合は記憶した位置・サイズを自動適用）
   const handleSelectPart = (part: AvatarPart) => {
+    // 0. 【直前のパーツの調整値を自動退避・キャッシュ記憶】
+    // 服Aを調整後にワンピースを着て、再度服Aに戻した際にもサイズや位置が100%保持されるように自動保存！
+    const prevEquippedPart = draft[part.category];
+    if (
+      prevEquippedPart &&
+      typeof prevEquippedPart === 'object' &&
+      prevEquippedPart.id &&
+      prevEquippedPart.id !== part.id
+    ) {
+      const curAdj = draftAdjustments[part.category];
+      if (curAdj) {
+        partAdjustmentsCacheRef.current.set(prevEquippedPart.id, { ...curAdj });
+        // バックグラウンドでカタログDBへも即時保存
+        void saveCatalogPart({
+          ...prevEquippedPart,
+          updatedAt: Date.now(),
+          defaultAdjustment: { ...curAdj },
+        });
+      }
+    }
+
     if (part.category === 'hand_item') {
       setDraft((prev) => {
         const existingItems = Array.isArray(prev.hand_items)
@@ -1154,6 +1209,19 @@ export function AvatarCloset({
       return;
     }
 
+    // 1. 今回選択されたパーツ固有の配置（セッションキャッシュ最優先、次にdefaultAdjustment、未設定なら初期値）を決定
+    const cachedAdj = partAdjustmentsCacheRef.current.get(part.id);
+    const targetAdj: LayerAdjustment = cachedAdj
+      ? { ...cachedAdj }
+      : part.defaultAdjustment
+      ? getPartDefaultAdjustment(part)
+      : { ...DEFAULT_LAYER_ADJUSTMENT };
+
+    const partWithAdjustment: AvatarPart = {
+      ...part,
+      defaultAdjustment: targetAdj,
+    };
+
     setDraft((prev) => {
       const currentKey = resolvePartKey(prev[part.category]);
       if (currentKey === part.id) {
@@ -1166,7 +1234,7 @@ export function AvatarCloset({
         });
         return { ...prev, [part.category]: null };
       }
-      const next = { ...prev, [part.category]: part };
+      const next = { ...prev, [part.category]: partWithAdjustment };
       const isOnePiece = isDressOrOnePiecePart(part);
 
       // ワンピース・ドレスの場合のみズボンを自動で外す。
@@ -1204,17 +1272,11 @@ export function AvatarCloset({
       return next;
     });
 
-    // 選択されたパーツの固有配置（defaultAdjustment）を即座に反映
-    // 未設定パーツなら初期値にリセット（前のパーツの調整値汚染を防止）
-    setDraftAdjustments((prev) => {
-      const nextAdj = { ...prev };
-      if (part.defaultAdjustment) {
-        nextAdj[part.category] = getPartDefaultAdjustment(part);
-      } else {
-        nextAdj[part.category] = { ...DEFAULT_LAYER_ADJUSTMENT };
-      }
-      return nextAdj;
-    });
+    // 選択されたパーツの固有配置を即座に反映（キャッシュまたはパーツデータから完全復元）
+    setDraftAdjustments((prev) => ({
+      ...prev,
+      [part.category]: targetAdj,
+    }));
 
     // セット記憶された手足の配置（位置情報など）を自動適用
     if (part.linkedParts?.adjustments) {
@@ -1571,28 +1633,52 @@ export function AvatarCloset({
   const handleSaveClick = async () => {
     setIsSaving(true);
     try {
-      // 装着中の全パーツに現在の個別配置（defaultAdjustment）を刻み込んでカタログDBへ永続保存
-      // （靴の左右足位置・スケール・全パーツの配置がパーツ固有データとして保存され、子ども画面へ完全同期されます）
+      // 装着中の全パーツおよびセッション中に調整されたパーツに個別配置（defaultAdjustment）を刻み込んでカタログDBへ永続保存
       const savePromises: Promise<unknown>[] = [];
+      const updatedDraft: EquippedPartMap = { ...draft };
+      const savedPartIds = new Set<string>();
+
+      // 1. 現在装着中の全パーツの個別配置を反映・保存
       for (const cat of AVATAR_LAYERS) {
         const partVal = draft[cat];
         if (partVal && typeof partVal === 'object' && partVal.id) {
           const adj = draftAdjustments[cat];
-          if (adj && (hasCustomAdjustment(adj) || partVal.defaultAdjustment)) {
+          if (adj) {
             const updatedPart: AvatarPart = {
               ...partVal,
               updatedAt: Date.now(),
               defaultAdjustment: { ...adj },
             };
+            updatedDraft[cat] = updatedPart;
+            savedPartIds.add(partVal.id);
+            partAdjustmentsCacheRef.current.set(partVal.id, { ...adj });
             savePromises.push(saveCatalogPart(updatedPart));
           }
         }
       }
+
+      // 2. セッション中に調整した後に別の服（ワンピース等）へ着替えた未装着パーツも漏れなくカタログDBへ保存
+      for (const [partId, cachedAdj] of partAdjustmentsCacheRef.current.entries()) {
+        if (!savedPartIds.has(partId)) {
+          const matchingPart = ownedParts.find((p) => p.id === partId);
+          if (matchingPart) {
+            const updatedCachedPart: AvatarPart = {
+              ...matchingPart,
+              updatedAt: Date.now(),
+              defaultAdjustment: { ...cachedAdj },
+            };
+            savedPartIds.add(partId);
+            savePromises.push(saveCatalogPart(updatedCachedPart));
+          }
+        }
+      }
+
       if (savePromises.length > 0) {
         await Promise.allSettled(savePromises);
       }
 
-      await onSave(draft, draftAdjustments);
+      setDraft(updatedDraft);
+      await onSave(updatedDraft, draftAdjustments);
       setSavedNotice(true);
       if (savedNoticeTimerRef.current !== null) {
         window.clearTimeout(savedNoticeTimerRef.current);
