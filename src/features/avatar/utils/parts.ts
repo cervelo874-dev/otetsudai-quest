@@ -476,9 +476,11 @@ export function getPartThumbnailStyle(part: AvatarPart | null | undefined): CSSP
   if (!Number.isFinite(cy)) cy = 256;
 
   // キャンバス中心(256, 256)とパーツ中心(cx, cy)のズレを打ち消す移動量（%）
-  // CSS translate は scale 前の要素サイズ基準のため、過剰な * scale を外して正確にセンタリング
-  const tx = ((256 - cx) / AVATAR_CANVAS_SIZE) * 100;
-  const ty = ((256 - cy) / AVATAR_CANVAS_SIZE) * 100;
+  // transform-origin: center center かつ translate(tx, ty) scale(s) の場合、
+  // 拡大によって中心からのオフセット (cx - 256, cy - 256) が scale 倍に広がるため、
+  // カード中央に正確に引き戻すには移動量にも scale を乗算する必要がある。
+  const tx = ((256 - cx) / AVATAR_CANVAS_SIZE) * 100 * scale;
+  const ty = ((256 - cy) / AVATAR_CANVAS_SIZE) * 100 * scale;
 
   return {
     transform: `translate(${tx.toFixed(2)}%, ${ty.toFixed(2)}%) scale(${scale.toFixed(2)})`,
