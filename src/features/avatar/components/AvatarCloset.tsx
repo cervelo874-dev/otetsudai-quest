@@ -661,8 +661,16 @@ export function AvatarCloset({
         };
 
         const curShoesPart = draft.shoes;
-        if (curShoesPart && typeof curShoesPart === 'object' && curShoesPart.id) {
-          partAdjustmentsCacheRef.current.set(curShoesPart.id, nextShoesAdj);
+        const shoesKey = resolvePartKey(curShoesPart);
+        if (shoesKey) {
+          partAdjustmentsCacheRef.current.set(shoesKey, nextShoesAdj);
+          if (curShoesPart && typeof curShoesPart === 'object') {
+            curShoesPart.defaultAdjustment = nextShoesAdj;
+          }
+          const matchingOwned = ownedParts.find((p) => p.id === shoesKey);
+          if (matchingOwned) {
+            matchingOwned.defaultAdjustment = nextShoesAdj;
+          }
         }
 
         return {
@@ -681,10 +689,18 @@ export function AvatarCloset({
         rotation: patch.rotation !== undefined ? round1(patch.rotation) : current.rotation,
       };
 
-      // 装着中のパーツがあれば、セッションキャッシュへ即座に反映
+      // 装着中のパーツがあれば、セッションキャッシュおよびオブジェクトへ即座に反映
       const curPart = draft[activeCategory];
-      if (curPart && typeof curPart === 'object' && curPart.id) {
-        partAdjustmentsCacheRef.current.set(curPart.id, next);
+      const curKey = resolvePartKey(curPart);
+      if (curKey) {
+        partAdjustmentsCacheRef.current.set(curKey, next);
+        if (curPart && typeof curPart === 'object') {
+          curPart.defaultAdjustment = next;
+        }
+        const matchingOwned = ownedParts.find((p) => p.id === curKey);
+        if (matchingOwned) {
+          matchingOwned.defaultAdjustment = next;
+        }
       }
 
       return {
@@ -1164,24 +1180,32 @@ export function AvatarCloset({
 
   // パーツ選択・解除（持ち物は複数選択対応、配置維持モードがONの場合は記憶した位置・サイズを自動適用）
   const handleSelectPart = (part: AvatarPart) => {
+    const partKey = resolvePartKey(part);
+
     // 0. 【直前のパーツの調整値を自動退避・キャッシュ記憶】
     // 服Aを調整後にワンピースを着て、再度服Aに戻した際にもサイズや位置が100%保持されるように自動保存！
     const prevEquippedPart = draft[part.category];
-    if (
-      prevEquippedPart &&
-      typeof prevEquippedPart === 'object' &&
-      prevEquippedPart.id &&
-      prevEquippedPart.id !== part.id
-    ) {
+    const prevKey = resolvePartKey(prevEquippedPart);
+    if (prevEquippedPart && prevKey && prevKey !== partKey) {
       const curAdj = draftAdjustments[part.category];
       if (curAdj) {
-        partAdjustmentsCacheRef.current.set(prevEquippedPart.id, { ...curAdj });
+        partAdjustmentsCacheRef.current.set(prevKey, { ...curAdj });
+        if (typeof prevEquippedPart === 'object') {
+          prevEquippedPart.defaultAdjustment = { ...curAdj };
+        }
+        // ownedParts 内の直前パーツオブジェクトにも直接反映
+        const matchingPrev = ownedParts.find((p) => p.id === prevKey);
+        if (matchingPrev) {
+          matchingPrev.defaultAdjustment = { ...curAdj };
+        }
         // バックグラウンドでカタログDBへも即時保存
-        void saveCatalogPart({
-          ...prevEquippedPart,
-          updatedAt: Date.now(),
-          defaultAdjustment: { ...curAdj },
-        });
+        if (typeof prevEquippedPart === 'object') {
+          void saveCatalogPart({
+            ...prevEquippedPart,
+            updatedAt: Date.now(),
+            defaultAdjustment: { ...curAdj },
+          });
+        }
       }
     }
 
@@ -1210,21 +1234,29 @@ export function AvatarCloset({
     }
 
     // 1. 今回選択されたパーツ固有の配置（セッションキャッシュ最優先、次にdefaultAdjustment、未設定なら初期値）を決定
-    const cachedAdj = partAdjustmentsCacheRef.current.get(part.id);
+    const cachedAdj = partAdjustmentsCacheRef.current.get(partKey);
+    const hasPartSpecificAdj = Boolean(cachedAdj || part.defaultAdjustment);
     const targetAdj: LayerAdjustment = cachedAdj
       ? { ...cachedAdj }
       : part.defaultAdjustment
       ? getPartDefaultAdjustment(part)
       : { ...DEFAULT_LAYER_ADJUSTMENT };
 
+    // パーツオブジェクト自身にも即座に注入（オブジェクトの参照更新）
+    part.defaultAdjustment = { ...targetAdj };
+    const matchingOwned = ownedParts.find((p) => p.id === partKey);
+    if (matchingOwned) {
+      matchingOwned.defaultAdjustment = { ...targetAdj };
+    }
+
     const partWithAdjustment: AvatarPart = {
       ...part,
-      defaultAdjustment: targetAdj,
+      defaultAdjustment: { ...targetAdj },
     };
 
     setDraft((prev) => {
       const currentKey = resolvePartKey(prev[part.category]);
-      if (currentKey === part.id) {
+      if (currentKey === partKey) {
         // 素体（body）は非装着にしない（絶対に消えない安全ガード）
         if (part.category === 'body') return prev;
         setDraftAdjustments((prevAdj) => {
@@ -1286,8 +1318,8 @@ export function AvatarCloset({
       }));
     }
 
-    // 「配置維持モード」がONで、かつ記憶された配置があれば自動適用
-    if (autoApplyTemplate && savedTemplate[part.category]) {
+    // 「配置維持モード」は、パーツ固有の個別調整が無い未調整パーツの場合にのみ適用（個別調整があるパーツは上書きブロック！）
+    if (!hasPartSpecificAdj && autoApplyTemplate && savedTemplate[part.category]) {
       const tpl = savedTemplate[part.category]!;
       setDraftAdjustments((prev) => ({
         ...prev,
@@ -1641,7 +1673,8 @@ export function AvatarCloset({
       // 1. 現在装着中の全パーツの個別配置を反映・保存
       for (const cat of AVATAR_LAYERS) {
         const partVal = draft[cat];
-        if (partVal && typeof partVal === 'object' && partVal.id) {
+        const partKey = resolvePartKey(partVal);
+        if (partVal && typeof partVal === 'object' && partKey) {
           const adj = draftAdjustments[cat];
           if (adj) {
             const updatedPart: AvatarPart = {
@@ -1650,8 +1683,12 @@ export function AvatarCloset({
               defaultAdjustment: { ...adj },
             };
             updatedDraft[cat] = updatedPart;
-            savedPartIds.add(partVal.id);
-            partAdjustmentsCacheRef.current.set(partVal.id, { ...adj });
+            savedPartIds.add(partKey);
+            partAdjustmentsCacheRef.current.set(partKey, { ...adj });
+            const matchingOwned = ownedParts.find((p) => p.id === partKey);
+            if (matchingOwned) {
+              matchingOwned.defaultAdjustment = { ...adj };
+            }
             savePromises.push(saveCatalogPart(updatedPart));
           }
         }
@@ -1667,6 +1704,7 @@ export function AvatarCloset({
               updatedAt: Date.now(),
               defaultAdjustment: { ...cachedAdj },
             };
+            matchingPart.defaultAdjustment = { ...cachedAdj };
             savedPartIds.add(partId);
             savePromises.push(saveCatalogPart(updatedCachedPart));
           }
