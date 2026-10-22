@@ -453,14 +453,21 @@ export function getPartThumbnailStyle(part: AvatarPart | null | undefined): CSSP
   ) {
     if (Number.isFinite(bounds.centerX)) cx = bounds.centerX;
     if (Number.isFinite(bounds.centerY)) cy = bounds.centerY;
-    const maxDim = Math.max(bounds.width, bounds.height);
+
+    // 靴（shoes）の場合は左右対称の両足セットのため、X軸の中心はキャンバス中央(256)に固定
+    if (part.category === 'shoes') {
+      cx = 256;
+    }
+
+    const effectiveWidth = part.category === 'shoes' ? Math.max(bounds.width, 92) : bounds.width;
+    const maxDim = Math.max(effectiveWidth, bounds.height);
     if (Number.isFinite(maxDim) && maxDim > 0) {
-      scale = Math.min(3.2, Math.max(1.15, (AVATAR_CANVAS_SIZE * 0.72) / maxDim));
+      scale = Math.min(2.8, Math.max(1.15, (AVATAR_CANVAS_SIZE * 0.72) / maxDim));
     }
   } else if (meta?.targetSpec) {
     const maxDim = Math.max(meta.targetSpec.targetWidth, meta.targetSpec.targetHeight);
     if (Number.isFinite(maxDim) && maxDim > 0) {
-      scale = Math.min(3.0, Math.max(1.15, (AVATAR_CANVAS_SIZE * 0.75) / maxDim));
+      scale = Math.min(2.6, Math.max(1.15, (AVATAR_CANVAS_SIZE * 0.75) / maxDim));
     }
   }
 
@@ -469,8 +476,9 @@ export function getPartThumbnailStyle(part: AvatarPart | null | undefined): CSSP
   if (!Number.isFinite(cy)) cy = 256;
 
   // キャンバス中心(256, 256)とパーツ中心(cx, cy)のズレを打ち消す移動量（%）
-  const tx = ((256 - cx) / 512) * 100 * scale;
-  const ty = ((256 - cy) / 512) * 100 * scale;
+  // CSS translate は scale 前の要素サイズ基準のため、過剰な * scale を外して正確にセンタリング
+  const tx = ((256 - cx) / AVATAR_CANVAS_SIZE) * 100;
+  const ty = ((256 - cy) / AVATAR_CANVAS_SIZE) * 100;
 
   return {
     transform: `translate(${tx.toFixed(2)}%, ${ty.toFixed(2)}%) scale(${scale.toFixed(2)})`,

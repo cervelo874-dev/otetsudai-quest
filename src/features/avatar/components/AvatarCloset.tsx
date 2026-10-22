@@ -991,6 +991,36 @@ export function AvatarCloset({
     );
   }, [draftAdjustments, shoesPairMode, showActionNotice]);
 
+  // 靴の左右画像を入れ替える（アバター表示＆カタログデータを即時更新）
+  const handleSwapShoesPair = async () => {
+    const curShoes = draft.shoes;
+    if (!curShoes || typeof curShoes !== 'object' || !curShoes.pairParts) return;
+
+    const nextLeft = curShoes.pairParts.rightSrc;
+    const nextRight = curShoes.pairParts.leftSrc;
+
+    const swappedShoes: AvatarPart = {
+      ...curShoes,
+      pairParts: {
+        ...curShoes.pairParts,
+        leftSrc: nextLeft,
+        rightSrc: nextRight,
+      },
+    };
+
+    setDraft((prev) => ({
+      ...prev,
+      shoes: swappedShoes,
+    }));
+
+    try {
+      await saveCatalogPart(swappedShoes);
+      showActionNotice('向かって左（右足）と向かって右（左足）の靴を入れ替えて更新しました！');
+    } catch {
+      showActionNotice('靴の左右を入れ替えました！');
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (savedNoticeTimerRef.current !== null) {
@@ -1758,17 +1788,28 @@ export function AvatarCloset({
                 </button>
               </div>
 
-              {/* 靴（shoes）専用：左右対称ミラー同期ボタン */}
+              {/* 靴（shoes）専用：左右入替 ＆ 左右対称ミラー同期ボタン */}
               {activeCategory === 'shoes' && hasShoesPair && (
-                <button
-                  type="button"
-                  onClick={() => handleMirrorSyncShoesPair()}
-                  className="flex h-6 items-center gap-0.5 rounded-lg border border-indigo-200 bg-indigo-50 px-1.5 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 active:scale-95 transition shadow-2xs"
-                  title="調整した足の位置を反対側の足へ左右対称コピーします"
-                >
-                  <FlipHorizontal className="h-3 w-3" />
-                  <span>対称</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleSwapShoesPair}
+                    className="flex h-6 items-center gap-0.5 rounded-lg border border-indigo-200 bg-indigo-50 px-1.5 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 active:scale-95 transition shadow-2xs"
+                    title="向かって左と右の靴画像を入れ替え、パーツデータを更新します"
+                  >
+                    <FlipHorizontal className="h-3 w-3" />
+                    <span>入替</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMirrorSyncShoesPair()}
+                    className="flex h-6 items-center gap-0.5 rounded-lg border border-indigo-200 bg-indigo-50 px-1.5 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 active:scale-95 transition shadow-2xs"
+                    title="調整した足の位置を反対側の足へ左右対称コピーします"
+                  >
+                    <FlipHorizontal className="h-3 w-3" />
+                    <span>対称</span>
+                  </button>
+                </>
               )}
 
               {/* リセットボタン */}
@@ -3453,24 +3494,9 @@ export function AvatarCloset({
                   })}
                   <button
                     type="button"
-                    onClick={() => {
-                      const curShoes = draft.shoes;
-                      if (!curShoes || typeof curShoes !== 'object' || !curShoes.pairParts) return;
-                      const swappedShoes: AvatarPart = {
-                        ...curShoes,
-                        pairParts: {
-                          ...curShoes.pairParts,
-                          leftSrc: curShoes.pairParts.rightSrc,
-                          rightSrc: curShoes.pairParts.leftSrc,
-                        },
-                      };
-                      setDraft((prev) => ({
-                        ...prev,
-                        shoes: swappedShoes,
-                      }));
-                    }}
-                    className="flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition"
-                    title="向かって左（右足）と向かって右（左足）の靴画像を入れ替えます"
+                    onClick={handleSwapShoesPair}
+                    className="flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
+                    title="向かって左（右足）と向かって右（左足）の靴画像を入れ替え、パーツデータを更新します"
                   >
                     <FlipHorizontal className="h-3 w-3" />
                     <span>⇄ 左右入替</span>
