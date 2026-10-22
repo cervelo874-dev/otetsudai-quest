@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import {
   ArrowDown,
   ArrowLeft,
@@ -18,6 +18,7 @@ import {
   Layers,
   Loader2,
   Maximize2,
+  Minus,
   Move,
   Pause,
   Pencil,
@@ -733,13 +734,62 @@ export function AvatarCloset({
     setDraftAdjustments({});
   };
 
+  // プレビュー上のタップ座標 (canvasX, canvasY: 512x512) から、タップされた装着パーツを判定
+  const detectTappedCategory = useCallback(
+    (canvasX: number, canvasY: number): { category: AvatarCategory; side?: 'right' | 'left' } | null => {
+      // 1. 靴（shoes: 下部足元 y > 395 付近）
+      if (draft.shoes && canvasY >= 395 && canvasY <= 512 && canvasX >= 160 && canvasX <= 352) {
+        const side: 'right' | 'left' = canvasX < 256 ? 'right' : 'left';
+        return { category: 'shoes', side };
+      }
+      // 2. 持ち物・ペット（左右手元や足元脇）
+      if (draft.pet && canvasY >= 340 && (canvasX <= 200 || canvasX >= 315)) {
+        return { category: 'pet' };
+      }
+      if (draft.hand_item && canvasY >= 230 && canvasY <= 450 && (canvasX <= 210 || canvasX >= 310)) {
+        return { category: 'hand_item' };
+      }
+      // 3. ボトムス（下半身: y 305〜425, x 190〜325）
+      if (draft.bottoms && canvasY >= 305 && canvasY <= 425 && canvasX >= 190 && canvasX <= 325) {
+        return { category: 'bottoms' };
+      }
+      // 4. トップス（胴体・服: y 205〜340, x 175〜340）
+      if (draft.tops && canvasY >= 205 && canvasY <= 340 && canvasX >= 175 && canvasX <= 340) {
+        return { category: 'tops' };
+      }
+      // 5. 帽子・メガネ（頭上: y < 145）
+      if (draft.hat_glasses && canvasY <= 145 && canvasX >= 150 && canvasX <= 360) {
+        return { category: 'hat_glasses' };
+      }
+      // 6. 前髪・髪型（頭部: y 90〜220）
+      if (draft.hair_front && canvasY >= 90 && canvasY <= 220 && canvasX >= 160 && canvasX <= 350) {
+        return { category: 'hair_front' };
+      }
+      // 7. 顔・表情（顔中央: y 150〜265）
+      if ((draft.face_eyes || draft.face_mouth) && canvasY >= 150 && canvasY <= 265 && canvasX >= 190 && canvasX <= 325) {
+        return { category: draft.face_eyes ? 'face_eyes' : 'face_mouth' };
+      }
+      // 8. 腕（arm_left / arm_right）
+      if (draft.arm_right && canvasX < 210 && canvasY >= 230 && canvasY <= 380) {
+        return { category: 'arm_right' };
+      }
+      if (draft.arm_left && canvasX > 300 && canvasY >= 230 && canvasY <= 380) {
+        return { category: 'arm_left' };
+      }
+      // 9. 後ろ髪（hair_back）
+      if (draft.hair_back && canvasY <= 320 && (canvasX <= 190 || canvasX >= 325)) {
+        return { category: 'hair_back' };
+      }
+      return null;
+    },
+    [draft],
+  );
+
   // ==================== プレビュー画面上での直接ドラッグ＆ホイール微調整 ====================
   const handlePreviewPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (!dragAdjustOnPreview || e.button !== 0) return;
-    if (!currentEquippedInActive && !draft.hand_item) return;
+    if (e.button !== 0) return;
 
     e.currentTarget.setPointerCapture(e.pointerId);
-    setIsDraggingPreview(true);
     if (activeCategory === 'hand_item' || (!currentEquippedInActive && draft.hand_item)) {
       previewDragRef.current = {
         target: 'part',
@@ -763,27 +813,53 @@ export function AvatarCloset({
     const drag = previewDragRef.current;
     const box = previewBoxRef.current;
     if (!drag || !box) return;
-    const rect = box.getBoundingClientRect();
-    const activeCrop = previewMode === 'face' ? FACE_CROP : FULL_CROP;
-    const pxToCanvas = activeCrop.size / Math.max(1, rect.width);
 
-    const deltaX = (e.clientX - drag.startX) * pxToCanvas;
-    const deltaY = (e.clientY - drag.startY) * pxToCanvas;
+    const dist = Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY);
+    if (dist > 4 && dragAdjustOnPreview) {
+      setIsDraggingPreview(true);
+      const rect = box.getBoundingClientRect();
+      const activeCrop = previewMode === 'face' ? FACE_CROP : FULL_CROP;
+      const pxToCanvas = activeCrop.size / Math.max(1, rect.width);
 
-    if (activeCategory === 'hand_item' || (!currentEquippedInActive && draft.hand_item)) {
-      updateHandItemAdjustment({
-        dx: drag.origDx + deltaX,
-        dy: drag.origDy + deltaY,
-      });
-    } else {
-      updateActiveAdjustment({
-        dx: drag.origDx + deltaX,
-        dy: drag.origDy + deltaY,
-      });
+      const deltaX = (e.clientX - drag.startX) * pxToCanvas;
+      const deltaY = (e.clientY - drag.startY) * pxToCanvas;
+
+      if (activeCategory === 'hand_item' || (!currentEquippedInActive && draft.hand_item)) {
+        updateHandItemAdjustment({
+          dx: drag.origDx + deltaX,
+          dy: drag.origDy + deltaY,
+        });
+      } else {
+        updateActiveAdjustment({
+          dx: drag.origDx + deltaX,
+          dy: drag.origDy + deltaY,
+        });
+      }
     }
   };
 
   const handlePreviewPointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    const drag = previewDragRef.current;
+    const box = previewBoxRef.current;
+
+    // クリック・タップ判定（移動量が4px以下の時、タップされたパーツを自動選択）
+    if (drag && box) {
+      const dist = Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY);
+      if (dist <= 4) {
+        const rect = box.getBoundingClientRect();
+        const activeCrop = previewMode === 'face' ? FACE_CROP : FULL_CROP;
+        const canvasX = activeCrop.x + ((e.clientX - rect.left) / Math.max(1, rect.width)) * activeCrop.size;
+        const canvasY = activeCrop.y + ((e.clientY - rect.top) / Math.max(1, rect.height)) * activeCrop.size;
+        const hit = detectTappedCategory(canvasX, canvasY);
+        if (hit) {
+          setActiveCategory(hit.category);
+          if (hit.category === 'shoes' && hit.side) {
+            setShoesPairMode(hit.side);
+          }
+        }
+      }
+    }
+
     previewDragRef.current = null;
     setIsDraggingPreview(false);
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
@@ -877,6 +953,43 @@ export function AvatarCloset({
       actionNoticeTimerRef.current = null;
     }, 2800);
   };
+
+  // 靴の片足の調整を反対側へ左右対称コピー（ミラー同期）
+  const handleMirrorSyncShoesPair = useCallback((fromSide?: 'right' | 'left') => {
+    const curShoes = getLayerAdjustment(draftAdjustments, 'shoes');
+    const curPairs = curShoes.pairAdjustments ?? {};
+    const sourceSide = fromSide ?? (shoesPairMode === 'left' ? 'left' : 'right');
+    const targetSide = sourceSide === 'right' ? 'left' : 'right';
+
+    const srcAdj = curPairs[sourceSide] ?? { dx: 0, dy: 0, scale: 1, rotation: 0, flipX: false };
+    const mirroredAdj: Partial<LayerAdjustment> = {
+      ...srcAdj,
+      dx: round1(-(srcAdj.dx ?? 0)),
+      dy: round1(srcAdj.dy ?? 0),
+      scale: srcAdj.scale ?? 1,
+      rotation: round1(-(srcAdj.rotation ?? 0)),
+      flipX: Boolean(srcAdj.flipX),
+    };
+
+    setDraftAdjustments((prev) => {
+      const pShoes = getLayerAdjustment(prev, 'shoes');
+      return {
+        ...prev,
+        shoes: {
+          ...pShoes,
+          pairAdjustments: {
+            ...(pShoes.pairAdjustments ?? {}),
+            [targetSide]: mirroredAdj,
+          },
+        },
+      };
+    });
+    showActionNotice(
+      sourceSide === 'left'
+        ? '左足の位置を右足へ対称コピーしました！'
+        : '右足の位置を左足へ対称コピーしました！'
+    );
+  }, [draftAdjustments, shoesPairMode, showActionNotice]);
 
   useEffect(() => {
     return () => {
@@ -1552,6 +1665,124 @@ export function AvatarCloset({
             </span>
           )}
         </div>
+
+        {/* ==================== アバター画面直下のミニマム調整バー (XY移動・拡大縮小・靴の対称同期) ==================== */}
+        {currentEquippedInActive && (
+          <div className="flex flex-wrap items-center justify-between gap-1.5 rounded-xl border border-zinc-200/90 bg-zinc-50/90 px-2 sm:px-2.5 py-1.5 shadow-xs">
+            {/* 選択中部位の名称バッジ */}
+            <div className="flex items-center gap-1 min-w-0 text-[11px] font-bold text-zinc-700">
+              <span className="truncate">
+                {CATEGORY_META[activeCategory].label}
+                {activeCategory === 'shoes' && hasShoesPair && (
+                  <span className="ml-1 text-[10px] font-semibold text-blue-600">
+                    ({shoesPairMode === 'both' ? '両足' : shoesPairMode === 'right' ? '右足' : '左足'})
+                  </span>
+                )}
+              </span>
+              {activeCategory === 'shoes' && hasShoesPair && (
+                <div className="flex items-center gap-0.5 ml-1">
+                  {(['right', 'left'] as const).map((side) => (
+                    <button
+                      key={side}
+                      type="button"
+                      onClick={() => setShoesPairMode(side)}
+                      className={`rounded px-1 py-0.5 text-[9px] font-bold transition ${
+                        shoesPairMode === side
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-100'
+                      }`}
+                      title={side === 'right' ? '向かって左（右足）' : '向かって右（左足）'}
+                    >
+                      {side === 'right' ? '右' : '左'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ミニマム操作コントロール群 */}
+            <div className="flex items-center gap-1">
+              {/* 十字移動ボタン */}
+              <div className="flex items-center gap-0.5 bg-white rounded-lg border border-zinc-200/80 p-0.5 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => updateActiveAdjustment({ dx: activeAdjustment.dx - 2 })}
+                  className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded hover:bg-zinc-100 text-zinc-700 active:scale-95 transition"
+                  title="左へ移動 (-2px)"
+                >
+                  <ArrowLeft className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateActiveAdjustment({ dy: activeAdjustment.dy - 2 })}
+                  className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded hover:bg-zinc-100 text-zinc-700 active:scale-95 transition"
+                  title="上へ移動 (-2px)"
+                >
+                  <ArrowUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateActiveAdjustment({ dy: activeAdjustment.dy + 2 })}
+                  className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded hover:bg-zinc-100 text-zinc-700 active:scale-95 transition"
+                  title="下へ移動 (+2px)"
+                >
+                  <ArrowDown className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateActiveAdjustment({ dx: activeAdjustment.dx + 2 })}
+                  className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded hover:bg-zinc-100 text-zinc-700 active:scale-95 transition"
+                  title="右へ移動 (+2px)"
+                >
+                  <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                </button>
+              </div>
+
+              {/* スケール拡大縮小ボタン */}
+              <div className="flex items-center gap-0.5 bg-white rounded-lg border border-zinc-200/80 p-0.5 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => updateActiveAdjustment({ scale: Math.max(0.2, activeAdjustment.scale - 0.03) })}
+                  className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded hover:bg-zinc-100 text-zinc-700 active:scale-95 transition"
+                  title="縮小 (-3%)"
+                >
+                  <Minus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateActiveAdjustment({ scale: Math.min(2.5, activeAdjustment.scale + 0.03) })}
+                  className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded hover:bg-zinc-100 text-zinc-700 active:scale-95 transition"
+                  title="拡大 (+3%)"
+                >
+                  <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                </button>
+              </div>
+
+              {/* 靴（shoes）専用：左右対称ミラー同期ボタン */}
+              {activeCategory === 'shoes' && hasShoesPair && (
+                <button
+                  type="button"
+                  onClick={() => handleMirrorSyncShoesPair()}
+                  className="flex h-6 items-center gap-0.5 rounded-lg border border-indigo-200 bg-indigo-50 px-1.5 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 active:scale-95 transition shadow-2xs"
+                  title="調整した足の位置を反対側の足へ左右対称コピーします"
+                >
+                  <FlipHorizontal className="h-3 w-3" />
+                  <span>対称</span>
+                </button>
+              )}
+
+              {/* リセットボタン */}
+              <button
+                type="button"
+                onClick={resetActiveAdjustment}
+                className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-lg border border-zinc-200 bg-white hover:bg-rose-50 text-zinc-400 hover:text-rose-600 active:scale-95 transition shadow-2xs"
+                title="位置・サイズをリセット"
+              >
+                <RotateCcw className="h-3 w-3" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* コントロールバー（全体 / 顔アイコン ＆ アニメ ＆ PNG） */}
         <div className="flex items-center justify-between gap-2">
@@ -3243,6 +3474,21 @@ export function AvatarCloset({
                   >
                     <FlipHorizontal className="h-3 w-3" />
                     <span>⇄ 左右入替</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMirrorSyncShoesPair()}
+                    className="flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
+                    title={
+                      shoesPairMode === 'left'
+                        ? '左足の位置を右足へ対称コピーします'
+                        : '右足の位置を左足へ対称コピーします'
+                    }
+                  >
+                    <FlipHorizontal className="h-3 w-3" />
+                    <span>
+                      {shoesPairMode === 'left' ? '🪞 右足へ対称コピー' : '🪞 左足へ対称コピー'}
+                    </span>
                   </button>
                 </div>
               </div>

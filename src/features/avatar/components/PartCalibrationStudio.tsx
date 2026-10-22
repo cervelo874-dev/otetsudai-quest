@@ -1325,11 +1325,12 @@ export function PartCalibrationStudio({
         setActivePairParts({
           leftSrc: mirrored.leftSrc,
           rightSrc: mirrored.rightSrc,
+          combinedSrc: mirrored.combinedSrc,
           originalSrc: canvas.toDataURL('image/png'),
         });
         showToast(
           'ok',
-          '向かって左側を「右の靴」、右側を「左の靴」として反転ペアを作成しました！',
+          '足元に合わせて向かって左＝右足、向かって右＝左足の反転ペアを作成しました！',
         );
       } catch (err) {
         showToast('err', `ペア作成に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
@@ -1381,7 +1382,7 @@ export function PartCalibrationStudio({
           : `part_${category}_${Date.now().toString(36)}_${randSuffix}`,
         category,
         name: partName.trim() || `${CATEGORY_META[category].label}パーツ`,
-        src: dataUrl,
+        src: category === 'shoes' && activePairParts?.combinedSrc ? activePairParts.combinedSrc : dataUrl,
         rig: finalRig,
         pairParts: category === 'shoes' ? (activePairParts ?? editingPart?.pairParts) : undefined,
         createdAt: isOverwriting ? (editingPart!.createdAt ?? Date.now()) : Date.now(),
@@ -1899,17 +1900,20 @@ export function PartCalibrationStudio({
                       />
                     </Fragment>,
                   );
-                } else {
-                  elements.push(
-                    <canvas
-                      key="editing-part-canvas"
-                      ref={stagePartCanvasRef}
-                      width={S}
-                      height={S}
-                      className="pointer-events-none absolute inset-0 h-full w-full"
-                    />,
-                  );
                 }
+
+                // stagePartCanvasRef は常に DOM 上にマウントを維持（リギング計算・描画コンテキストの安定化）
+                elements.push(
+                  <canvas
+                    key="editing-part-canvas"
+                    ref={stagePartCanvasRef}
+                    width={S}
+                    height={S}
+                    className={`pointer-events-none absolute inset-0 h-full w-full ${
+                      category === 'shoes' && activePairParts && tool !== 'erase' ? 'hidden' : ''
+                    }`}
+                  />,
+                );
               }
 
               return <Fragment key={layer}>{elements}</Fragment>;

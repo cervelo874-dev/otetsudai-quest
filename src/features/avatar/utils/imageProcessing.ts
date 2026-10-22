@@ -380,11 +380,12 @@ function loadHelperImage(src: string): Promise<HTMLImageElement> {
 /**
  * 消しゴムツール等で片足だけ残された靴イラストから、水平反転して綺麗な両足ペア（PairPartData）を自動生成
  * - sourceSide: 'auto'（不透明ピクセルの重心位置から自動判定）| 'right'（キャラ右足/画面左基準）| 'left'（キャラ左足/画面右基準）
+ * - 素体の足元位置（feet_right: x≈235, feet_left: x≈277）に対称配置し、2つ揃えて綺麗に並ぶ描写を作成
  */
 export async function createMirroredPair(
   source: HTMLCanvasElement | HTMLImageElement | string,
   sourceSide: 'auto' | 'right' | 'left' = 'auto',
-): Promise<{ leftSrc: string; rightSrc: string }> {
+): Promise<{ leftSrc: string; rightSrc: string; combinedSrc: string }> {
   let sourceCanvas: HTMLCanvasElement;
 
   if (typeof source === 'string') {
@@ -402,53 +403,100 @@ export async function createMirroredPair(
   const h = sourceCanvas.height;
   const sourceCtx = sourceCanvas.getContext('2d', { willReadFrequently: true })!;
   const imgData = sourceCtx.getImageData(0, 0, w, h);
+  const data = imgData.data;
 
-  // 不透明ピクセル（実体）の重心Xを計算して、左右どちらの足が残っているか自動判定
-  let detectedSide: 'right' | 'left' = 'right';
-  if (sourceSide === 'auto') {
-    let sumX = 0;
-    let count = 0;
-    const data = imgData.data;
-    for (let y = 0; y < h; y += 2) {
-      for (let x = 0; x < w; x += 2) {
-        const a = data[(y * w + x) * 4 + 3];
-        if (a > 20) {
-          sumX += x;
-          count++;
-        }
+  // 不透明ピクセル（実体）のバウンディングボックス＆重心Xを検出
+  let minX = w;
+  let minY = h;
+  let maxX = -1;
+  let maxY = -1;
+  let sumX = 0;
+  let count = 0;
+
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const a = data[(y * w + x) * 4 + 3];
+      if (a > 20) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+        sumX += x;
+        count++;
       }
     }
-    if (count > 0) {
-      const avgX = sumX / count;
-      // 画面中央 (w / 2) より左側にあればアバター右足、右側にあればアバター左足
-      detectedSide = avgX < w / 2 ? 'right' : 'left';
-    }
+  }
+
+  // 不透明ピクセルが見つからない場合の安全なフォールバック
+  if (count === 0 || maxX < minX || maxY < minY) {
+    const fallbackUrl = sourceCanvas.toDataURL('image/png');
+    return { leftSrc: fallbackUrl, rightSrc: fallbackUrl, combinedSrc: fallbackUrl };
+  }
+
+  const bWidth = maxX - minX + 1;
+  const bHeight = maxY - minY + 1;
+  const avgX = sumX / count;
+
+  // 画面中央 (w / 2) より左側にあればアバター右足（向かって左）、右側にあればアバター左足（向かって右）
+  let detectedSide: 'right' | 'left' = 'right';
+  if (sourceSide === 'auto') {
+    detectedSide = avgX < w / 2 ? 'right' : 'left';
   } else {
     detectedSide = sourceSide;
   }
 
-  // キャンバス中央軸を基準に水平反転したもう片足のキャンバスを生成
-  const mirrorCanvas = createOffscreenCanvas(w, h);
-  const mirrorCtx = mirrorCanvas.getContext('2d')!;
-  mirrorCtx.save();
-  mirrorCtx.translate(w, 0);
-  mirrorCtx.scale(-1, 1);
-  mirrorCtx.drawImage(sourceCanvas, 0, 0);
-  mirrorCtx.restore();
+  // 残っている片足の実体ピクセル部分をきれいに切り抜く
+  const cropCanvas = createOffscreenCanvas(bWidth, bHeight);
+  const cropCtx = cropCanvas.getContext('2d')!;
+  cropCtx.drawImage(sourceCanvas, minX, minY, bWidth, bHeight, 0, 0, bWidth, bHeight);
 
-  const originalDataUrl = sourceCanvas.toDataURL('image/png');
-  const mirroredDataUrl = mirrorCanvas.toDataURL('image/png');
+  // 水平反転した靴のキャンバスを生成
+  const flippedCropCanvas = createOffscreenCanvas(bWidth, bHeight);
+  const flippedCtx = flippedCropCanvas.getContext('2d')!;
+  flippedCtx.save();
+  flippedCtx.translate(bWidth, 0);
+  flippedCtx.scale(-1, 1);
+  flippedCtx.drawImage(cropCanvas, 0, 0);
+  flippedCtx.restore();
 
-  // 向かって左側が右の靴（rightSrc）、向かって右側が左の靴（leftSrc）になるよう設定
-  if (detectedSide === 'right') {
-    return {
-      rightSrc: mirroredDataUrl,
-      leftSrc: originalDataUrl,
-    };
-  } else {
-    return {
-      rightSrc: originalDataUrl,
-      leftSrc: mirroredDataUrl,
-    };
-  }
+  // 素体の足元基準（全身キャンバス 512x512）における左右の足の中心X座標
+  // 全身中央 = 256
+  // 向かって左（キャラクターの右足用）: x ≈ 235（中央から -21px）
+  // 向かって右（キャラクターの左足用）: x ≈ 277（中央から +21px）
+  const measuredOffset = Math.abs(avgX - w / 2);
+  const targetHalfSpread = measuredOffset >= 14 && measuredOffset <= 36 ? Math.round(measuredOffset) : 21;
+  const targetRightFootCenterX = Math.round(w / 2 - targetHalfSpread); // 向かって左（右足用）
+  const targetLeftFootCenterX = Math.round(w / 2 + targetHalfSpread);  // 向かって右（左足用）
+
+  // 接地Y座標（底面）：元の靴の底面が 350〜495 の足元領域にあればその高さを維持、なければ標準足元（476）
+  const targetBottomY = maxY >= 350 && maxY <= 495 ? maxY : Math.min(h - 8, 476);
+  const targetDrawY = targetBottomY - bHeight;
+
+  // 1. 向かって左の靴（右足用 rightCanvas）
+  // 残った足が右足（向かって左）なら元画像、左足（向かって右）なら反転画像を使用
+  const rightCanvas = createOffscreenCanvas(w, h);
+  const rightCtx = rightCanvas.getContext('2d')!;
+  const rightFootImg = detectedSide === 'right' ? cropCanvas : flippedCropCanvas;
+  const rightDrawX = Math.round(targetRightFootCenterX - bWidth / 2);
+  rightCtx.drawImage(rightFootImg, rightDrawX, targetDrawY);
+
+  // 2. 向かって右の靴（左足用 leftCanvas）
+  // 残った足が左足（向かって右）なら元画像、右足（向かって左）なら反転画像を使用
+  const leftCanvas = createOffscreenCanvas(w, h);
+  const leftCtx = leftCanvas.getContext('2d')!;
+  const leftFootImg = detectedSide === 'left' ? cropCanvas : flippedCropCanvas;
+  const leftDrawX = Math.round(targetLeftFootCenterX - bWidth / 2);
+  leftCtx.drawImage(leftFootImg, leftDrawX, targetDrawY);
+
+  // 3. 両足そろった合成キャンバス（サムネイル・一覧プレビュー用）
+  const combinedCanvas = createOffscreenCanvas(w, h);
+  const combinedCtx = combinedCanvas.getContext('2d')!;
+  combinedCtx.drawImage(rightCanvas, 0, 0);
+  combinedCtx.drawImage(leftCanvas, 0, 0);
+
+  return {
+    rightSrc: rightCanvas.toDataURL('image/png'),
+    leftSrc: leftCanvas.toDataURL('image/png'),
+    combinedSrc: combinedCanvas.toDataURL('image/png'),
+  };
 }

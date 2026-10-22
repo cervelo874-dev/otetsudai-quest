@@ -231,6 +231,8 @@ export interface PairPartData {
   leftSrc: string;
   /** 右側（キャラの右足 / 向かって左）画像URLまたはDataURL */
   rightSrc: string;
+  /** 両足揃った合成画像URLまたはDataURL（サムネイル・一覧用） */
+  combinedSrc?: string;
   /** 分割元の元画像URLまたはDataURL（任意） */
   originalSrc?: string;
   /** 分割位置比率（0.1〜0.9、デフォルト: 0.5） */
