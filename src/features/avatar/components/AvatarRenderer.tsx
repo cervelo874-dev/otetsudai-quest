@@ -215,12 +215,12 @@ export const AvatarRenderer = memo(function AvatarRenderer({
     );
   };
 
-  const hasCustomLayerOrder = Boolean(
-    layerOrder || solvedRig.effectiveAdjustments?.layerOrder,
-  );
+  const targetLayerOrder =
+    layerOrder ?? adjustments?.layerOrder ?? solvedRig.effectiveAdjustments?.layerOrder;
+  const hasCustomLayerOrder = Boolean(targetLayerOrder && targetLayerOrder.length > 0);
   const activeLayerOrder = useMemo(
-    () => resolveAvatarLayerOrder(solvedRig.effectiveAdjustments, layerOrder),
-    [solvedRig.effectiveAdjustments, layerOrder],
+    () => resolveAvatarLayerOrder(adjustments ?? solvedRig.effectiveAdjustments, targetLayerOrder),
+    [adjustments, solvedRig.effectiveAdjustments, targetLayerOrder],
   );
 
   const orderedBodyLayers = getOrderedCharacterBodyLayers(

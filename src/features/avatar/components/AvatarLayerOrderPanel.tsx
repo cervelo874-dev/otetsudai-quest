@@ -69,16 +69,23 @@ export function AvatarLayerOrderPanel({
   }, [layerOrder, filterEquippedOnly, equippedParts]);
 
   // アイテムの移動処理
-  const handleMove = (fromCat: AvatarCategory, toCat: AvatarCategory) => {
+  const handleMove = (fromCat: AvatarCategory, toCat: AvatarCategory, place: 'before' | 'after') => {
     if (fromCat === toCat) return;
     const current = [...layerOrder];
     const fromIdx = current.indexOf(fromCat);
-    const toIdx = current.indexOf(toCat);
-    if (fromIdx === -1 || toIdx === -1) return;
+    if (fromIdx === -1) return;
 
-    // fromCat を取り出して toIdx の位置に挿入
+    // fromCat を一度取り出す
     current.splice(fromIdx, 1);
-    current.splice(toIdx, 0, fromCat);
+
+    const toIdx = current.indexOf(toCat);
+    if (toIdx === -1) return;
+
+    // layerOrder は [0: 最背面 ... N-1: 最前面]
+    // place === 'after' の場合、toCat の手前（前面: index + 1）に挿入
+    // place === 'before' の場合、toCat の奥（背面: index）に挿入
+    const insertIdx = place === 'after' ? toIdx + 1 : toIdx;
+    current.splice(insertIdx, 0, fromCat);
     onLayerOrderChange(current);
   };
 
@@ -89,13 +96,13 @@ export function AvatarLayerOrderPanel({
     if (dispIdx === -1) return;
 
     if (direction === 'front' && dispIdx > 0) {
-      // 1つ上（前面）のアイテムと入れ替え
+      // 1つ上（前面）のアイテムの手前へ配置
       const targetCat = displayCategories[dispIdx - 1];
-      handleMove(cat, targetCat);
+      handleMove(cat, targetCat, 'after');
     } else if (direction === 'back' && dispIdx < displayCategories.length - 1) {
-      // 1つ下（背面）のアイテムと入れ替え
+      // 1つ下（背面）のアイテムの奥へ配置
       const targetCat = displayCategories[dispIdx + 1];
-      handleMove(cat, targetCat);
+      handleMove(cat, targetCat, 'before');
     }
   };
 
@@ -125,7 +132,12 @@ export function AvatarLayerOrderPanel({
   const handleDrop = (e: DragEvent<HTMLDivElement>, targetCat: AvatarCategory) => {
     e.preventDefault();
     if (draggedCat && draggedCat !== targetCat) {
-      handleMove(draggedCat, targetCat);
+      const fromDispIdx = displayCategories.indexOf(draggedCat);
+      const toDispIdx = displayCategories.indexOf(targetCat);
+      // 表示リスト上で上へドラッグ（奥から手前へ）なら targetCat の手前('after')、
+      // 下へドラッグ（手前から奥へ）なら targetCat の奥('before')へ配置
+      const place = fromDispIdx > toDispIdx ? 'after' : 'before';
+      handleMove(draggedCat, targetCat, place);
     }
     setDraggedCat(null);
     setDragOverCat(null);

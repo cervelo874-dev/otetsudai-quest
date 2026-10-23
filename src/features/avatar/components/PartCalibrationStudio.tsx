@@ -387,7 +387,28 @@ export function PartCalibrationStudio({
   // トランスフォーム＆ツール状態
   const [transform, setTransform] = useState<PartTransform>(IDENTITY_TRANSFORM);
   const [tool, setTool] = useState<StudioTool>('move');
-  const [brushSize, setBrushSize] = useState<number>(24);
+  const [brushSize, setBrushSize] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('mobage_avatar_studio_eraser_brush_size');
+      if (saved) {
+        const parsed = Number(saved);
+        if (Number.isFinite(parsed) && parsed >= 2 && parsed <= 180) {
+          return parsed;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return 24;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('mobage_avatar_studio_eraser_brush_size', String(brushSize));
+    } catch {
+      // ignore
+    }
+  }, [brushSize]);
 
   // ガイド表示設定
   const [customBodyGuideUrl, setCustomBodyGuideUrl] = useState<string | null>(null);

@@ -1805,6 +1805,7 @@ export function AvatarCloset({
             <AvatarRenderer
               equippedParts={draft}
               adjustments={draftAdjustments}
+              layerOrder={draftAdjustments.layerOrder}
               autoRig={autoRig}
               size="full"
               animate={animate && !isDraggingPreview}
@@ -1817,6 +1818,7 @@ export function AvatarCloset({
               <AvatarRenderer
                 equippedParts={draft}
                 adjustments={draftAdjustments}
+                layerOrder={draftAdjustments.layerOrder}
                 autoRig={autoRig}
                 size={168}
                 faceOnly
@@ -1829,6 +1831,7 @@ export function AvatarCloset({
                 <AvatarRenderer
                   equippedParts={draft}
                   adjustments={draftAdjustments}
+                  layerOrder={draftAdjustments.layerOrder}
                   autoRig={autoRig}
                   size={52}
                   faceOnly
@@ -1838,6 +1841,7 @@ export function AvatarCloset({
                 <AvatarRenderer
                   equippedParts={draft}
                   adjustments={draftAdjustments}
+                  layerOrder={draftAdjustments.layerOrder}
                   autoRig={autoRig}
                   size={36}
                   faceOnly
@@ -1847,6 +1851,7 @@ export function AvatarCloset({
                 <AvatarRenderer
                   equippedParts={draft}
                   adjustments={draftAdjustments}
+                  layerOrder={draftAdjustments.layerOrder}
                   autoRig={autoRig}
                   size={26}
                   faceOnly

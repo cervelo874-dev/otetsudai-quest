@@ -20,6 +20,7 @@ import {
   getLayerAdjustment,
   getOrderedCharacterBodyLayers,
   hasCustomAdjustment,
+  resolveAvatarLayerOrder,
   resolvePartSrc,
 } from './parts';
 import {
@@ -84,14 +85,15 @@ export async function renderAvatarToCanvas(
     ...Array.from(solved.autoHiddenLayers),
   ]);
 
-  const orderedCategories: AvatarCategory[] =
-    options.adjustments?.layerOrder ?? [
-      'background',
-      'back_effect',
-      ...getOrderedCharacterBodyLayers(solved.effectiveAdjustments, solved.activeHandHoldMode),
-      'pet',
-      'front_effect',
-    ];
+  const orderedCategories: AvatarCategory[] = options.adjustments?.layerOrder
+    ? resolveAvatarLayerOrder(options.adjustments)
+    : [
+        'background',
+        'back_effect',
+        ...getOrderedCharacterBodyLayers(solved.effectiveAdjustments, solved.activeHandHoldMode),
+        'pet',
+        'front_effect',
+      ];
 
   const activeLayers: { category: AvatarCategory; src: string }[] = [];
   for (const cat of orderedCategories) {

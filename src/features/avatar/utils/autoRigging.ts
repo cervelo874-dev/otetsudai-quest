@@ -913,6 +913,9 @@ export function solveAutoRigAdjustments(
   for (const cat of AVATAR_LAYERS) {
     effectiveAdjustments[cat] = getLayerAdjustment(manualAdjustments, cat);
   }
+  if (manualAdjustments.layerOrder) {
+    effectiveAdjustments.layerOrder = [...manualAdjustments.layerOrder];
+  }
 
   // 複数持ち物リストの正規化抽出
   const handItemParts: AvatarPart[] = [];

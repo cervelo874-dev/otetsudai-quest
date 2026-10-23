@@ -151,7 +151,8 @@ export function getEquippedSignature(
       : '';
     return `${category}@${a.dx},${a.dy},${a.scale},${a.rotation},${a.flipX ? 1 : 0},${a.aboveTops ? 1 : 0},${a.sleeveModeOverride ?? ''},${a.handHoldModeOverride ?? ''},${a.holdHandSide ?? ''},${a.gripHandPose ?? ''},${a.gripDx ?? 0},${a.gripDy ?? 0},${a.gripScale ?? 1},${a.gripRotation ?? 0},${a.gripFlipX ? 1 : 0},${a.gripFlipY ? 1 : 0},${a.bodyClipMode ?? ''},${a.bodyClipInsetPx ?? ''}${pairSig}`;
   }).join('|');
-  return `${eqSig}##${adjSig}`;
+  const layerOrderSig = adjustments.layerOrder ? `##order:${adjustments.layerOrder.join(',')}` : '';
+  return `${eqSig}##${adjSig}${layerOrderSig}`;
 }
 
 /**
