@@ -452,6 +452,30 @@ export function AvatarCloset({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentSignature, tryOnId]);
 
+  // カタログパーツ（ownedParts）が非同期ロードされた際、draft や equippedParts の自作パーツを即座に再照合・完全復元
+  useEffect(() => {
+    if (ownedParts.length === 0) return;
+    setDraft((prevDraft) => {
+      let changed = false;
+      const nextDraft = { ...prevDraft };
+      for (const cat of AVATAR_LAYERS) {
+        const curVal = nextDraft[cat];
+        const curKey = resolvePartKey(curVal);
+        const eqVal = equippedParts[cat];
+        const eqKey = resolvePartKey(eqVal);
+        const targetKey = curKey || eqKey;
+        if (targetKey) {
+          const matched = ownedParts.find((p) => p.category === cat && p.id === targetKey);
+          if (matched && (!curVal || typeof curVal !== 'object' || !curVal.src || curVal !== matched)) {
+            nextDraft[cat] = matched;
+            changed = true;
+          }
+        }
+      }
+      return changed ? nextDraft : prevDraft;
+    });
+  }, [ownedParts, equippedParts]);
+
   const draftCallbackRef = useRef(onDraftChange);
   draftCallbackRef.current = onDraftChange;
   useEffect(() => {

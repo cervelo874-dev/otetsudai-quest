@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AvatarPart } from '../types';
-import { PRESET_PARTS } from '../presets/svgParts';
+import { PRESET_BODY } from '../presets/svgParts';
 import {
   clearCatalogParts,
   duplicateCatalogPart,
@@ -14,8 +14,10 @@ import {
 
 /**
  * ブラウザ内パーツカタログ（IndexedDB + LocalStorage同期キャッシュ）を購読・操作するカスタムフック
+ * - 自作パーツのみを一覧として提供します（もともとあったプリセットパーツは除外）。
+ * - 自作素体が1件も登録されていない場合のみ、表示破綻を防ぐ安全フォールバックとして公式素体（PRESET_BODY）を補完します。
  */
-export function usePartCatalog(externalParts: AvatarPart[] = PRESET_PARTS) {
+export function usePartCatalog(externalParts: AvatarPart[] = []) {
   // 初回マウント時から自作パーツ・素体が即座に利用できるように同期的にLocalStorageキャッシュで初期化！
   const [customParts, setCustomParts] = useState<AvatarPart[]>(() => {
     return readFallbackParts();
@@ -58,10 +60,12 @@ export function usePartCatalog(externalParts: AvatarPart[] = PRESET_PARTS) {
   }, []);
 
   const allParts = useMemo(() => {
-    if (externalParts.length === 0) return customParts;
-    const customIdSet = new Set(customParts.map((p) => p.id));
-    const filteredPresets = externalParts.filter((p) => !customIdSet.has(p.id));
-    return [...customParts, ...filteredPresets];
+    const list = externalParts.length > 0 ? [...customParts, ...externalParts] : [...customParts];
+    const hasBody = list.some((p) => p.category === 'body');
+    if (!hasBody) {
+      list.push(PRESET_BODY);
+    }
+    return list;
   }, [customParts, externalParts]);
 
   return {

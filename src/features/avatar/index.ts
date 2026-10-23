@@ -170,9 +170,7 @@ export function resolveChildEquippedParts(
   catalogParts: AvatarPart[] = [],
 ): EquippedParts {
   const allPartsMap = new Map<string, AvatarPart>();
-  for (const p of PRESET_PARTS) {
-    allPartsMap.set(p.id, p);
-  }
+  allPartsMap.set(PRESET_BODY.id, PRESET_BODY);
   for (const p of catalogParts) {
     allPartsMap.set(p.id, p);
   }
@@ -201,9 +199,8 @@ export function resolveChildEquippedParts(
   const activeCustomBody = customBodies.length > 0 ? customBodies[customBodies.length - 1] : null;
   const preferredBody = parentStudioBodyPart ?? activeCustomBody ?? PRESET_BODY;
 
-  // 2. DEFAULT_EQUIPPED を基本ベースとする（絶対に服やズボンが消えて全裸にならない！）
+  // 2. 自作素体（またはフォールバック素体）を基本ベースとする
   const result: EquippedParts = {
-    ...DEFAULT_EQUIPPED,
     body: preferredBody,
   };
 

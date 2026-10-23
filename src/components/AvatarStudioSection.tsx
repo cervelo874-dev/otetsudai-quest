@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { RotateCcw, Shirt, Wand2, Sparkles } from 'lucide-react';
+import { Shirt, Wand2, Sparkles } from 'lucide-react';
 import {
   AvatarCloset,
   AvatarRenderer,
   createEmptyEquippedMap,
+  normalizeEquippedParts,
+  toEquippedIdMap,
   PartCalibrationStudio,
   usePartCatalog,
   PRESET_BODY,
@@ -21,17 +23,13 @@ type StudioSectionView = 'studio' | 'closet';
 const PARENT_STUDIO_EQUIPPED_KEY = 'mobage_avatar_current_equipped_v2';
 const PARENT_STUDIO_ADJUSTMENTS_KEY = 'mobage_avatar_current_adjustments_v2';
 
-function loadSavedEquipped(): EquippedPartMap {
+function loadSavedEquipped(catalogParts: AvatarPart[] = []): EquippedPartMap {
   try {
     const raw = localStorage.getItem(PARENT_STUDIO_EQUIPPED_KEY);
     const base: EquippedPartMap = { ...createEmptyEquippedMap(), body: PRESET_BODY };
     if (!raw) return base;
     const parsed = JSON.parse(raw);
-    const validBody =
-      parsed.body && typeof parsed.body === 'object' && parsed.body.src
-        ? parsed.body
-        : PRESET_BODY;
-    return { ...base, ...parsed, body: validBody };
+    return normalizeEquippedParts(parsed, catalogParts);
   } catch {
     return { ...createEmptyEquippedMap(), body: PRESET_BODY };
   }
@@ -50,11 +48,18 @@ function loadSavedAdjustments(): LayerAdjustmentMap {
 
 export function AvatarStudioSection() {
   // ブラウザ内カタログ（IndexedDB / LocalStorage）
-  const { parts, customParts, duplicatePart, deletePart, clearAllParts } = usePartCatalog();
+  const { parts, customParts, duplicatePart, deletePart } = usePartCatalog();
 
   // プレビュー・ガイド用の装備状態
-  const [equippedParts, setEquippedParts] = useState<EquippedPartMap>(loadSavedEquipped);
+  const [equippedParts, setEquippedParts] = useState<EquippedPartMap>(() => loadSavedEquipped());
   const [adjustments, setAdjustments] = useState<LayerAdjustmentMap>(loadSavedAdjustments);
+
+  // カタログパーツが非同期でロード完了した際、保存されていたIDから完全なパーツオブジェクトを再照合して復元
+  useEffect(() => {
+    if (parts.length > 0) {
+      setEquippedParts((prev) => normalizeEquippedParts(prev, parts));
+    }
+  }, [parts]);
 
   // 表示画面切り替え（初期表示は「スタジオ」）
   const [view, setView] = useState<StudioSectionView>('studio');
@@ -70,7 +75,9 @@ export function AvatarStudioSection() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PARENT_STUDIO_EQUIPPED_KEY, JSON.stringify(equippedParts));
+      // LocalStorageには画像Base64ではなく軽量なパーツIDマップを保存（容量上限エラーを防止）
+      const idMap = toEquippedIdMap(equippedParts);
+      localStorage.setItem(PARENT_STUDIO_EQUIPPED_KEY, JSON.stringify(idMap));
     } catch {
       // ignore
     }
@@ -96,22 +103,6 @@ export function AvatarStudioSection() {
     },
     [],
   );
-
-  // 前の登録素材を一括クリア
-  const handleClearOldAssets = useCallback(async () => {
-    if (
-      !window.confirm(
-        'ブラウザに保存されている自作パーツをすべてリセットしますか？\n（子どもの着せ替えからも消去されます）',
-      )
-    ) {
-      return;
-    }
-    await clearAllParts();
-    setEquippedParts(createEmptyEquippedMap());
-    setAdjustments({});
-    sound.tap();
-    toast('登録パーツをリセットしました', '🗑️');
-  }, [clearAllParts]);
 
   // スタジオで新規パーツ登録が完了したとき
   const handlePartRegistered = useCallback(
@@ -179,18 +170,6 @@ export function AvatarStudioSection() {
               </p>
             </div>
           </div>
-
-          {customParts.length > 0 && (
-            <button
-              type="button"
-              onClick={handleClearOldAssets}
-              className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-zinc-400 hover:text-rose-600 hover:bg-rose-50 transition"
-              title="自作パーツを一括リセット"
-            >
-              <RotateCcw className="h-3 w-3" />
-              <span>初期化 ({customParts.length})</span>
-            </button>
-          )}
         </div>
 
         {/* スマホ用2タブ切り替え */}
@@ -252,18 +231,6 @@ export function AvatarStudioSection() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {customParts.length > 0 && (
-            <button
-              type="button"
-              onClick={handleClearOldAssets}
-              className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-zinc-500 hover:bg-zinc-100 hover:text-rose-600 transition"
-              title="自作パーツを一括リセットします"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>自作初期化 ({customParts.length})</span>
-            </button>
-          )}
-
           <nav className="flex items-center rounded-lg bg-zinc-100 p-1 border border-zinc-200/70">
             <button
               type="button"

@@ -64,7 +64,7 @@ import {
   requestNotificationPermission,
   sendBrowserNotification,
 } from '../notifications';
-import { usePartCatalog, PRESET_PARTS } from '../features/avatar';
+import { usePartCatalog } from '../features/avatar';
 
 const TICKET_TEMPLATES: {
   category: 'tablet' | 'real';
@@ -1438,7 +1438,7 @@ export function ParentView({ state }: { state: AppState }) {
                   <span>アバターカタログ＆パーツ管理</span>
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  親が制作した自作パーツ {catalogParts.filter((p) => p.source === 'custom' || !p.id.startsWith('preset_')).length} 個、公式プリセットパーツ {PRESET_PARTS.length} 個が利用可能です。
+                  親が制作した自作パーツ {catalogParts.filter((p) => p.source === 'custom' || !p.id.startsWith('preset_')).length} 個が利用可能です。
                 </p>
               </div>
 
@@ -1469,10 +1469,10 @@ export function ParentView({ state }: { state: AppState }) {
             {showAvatarGallery && (
               <div className="mt-4 pt-4 border-t border-slate-100 max-h-96 overflow-y-auto">
                 <div className="text-xs font-bold text-slate-500 mb-2">
-                  登録済みパーツ一覧（自作＋プリセット 合計 {PRESET_PARTS.length + catalogParts.filter((p) => p.source === 'custom' || !p.id.startsWith('preset_')).length} 件）
+                  登録済み自作パーツ一覧（{catalogParts.filter((p) => p.source === 'custom' || !p.id.startsWith('preset_')).length} 件）
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                  {[...catalogParts.filter((p) => p.source === 'custom' || !p.id.startsWith('preset_')), ...PRESET_PARTS].map((part) => (
+                  {catalogParts.filter((p) => p.source === 'custom' || !p.id.startsWith('preset_')).map((part) => (
                     <div
                       key={part.id}
                       className="rounded-xl border border-slate-200 bg-slate-50/50 p-2 text-xs flex items-center gap-2.5"
