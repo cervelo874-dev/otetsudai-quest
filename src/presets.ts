@@ -1,7 +1,59 @@
-import type { AppState, AvatarConfig, Child, NotificationSettings, Quest, ShopItem } from './types';
+import type { AppState, AvatarConfig, Child, GachaConfig, NotificationSettings, Quest, ShopItem } from './types';
 import { yesterdayKey } from './utils';
 
 export const STATE_VERSION = 3; // バージョン3: 2D RPGアバター合成レイヤー＆ガチャ確率・ダブり救済システム対応
+
+export const DEFAULT_GACHA_CONFIG: GachaConfig = {
+  bannerTitle: 'ロイヤル・ジュエルステージ',
+  bannerSubtitle: '特別なドレス・コーデセット＆ごほうびを手に入れよう！',
+  singleCost: 50,
+  tenPullCost: 450,
+  enableDailyFree: true,
+  rarityRates: {
+    r3: 6,
+    r2: 34,
+    r1: 60,
+  },
+  avatarWeightPercent: {
+    r3: 85,
+    r2: 80,
+    r1: 65,
+  },
+  ticketSubWeightPercent: 45,
+  enabledShopTicketIds: [
+    'sh-tab10',
+    'sh-tab15',
+    'sh-snack',
+    'sh-snack-up',
+    'sh-book',
+    'sh-dinner',
+    'sh-outing',
+  ],
+  subPrizeCoins: {
+    r3Coins: 50,
+    r3Shards: 4,
+    r2Coins: 20,
+    r2Shards: 2,
+    r1Coins: 15,
+    r1Shards: 1,
+  },
+  duplicateRefund: {
+    r3Coins: 35,
+    r3Shards: 3,
+    r2Coins: 15,
+    r2Shards: 2,
+    r1Coins: 10,
+    r1Shards: 1,
+  },
+  exchangeCosts: {
+    r3Set: 25,
+    r3Part: 15,
+    r2Part: 8,
+    r1Part: 4,
+  },
+  partSettings: {},
+  coordSets: [],
+};
 
 export const DEFAULT_AVATAR: AvatarConfig = {
   skin: 's1',
@@ -177,6 +229,17 @@ export function createInitialState(): AppState {
     logs: [{ id: 'log-init', icon: '🏰', text: 'ごほうびタウンへ ようこそ！初期データを読み込みました', at: Date.now() }],
     done: [],
     notificationSettings: { ...DEFAULT_NOTIFICATION_SETTINGS },
+    gachaConfig: {
+      ...DEFAULT_GACHA_CONFIG,
+      rarityRates: { ...DEFAULT_GACHA_CONFIG.rarityRates },
+      avatarWeightPercent: { ...DEFAULT_GACHA_CONFIG.avatarWeightPercent },
+      enabledShopTicketIds: [...DEFAULT_GACHA_CONFIG.enabledShopTicketIds],
+      subPrizeCoins: { ...DEFAULT_GACHA_CONFIG.subPrizeCoins },
+      duplicateRefund: { ...DEFAULT_GACHA_CONFIG.duplicateRefund },
+      exchangeCosts: { ...DEFAULT_GACHA_CONFIG.exchangeCosts },
+      partSettings: {},
+      coordSets: [],
+    },
     deletedChildIds: [],
     deletedQuestIds: [],
     deletedShopItemIds: [],

@@ -1,706 +1,1124 @@
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Sparkles, Crown, BookOpen, Repeat, Check, SkipForward, Shirt, X } from 'lucide-react';
 import type { Child } from '../types';
-import { canFreeGacha, spinGacha, exchangeStarShards, type GachaPrize } from '../actions';
-import { GACHA_COST } from '../logic';
-import { AVATAR_OPTIONS, type AvatarOption, findOption, isUnlockableAvatarItem, getShardCost, SHARD_COST } from '../avatar';
+import {
+  canFreeGacha,
+  spinGachaPulls,
+  exchangeGachaItem,
+  equipGachaPartsToChild,
+  getEffectivePartGachaSetting,
+  type GachaPullItemResult,
+  type RarityNumber,
+} from '../actions';
+import { useAppState } from '../store';
+import { DEFAULT_GACHA_CONFIG } from '../presets';
+import {
+  AvatarRenderer,
+  createEmptyEquippedMap,
+  resolveChildEquippedParts,
+  usePartCatalog,
+  PRESET_BODY,
+  CATEGORY_META,
+  type AvatarPart,
+  type EquippedParts,
+} from '../features/avatar';
+import { GachaIcon } from './GachaIcons';
 import { sound } from '../sound';
 import { burst } from '../effects';
 import { toast } from './ui';
-import { GachaMachineVisual } from './GachaMachineVisual';
-import { GameAvatar2D } from './Avatar';
-import { Sparkles, Coins, RefreshCw, Star, Check, X } from 'lucide-react';
+
+type ModalTab = 'stage' | 'lineup' | 'exchange';
+type AnimPhase = 'idle' | 'opening' | 'orbs' | 'promotion' | 'ssr_runway' | 'result';
 
 export function GachaModal({
   child,
-  onClose,
   initialTab = 'spin',
+  onClose,
 }: {
   child: Child;
-  onClose: () => void;
   initialTab?: 'spin' | 'exchange';
+  onClose: () => void;
 }) {
-  const isFree = canFreeGacha(child);
-  const [activeTab, setActiveTab] = useState<'spin' | 'exchange'>(initialTab);
-  const [phase, setPhase] = useState<'idle' | 'spinning' | 'dropping' | 'opening' | 'result'>('idle');
-  const [prize, setPrize] = useState<GachaPrize | null>(null);
-  const [isDuplicate, setIsDuplicate] = useState(false);
-  const [refundCoins, setRefundCoins] = useState(0);
-  const [refundShards, setRefundShards] = useState(0);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const state = useAppState();
+  const cfg = state.gachaConfig ?? DEFAULT_GACHA_CONFIG;
+  const { parts: catalogParts } = usePartCatalog();
 
-  const timeoutIdsRef = useRef<number[]>([]);
+  const [tab, setTab] = useState<ModalTab>(initialTab === 'exchange' ? 'exchange' : 'stage');
+  const [phase, setPhase] = useState<AnimPhase>('idle');
+  const [pulls, setPulls] = useState<GachaPullItemResult[]>([]);
+  const [highestRarity, setHighestRarity] = useState<RarityNumber>(1);
+  const [promotedVisual, setPromotedVisual] = useState(false);
+  const [ssrRunwayIdx, setSsrRunwayIdx] = useState(0);
+  const [equippedDone, setEquippedDone] = useState(false);
 
-  const addTimeout = (cb: () => void, ms: number): number => {
-    const id = window.setTimeout(() => {
-      timeoutIdsRef.current = timeoutIdsRef.current.filter((x) => x !== id);
-      cb();
-    }, ms);
-    timeoutIdsRef.current.push(id);
-    return id;
+  // 図鑑・交換所での試着プレビュー対象
+  const [previewTarget, setPreviewTarget] = useState<{
+    title: string;
+    partIds: string[];
+    rarity: RarityNumber;
+  } | null>(null);
+
+  const timersRef = useRef<number[]>([]);
+  const clearTimers = () => {
+    timersRef.current.forEach((id) => window.clearTimeout(id));
+    timersRef.current = [];
   };
 
-  useEffect(() => {
-    return () => {
-      timeoutIdsRef.current.forEach((id) => window.clearTimeout(id));
-      timeoutIdsRef.current = [];
-    };
-  }, []);
+  useEffect(() => () => clearTimers(), []);
 
-  // ガチャを回すハンドラー
-  const handleSpin = () => {
-    if (phase !== 'idle') return;
-    if (!isFree && child.coins < GACHA_COST) {
-      sound.error();
-      toast('コインがたりないよ！', '🪙');
+  const free = canFreeGacha(child);
+  const starJewels = child.starShards ?? 0;
+
+  // 素体と現在の子どもの装備を解決
+  const dressupParts = useMemo(
+    () => catalogParts.filter((p) => p.category !== 'body'),
+    [catalogParts],
+  );
+
+  const childBaseEquipped = useMemo<EquippedParts>(() => {
+    if (catalogParts.length === 0) {
+      return { ...createEmptyEquippedMap(), body: PRESET_BODY };
+    }
+    return resolveChildEquippedParts(child.avatarStudio, catalogParts);
+  }, [child.avatarStudio, catalogParts]);
+
+  // ガチャ限定パーツ一覧（レア度別）
+  const gachaOnlyParts = useMemo(() => {
+    return dressupParts.filter((p) => getEffectivePartGachaSetting(p, cfg).isGachaOnly);
+  }, [dressupParts, cfg]);
+
+  // ピックアップ看板用の目玉アイテム（★3フルコーデ or ★3ピックアップパーツ）
+  const featuredShowcase = useMemo(() => {
+    const pickupSet =
+      cfg.coordSets.find((cs) => cs.isPickup && cs.partIds.length > 0) ?? cfg.coordSets[0];
+    if (pickupSet && pickupSet.partIds.length > 0) {
+      return {
+        type: 'coord_set' as const,
+        title: pickupSet.name,
+        subtitle: pickupSet.description || `${pickupSet.partIds.length}点フルコーデ一式`,
+        partIds: pickupSet.partIds,
+      };
+    }
+    const pickupPart =
+      gachaOnlyParts.find((p) => {
+        const st = getEffectivePartGachaSetting(p, cfg);
+        return st.rarity === 3 && st.isPickup;
+      }) ??
+      gachaOnlyParts.find((p) => getEffectivePartGachaSetting(p, cfg).rarity === 3) ??
+      gachaOnlyParts[0];
+
+    if (pickupPart) {
+      return {
+        type: 'part' as const,
+        title: pickupPart.name,
+        subtitle: 'ガチャ限定スペシャルアイテム✨',
+        partIds: [pickupPart.id],
+      };
+    }
+    return null;
+  }, [cfg, gachaOnlyParts]);
+
+  // 任意のpartIdsを着せたアバター装備マップを作るヘルパー
+  const buildTryOnEquipped = (partIds: string[]): EquippedParts => {
+    const map: EquippedParts = { ...childBaseEquipped };
+    const hands: AvatarPart[] = [];
+    for (const pid of partIds) {
+      const p = dressupParts.find((x) => x.id === pid);
+      if (p) {
+        map[p.category] = p;
+        if (p.category === 'hand_item') hands.push(p);
+      }
+    }
+    if (hands.length > 0) map.hand_items = hands;
+    return map;
+  };
+
+  // ★3ランウェイ対象のリスト
+  const ssrPulls = useMemo(
+    () => pulls.filter((r) => r.prize.rarity === 3),
+    [pulls],
+  );
+
+  // ガチャ実行（1回 or 10連）
+  const handleStartPull = (count: 1 | 10) => {
+    if (phase !== 'idle' && phase !== 'result') return;
+    clearTimers();
+    setEquippedDone(false);
+
+    const outcome = spinGachaPulls(child.id, count, catalogParts);
+    if (!outcome.ok) {
+      toast('コインが足りないよ！おてつだいで貯めよう💪', '🪙');
       return;
     }
 
-    setPhase('spinning');
+    setPulls(outcome.pulls);
+    setHighestRarity(outcome.highestRarity);
+    setPromotedVisual(false);
+    setSsrRunwayIdx(0);
+
+    // Phase 1: 黄金の鍵でジュエリーボックス解錠！
+    setPhase('opening');
     sound.gachaSpin();
 
-    // ハンドル回転演出（約1.5秒）
-    addTimeout(() => {
-      const outcome = spinGacha(child.id);
-      if (outcome.ok) {
-        setPrize(outcome.prize);
-        setIsDuplicate(outcome.isDuplicate);
-        setRefundCoins(outcome.refundCoins);
-        setRefundShards(outcome.refundShards);
+    // 1.1秒後 → ジュエルオーブ展開
+    timersRef.current.push(
+      window.setTimeout(() => {
+        setPhase('orbs');
+        sound.coin();
+      }, 1100),
+    );
 
-        // カプセル落下フェーズ
-        setPhase('dropping');
-        sound.pop();
-      } else {
-        sound.error();
-        setPhase('idle');
+    const hasPromo = outcome.hasPromotion;
+    const ssrItems = outcome.pulls.filter((p) => p.prize.rarity === 3);
+
+    if (hasPromo) {
+      // 2.2秒後 → パリーン！昇格演出
+      timersRef.current.push(
+        window.setTimeout(() => {
+          setPhase('promotion');
+          setPromotedVisual(true);
+          sound.fanfare();
+          burst();
+        }, 2200),
+      );
+    }
+
+    const nextStepDelay = hasPromo ? 3500 : 2300;
+
+    if (ssrItems.length > 0) {
+      // ★3 SSR当選時はドリームステージ試着ランウェイへ！
+      timersRef.current.push(
+        window.setTimeout(() => {
+          setPhase('ssr_runway');
+          sound.fanfare();
+          burst();
+        }, nextStepDelay),
+      );
+    } else {
+      // ★1〜★2のみの場合はリザルト一覧へ
+      timersRef.current.push(
+        window.setTimeout(() => {
+          setPhase('result');
+          if (outcome.highestRarity === 2) {
+            sound.fanfare();
+            burst();
+          } else {
+            sound.success();
+          }
+        }, nextStepDelay),
+      );
+    }
+  };
+
+  // SKIPボタン（いつでも即リザルトへ）
+  const handleSkipToResult = () => {
+    clearTimers();
+    setPromotedVisual(true);
+    setPhase('result');
+    if (highestRarity === 3) {
+      sound.fanfare();
+      burst();
+    } else {
+      sound.tap();
+    }
+  };
+
+  // 当たったパーツをまとめてその場で着用する
+  const wonEquipablePartIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const r of pulls) {
+      for (const pid of r.prize.partIds) {
+        if (!ids.includes(pid)) ids.push(pid);
       }
-    }, 1500);
-  };
+    }
+    return ids;
+  }, [pulls]);
 
-  // カプセルをタップして開封するハンドラー
-  const handleOpenCapsule = () => {
-    if (phase !== 'dropping' || !prize) return;
-    setPhase('opening');
+  const handleEquipWonItems = () => {
+    if (wonEquipablePartIds.length === 0) return;
+    equipGachaPartsToChild(child.id, wonEquipablePartIds, catalogParts);
+    setEquippedDone(true);
     sound.fanfare();
     burst();
-
-    if (prize.rarity === 3) {
-      addTimeout(() => burst(), 300);
-      addTimeout(() => burst(), 650);
-    }
-
-    addTimeout(() => {
-      setPhase('result');
-    }, 700);
+    toast('当たったコーデにお着替えしたよ！✨', '👗');
   };
 
-  // ほしのかけら交換ハンドラー
-  const handleExchange = (avatarItemId: string, cost: number, name: string) => {
-    if ((child.starShards ?? 0) < cost) {
-      sound.error();
-      toast('ほしのかけらが たりないよ！', '🌟');
-      return;
-    }
-    sound.fanfare();
-    burst();
-    const res = exchangeStarShards(child.id, avatarItemId);
+  // 交換所アクション
+  const handleExchange = (target: { type: 'coord_set' | 'part'; id: string; name: string }) => {
+    const res = exchangeGachaItem(child.id, { type: target.type, id: target.id }, catalogParts);
     if (res === 'ok') {
-      toast(`「${name}」と こうかんしたよ！🎒`, '✨');
+      sound.fanfare();
+      burst();
+      toast(`💎 スタージュエルで「${target.name}」をゲットしたよ！`, '🎉');
+    } else if (res === 'not_enough') {
+      toast('スタージュエルがまだ足りないよ！ガチャで集めよう✨', '💎');
+    } else if (res === 'owned') {
+      toast('すでに持っているよ！', '✨');
     }
   };
 
-  const rarityInfo: Record<number, { label: string; badgeCls: string; borderCls: string; glowCls: string }> = {
-    1: {
-      label: '★1 ノーマル',
-      badgeCls: 'bg-slate-200 text-slate-700',
-      borderCls: 'border-slate-300 bg-slate-50',
-      glowCls: 'from-blue-400 to-indigo-500',
-    },
-    2: {
-      label: '★2 レア！✨',
-      badgeCls: 'bg-gradient-to-r from-sky-400 to-blue-500 text-white',
-      borderCls: 'border-sky-300 bg-sky-50',
-      glowCls: 'from-purple-400 to-pink-500',
-    },
-    3: {
-      label: '★3 レジェンド！！🌈👑',
-      badgeCls: 'bg-gradient-to-r from-amber-400 via-rose-500 to-purple-600 text-white animate-pulse',
-      borderCls: 'border-amber-400 bg-gradient-to-b from-amber-50 via-pink-50 to-purple-50 animate-legend-glow',
-      glowCls: 'from-amber-400 via-rose-500 to-purple-600',
-    },
-  };
+  const isAnimating = phase !== 'idle' && phase !== 'result';
 
-  // 交換対象アイテム（初期から持っているデフォルトアイテムを除外し、アンロック対象のみを表示）
-  const exchangeItems = AVATAR_OPTIONS.filter((o) => isUnlockableAvatarItem(o));
-
-  const categories = [
-    { id: 'all', label: 'すべて' },
-    { id: 'outfit', label: 'おようふく' },
-    { id: 'accessory', label: 'あたま' },
-    { id: 'weapon', label: 'もちもの' },
-    { id: 'pet', label: 'ペット' },
-    { id: 'bg', label: 'はいけい' },
-  ];
-
-  const filteredItems = exchangeItems.filter((it) => {
-    if (selectedCategory === 'all') return true;
-    return it.slot === selectedCategory;
-  });
+  // 開幕のボックスオーラ色（昇格前はinitialOrbRarityの最大値でじらす！）
+  const initialMaxRarity = useMemo<RarityNumber>(() => {
+    if (pulls.length === 0) return 1;
+    return pulls.reduce(
+      (max, r) => (r.initialOrbRarity > max ? r.initialOrbRarity : max),
+      1 as RarityNumber,
+    );
+  }, [pulls]);
 
   return (
-    <div className="flex flex-col items-center max-w-md mx-auto w-full">
-      {/* ヘッダー情報バー（閉じるボタンを独自統合し被りを解消） */}
-      <div className="w-full flex items-center justify-between border-b pb-2.5 mb-3">
-        <h3 className="text-lg sm:text-xl font-black text-amber-950 flex items-center gap-1.5 shrink-0">
-          <span className="text-xl sm:text-2xl">🎰</span>
-          <span className="whitespace-nowrap">ごほうびガチャ</span>
-        </h3>
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* ほしのかけら */}
-          <button
-            type="button"
-            onClick={() => {
-              sound.tap();
-              setActiveTab('exchange');
-            }}
-            title="ほしのかけら交換所へ"
-            className="flex items-center gap-1 sm:gap-1.5 rounded-full bg-gradient-to-r from-amber-100 to-yellow-100 px-2.5 py-1 font-black text-amber-950 text-xs shadow-xs border border-amber-300 hover:scale-105 transition-transform"
-          >
-            <span className="text-amber-500 text-xs sm:text-sm">🌟</span>
-            <span className="whitespace-nowrap">{child.starShards ?? 0} こ</span>
-          </button>
-          {/* コイン */}
-          <div className="flex items-center gap-1 rounded-full bg-yellow-100 px-2.5 py-1 font-black text-yellow-950 text-xs shadow-xs border border-yellow-300">
-            <span>🪙</span>
-            <span>{child.coins}</span>
-          </div>
-          {/* 押しやすい閉じるボタン */}
-          <button
-            type="button"
-            onClick={() => {
-              sound.tap();
-              onClose();
-            }}
-            className="btn-pop ml-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition"
-            title="とじる"
-            aria-label="とじる"
-          >
-            <X size={18} strokeWidth={2.5} />
-          </button>
-        </div>
-      </div>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 animate-fade-in"
+      onClick={() => !isAnimating && onClose()}
+    >
+      <div
+        className="relative flex flex-col w-full max-w-xl max-h-[92vh] overflow-hidden rounded-3xl border border-amber-300/30 bg-gradient-to-b from-slate-950 via-indigo-950 to-purple-950 text-white shadow-[0_25px_70px_rgba(0,0,0,0.85)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 背景のステージスポットライト装飾 */}
+        <div className="pointer-events-none absolute -top-24 left-1/4 h-64 w-32 rotate-12 bg-gradient-to-b from-pink-500/20 via-amber-300/10 to-transparent blur-2xl" />
+        <div className="pointer-events-none absolute -top-24 right-1/4 h-64 w-32 -rotate-12 bg-gradient-to-b from-cyan-400/20 via-indigo-400/10 to-transparent blur-2xl" />
 
-      {/* タブ切り替え（ガチャをまわす / かけら交換所）※回転演出中は非表示 */}
-      {phase === 'idle' && (
-        <div className="flex w-full rounded-2xl bg-slate-100 p-1 mb-3">
-          <button
-            type="button"
-            onClick={() => {
-              sound.tap();
-              setActiveTab('spin');
-            }}
-            className={`flex-1 rounded-xl py-2 text-xs font-black transition-all ${
-              activeTab === 'spin'
-                ? 'bg-white text-indigo-700 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            🎰 ガチャをまわす
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              sound.tap();
-              setActiveTab('exchange');
-            }}
-            className={`flex-1 rounded-xl py-2 text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'exchange'
-                ? 'bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-950 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <span>🌟</span>
-            <span>かけら こうかんじょ</span>
-          </button>
-        </div>
-      )}
-
-      {/* ==================== 1. ガチャをまわす画面（リアル自販機） ==================== */}
-      {activeTab === 'spin' && (
-        <div className="flex flex-col items-center text-center w-full min-h-[360px] justify-center">
-          {/* --- A: 待機中 (idle) --- */}
-          {phase === 'idle' && (
-            <div className="flex flex-col items-center w-full animate-popin">
-              <div className="mb-2">
-                <GachaMachineVisual
-                  size="lg"
-                  isFree={isFree}
-                  showHandlePrompt={true}
-                  onClick={handleSpin}
-                  className="cursor-pointer"
-                />
+        {/* ===== トップヘッダー ===== */}
+        <div className="relative z-10 flex items-center justify-between gap-2 border-b border-white/10 bg-black/30 px-4 py-3 backdrop-blur-xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <GachaIcon type="box_closed" size={36} className="shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h2 className="truncate text-base sm:text-lg font-black tracking-wide bg-gradient-to-r from-amber-200 via-pink-200 to-cyan-200 bg-clip-text text-transparent">
+                  ドリームジュエルガチャ
+                </h2>
               </div>
-
-              <div className="text-xs font-bold text-slate-600 mb-1">
-                ハンドルをタップ、または下のボタンを押してね！
-              </div>
-              <div className="text-[11px] font-bold text-amber-800 bg-amber-50 px-3 py-1 rounded-full mb-3 border border-amber-200">
-                ★1 (55%) / ★2 レア (35%) / ★3 レジェンド (10%)
-              </div>
-
-              <button
-                type="button"
-                onClick={handleSpin}
-                disabled={!isFree && child.coins < GACHA_COST}
-                className={`btn-pop flex items-center justify-center gap-2 w-full rounded-2xl py-3.5 text-lg font-black shadow-lg transition-all ${
-                  isFree
-                    ? 'bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 text-white shadow-[0_6px_0_#0f766e] animate-pulse'
-                    : child.coins >= GACHA_COST
-                    ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-[0_6px_0_#c2410c]'
-                    : 'bg-slate-300 text-slate-500 shadow-none cursor-not-allowed'
-                }`}
-              >
-                {isFree ? (
-                  <>
-                    <Sparkles size={22} className="animate-spin" />
-                    <span>きょうの 1かい むりょう！✨</span>
-                  </>
-                ) : (
-                  <>
-                    <Coins size={22} />
-                    <span>{GACHA_COST} コインで まわす！</span>
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* --- B: ハンドル回転中 (spinning) --- */}
-          {phase === 'spinning' && (
-            <div className="flex flex-col items-center justify-center py-4 w-full">
-              <GachaMachineVisual
-                size="lg"
-                isSpinning={true}
-                isFree={isFree}
-              />
-              <div className="mt-4 flex items-center gap-2 text-xl font-black text-amber-900 animate-pulse">
-                <span className="text-2xl animate-spin">🌀</span>
-                <span>ガチャン！ガチャン！ まわしているよ…！</span>
-              </div>
-            </div>
-          )}
-
-          {/* --- C: カプセル落下・待機 (dropping) --- */}
-          {phase === 'dropping' && prize && (
-            <div className="flex flex-col items-center justify-center py-2 w-full animate-popin">
-              {/* フキダシプロンプト */}
-              <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-sm font-black text-white shadow-lg animate-bounce border-2 border-white">
-                <span>👆</span>
-                <span>カプセルを タップして パカッと あけてね！</span>
-              </div>
-
-              {/* リアルなカプセルトイ（タップ可能） */}
-              <button
-                type="button"
-                onClick={handleOpenCapsule}
-                className="group relative flex flex-col items-center justify-center cursor-pointer transition-transform hover:scale-110 active:scale-95 focus:outline-none"
-              >
-                {/* オーラ・後光エフェクト */}
-                <div
-                  className={`absolute -inset-6 rounded-full blur-xl opacity-60 animate-pulse bg-gradient-to-r ${
-                    rarityInfo[prize.rarity]?.glowCls ?? 'from-amber-300 to-yellow-400'
-                  }`}
-                />
-
-                {/* リアルなカプセルSVG */}
-                <div className="relative w-40 h-40 filter drop-shadow-2xl animate-bounce">
-                  <svg viewBox="0 0 120 120" className="w-full h-full overflow-visible">
-                    <defs>
-                      {/* 金カプセル */}
-                      <linearGradient id="goldCapsuleTop" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#fef08a" />
-                        <stop offset="50%" stopColor="#eab308" />
-                        <stop offset="100%" stopColor="#a16207" />
-                      </linearGradient>
-                      {/* 銀/紫カプセル */}
-                      <linearGradient id="rareCapsuleTop" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#e9d5ff" />
-                        <stop offset="50%" stopColor="#a855f7" />
-                        <stop offset="100%" stopColor="#6b21a8" />
-                      </linearGradient>
-                      {/* 赤ノーマルカプセル */}
-                      <linearGradient id="normalCapsuleTop" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#fca5a5" />
-                        <stop offset="50%" stopColor="#ef4444" />
-                        <stop offset="100%" stopColor="#991b1b" />
-                      </linearGradient>
-                      {/* 白底ボトム */}
-                      <linearGradient id="capsuleBottom" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#ffffff" />
-                        <stop offset="100%" stopColor="#cbd5e1" />
-                      </linearGradient>
-                    </defs>
-
-                    {/* 下半分（乳白色ベース） */}
-                    <path
-                      d="M 15,60 A 45,45 0 0,0 105,60 Z"
-                      fill="url(#capsuleBottom)"
-                      stroke="#94a3b8"
-                      strokeWidth="2.5"
-                    />
-                    {/* 上半分（レア度色） */}
-                    <path
-                      d="M 15,60 A 45,45 0 0,1 105,60 Z"
-                      fill={
-                        prize.rarity === 3
-                          ? 'url(#goldCapsuleTop)'
-                          : prize.rarity === 2
-                          ? 'url(#rareCapsuleTop)'
-                          : 'url(#normalCapsuleTop)'
-                      }
-                      stroke={prize.rarity === 3 ? '#ca8a04' : '#64748b'}
-                      strokeWidth="2.5"
-                    />
-
-                    {/* 接合リング帯 */}
-                    <rect
-                      x="12"
-                      y="57"
-                      width="96"
-                      height="6"
-                      rx="3"
-                      fill="#ffffff"
-                      stroke="#64748b"
-                      strokeWidth="1.5"
-                    />
-
-                    {/* ハイライト艶 */}
-                    <path
-                      d="M 28,32 Q 45,20 70,24 Q 45,35 32,50 Q 25,40 28,32 Z"
-                      fill="#ffffff"
-                      opacity="0.65"
-                    />
-
-                    {/* キラリ星 */}
-                    {prize.rarity === 3 && (
-                      <text x="80" y="45" fontSize="20" fill="#ffffff" className="animate-spin origin-center">
-                        ✨
-                      </text>
-                    )}
-                  </svg>
-                </div>
-
-                <div className="mt-4 text-base font-black text-slate-800 flex items-center gap-1.5 group-hover:text-indigo-600">
-                  <span>✨</span>
-                  <span>なにが でてくるかな…？ タップ！</span>
-                </div>
-              </button>
-            </div>
-          )}
-
-          {/* --- D: 開封演出中 (opening) --- */}
-          {phase === 'opening' && prize && (
-            <div className="relative flex flex-col items-center justify-center py-10 w-full">
-              {/* 開いて上下に割れるカプセルSVG */}
-              <div className="relative w-44 h-44 flex items-center justify-center">
-                {/* 激しい光 */}
-                <div className="absolute inset-0 rounded-full bg-yellow-300 blur-2xl animate-ping opacity-80" />
-                <div className="absolute text-7xl animate-spin">🌟</div>
-                <div className="absolute text-5xl -top-4 -left-4 animate-bounce">✨</div>
-                <div className="absolute text-5xl -bottom-4 -right-4 animate-bounce">🎉</div>
-
-                {/* 割れた上フタ（上に跳ね上がる） */}
-                <div className="absolute -top-10 transition-transform transform -translate-y-8 rotate-12 duration-500 opacity-90 drop-shadow-lg">
-                  <svg viewBox="0 0 100 55" className="w-28 h-16">
-                    <path
-                      d="M 5,50 A 45,45 0 0,1 95,50 Z"
-                      fill={
-                        prize.rarity === 3
-                          ? '#eab308'
-                          : prize.rarity === 2
-                          ? '#a855f7'
-                          : '#ef4444'
-                      }
-                      stroke="#475569"
-                      strokeWidth="2.5"
-                    />
-                  </svg>
-                </div>
-
-                {/* 割れた下フタ（下に沈む） */}
-                <div className="absolute -bottom-10 transition-transform transform translate-y-8 -rotate-12 duration-500 opacity-90 drop-shadow-lg">
-                  <svg viewBox="0 0 100 55" className="w-28 h-16">
-                    <path
-                      d="M 5,5 A 45,45 0 0,0 95,5 Z"
-                      fill="#ffffff"
-                      stroke="#475569"
-                      strokeWidth="2.5"
-                    />
-                  </svg>
-                </div>
-              </div>
-
-              <div className="mt-6 text-2xl font-black text-amber-600 animate-pulse">
-                パカッ！！✨
-              </div>
-            </div>
-          )}
-
-          {/* --- E: 結果画面 (result) --- */}
-          {phase === 'result' && prize && (
-            <div className="animate-popin flex flex-col items-center text-center py-2 w-full">
-              <div className="text-4xl animate-bounce mb-1">
-                {prize.rarity === 3 ? '👑🎉🌈' : '🎉✨'}
-              </div>
-
-              {/* レア度バッジ */}
-              <div
-                className={`rounded-full px-5 py-1 text-xs font-black shadow-md mb-3 ${
-                  rarityInfo[prize.rarity]?.badgeCls ?? 'bg-amber-400 text-slate-900'
-                }`}
-              >
-                {rarityInfo[prize.rarity]?.label ?? `★${prize.rarity}`}
-              </div>
-
-              {/* 当選アイテムカード */}
-              <div
-                className={`flex flex-col items-center justify-center rounded-3xl border-3 p-5 w-full shadow-inner mb-4 transition-all ${
-                  rarityInfo[prize.rarity]?.borderCls ?? 'border-amber-200 bg-amber-50'
-                }`}
-              >
-                {/* 実際のアバターパーツイラスト、またはアイコン */}
-                {prize.kind === 'avatar' && prize.avatarItemId ? (
-                  <div className="flex items-center justify-center w-24 h-24 overflow-hidden rounded-2xl bg-white/95 border-2 border-amber-300 shadow-md mb-2">
-                    <GameAvatar2D
-                      avatar={{
-                        ...child.avatar,
-                        [findOption(prize.avatarItemId)?.slot ?? 'outfit']: prize.avatarItemId,
-                      }}
-                      previewMode={findOption(prize.avatarItemId)?.slot}
-                      size={96}
-                      interactive={false}
-                      rounded="rounded-none"
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                ) : (
-                  <span className="text-6xl mb-2 drop-shadow-md">{prize.icon}</span>
-                )}
-
-                <span className="text-xl font-black text-slate-800">{prize.label}</span>
-
-                {/* ほしのかけら当選の場合 */}
-                {prize.kind === 'shards' && (
-                  <div className="mt-3 flex flex-col items-center gap-1.5">
-                    <span className="text-lg font-black text-amber-700 bg-white/90 px-4 py-1.5 rounded-2xl shadow-sm border border-amber-200">
-                      🌟 ほしのかけら ＋{prize.shards}こ ゲット！
-                    </span>
-                    <span className="text-xs font-bold text-amber-800">
-                      🪙 ＋{prize.coins} コインも プレゼント！
-                    </span>
-                  </div>
-                )}
-
-                {/* コイン当選の場合 */}
-                {prize.kind === 'coins' && (
-                  <span className="text-base font-black text-amber-600 mt-2">
-                    ＋{prize.coins} コイン ゲット！🪙
-                  </span>
-                )}
-
-                {/* チケット当選の場合 */}
-                {prize.kind === 'ticket' && (
-                  <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-xl mt-2 border border-indigo-200">
-                    ごほうびチケットボックスに追加されたよ！🎟️
-                  </span>
-                )}
-
-                {/* アバター当選の場合 */}
-                {prize.kind === 'avatar' && !isDuplicate && (
-                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl mt-2 border border-emerald-200">
-                    アバターきせかえで つかえるようになったよ！👕✨
-                  </span>
-                )}
-
-                {/* ダブり救済ボーナスの表示 */}
-                {isDuplicate && (
-                  <div className="mt-3 flex flex-col items-center rounded-2xl bg-amber-100/90 p-3 border border-amber-300 w-full animate-popin">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
-                      <RefreshCw size={14} className="text-amber-700 animate-spin" />
-                      <span>すでにもっている アイテム だったよ！</span>
-                    </div>
-                    <div className="mt-1 text-sm font-black text-amber-900">
-                      ダブりボーナス！ 🌟ほしのかけら+{refundShards}こ ＆ 🪙+{refundCoins}コイン にへんかん！✨
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* ボタン列 */}
-              <div className="flex gap-2 w-full">
-                <button
-                  type="button"
-                  onClick={() => {
-                    sound.tap();
-                    setPhase('idle');
-                  }}
-                  className="btn-pop flex-1 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-400 py-3 text-sm font-black text-amber-950 shadow-[0_4px_0_#d97706]"
-                >
-                  もう１かい まわす！
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    sound.tap();
-                    onClose();
-                  }}
-                  className="btn-pop flex-1 rounded-2xl bg-slate-200 py-3 text-sm font-black text-slate-700 hover:bg-slate-300"
-                >
-                  おわる
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ==================== 2. ほしのかけら交換所 ==================== */}
-      {activeTab === 'exchange' && phase === 'idle' && (
-        <div className="flex flex-col w-full animate-popin">
-          {/* 交換レート・所持状況ガイド */}
-          <div className="flex items-center justify-between bg-gradient-to-r from-amber-50 to-yellow-50 rounded-2xl p-3 border border-amber-200 mb-3">
-            <div className="flex items-center gap-2">
-              <Star className="text-amber-500 fill-amber-400" size={24} />
-              <div>
-                <div className="text-xs font-bold text-amber-900">
-                  もっている ほしのかけら: <span className="text-lg font-black text-amber-600">{child.starShards ?? 0}</span> こ
-                </div>
-                <div className="text-[10px] text-amber-700">
-                  すきなアイテムをえらんで 確実にアンロックできるよ！
-                </div>
-              </div>
-            </div>
-            <div className="text-[10px] font-bold text-slate-600 bg-white/90 px-2.5 py-1 rounded-xl border border-amber-200 text-right">
-              <div>★1: {SHARD_COST[1]}こ</div>
-              <div>★2: {SHARD_COST[2]}こ</div>
-              <div className="text-amber-700 font-black">★3: {SHARD_COST[3]}こ</div>
+              <p className="text-[10px] text-indigo-200/80 truncate">
+                黄金のカギで宝石箱を開けて特別コーデをゲット！
+              </p>
             </div>
           </div>
 
-          {/* カテゴリフィルター */}
-          <div className="flex gap-1.5 overflow-x-auto pb-2 mb-1 no-scrollbar">
-            {categories.map((c) => (
+          {/* 所持ジュエル＆コイン・閉じるボタン */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1 rounded-full bg-indigo-900/80 border border-cyan-400/30 px-2.5 py-1 text-xs font-extrabold text-cyan-200 shadow-inner">
+              <GachaIcon type="star_jewel" size={16} />
+              <span>{starJewels}</span>
+            </div>
+            <div className="flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-400/40 px-2.5 py-1 text-xs font-extrabold text-amber-200">
+              <span>🪙</span>
+              <span>{child.coins}</span>
+            </div>
+            {!isAnimating && (
               <button
-                key={c.id}
                 type="button"
-                onClick={() => {
-                  sound.tap();
-                  setSelectedCategory(c.id);
-                }}
-                className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-black transition-all ${
-                  selectedCategory === c.id
-                    ? 'bg-amber-500 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
+                onClick={onClose}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/80 hover:bg-white/20 hover:text-white transition"
+                aria-label="とじる"
               >
-                {c.label}
+                <X className="h-4 w-4" />
               </button>
-            ))}
+            )}
           </div>
+        </div>
 
-          {/* アイテム一覧：実際のSVGイラストプレビューを表示（スマホ1列・タブレット2列で押し潰れ防止） */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1">
-            {filteredItems.map((item) => {
-              const isOwned = child.ownedItems.includes(item.id);
-              const cost = getShardCost(item.rarity);
-              const canAfford = (child.starShards ?? 0) >= cost;
+        {/* ===== ナビゲーションタブ（演出中は非表示） ===== */}
+        {!isAnimating && (
+          <div className="relative z-10 grid grid-cols-3 gap-1.5 bg-black/40 px-4 py-2 border-b border-white/10">
+            <button
+              type="button"
+              onClick={() => {
+                setTab('stage');
+                setPreviewTarget(null);
+              }}
+              className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-extrabold transition ${
+                tab === 'stage'
+                  ? 'bg-gradient-to-r from-amber-400 via-pink-500 to-indigo-500 text-white shadow-md'
+                  : 'bg-white/5 text-indigo-200 hover:bg-white/10'
+              }`}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>ガチャステージ</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('lineup')}
+              className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-extrabold transition ${
+                tab === 'lineup'
+                  ? 'bg-gradient-to-r from-amber-400 via-pink-500 to-indigo-500 text-white shadow-md'
+                  : 'bg-white/5 text-indigo-200 hover:bg-white/10'
+              }`}
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              <span>ラインナップ図鑑</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('exchange')}
+              className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-extrabold transition ${
+                tab === 'exchange'
+                  ? 'bg-gradient-to-r from-cyan-500 to-indigo-600 text-white shadow-md'
+                  : 'bg-white/5 text-indigo-200 hover:bg-white/10'
+              }`}
+            >
+              <GachaIcon type="star_jewel" size={15} />
+              <span>ジュエル交換所</span>
+            </button>
+          </div>
+        )}
 
-              return (
-                <div
-                  key={item.id}
-                  className={`rounded-2xl p-2.5 border-2 flex flex-col justify-between transition-all ${
-                    isOwned
-                      ? 'bg-slate-50 border-slate-200 opacity-60'
-                      : canAfford
-                      ? 'bg-white border-amber-300 shadow-sm hover:border-amber-400'
-                      : 'bg-white border-slate-100'
-                  }`}
-                >
-                  <div className="flex items-start gap-2.5 mb-2">
-                    {/* スタンプ（絵文字）ではなく実際のアバターパーツイラストを描画 */}
-                    <div className="flex items-center justify-center w-14 h-14 shrink-0 overflow-hidden rounded-xl bg-slate-50 border border-slate-200/80 shadow-inner">
-                      <GameAvatar2D
-                        avatar={{
-                          ...child.avatar,
-                          [item.slot]: item.id,
-                        }}
-                        previewMode={item.slot}
-                        size={56}
-                        interactive={false}
-                        rounded="rounded-none"
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
+        {/* ===== メインスクロール領域 ===== */}
+        <div className="relative z-10 flex-1 overflow-y-auto p-4">
+          {/* 演出中の常設 SKIP ボタン */}
+          {isAnimating && (
+            <button
+              type="button"
+              onClick={handleSkipToResult}
+              className="absolute top-3 right-3 z-30 flex items-center gap-1 rounded-full bg-black/60 border border-white/30 px-3.5 py-1.5 text-xs font-extrabold text-white backdrop-blur-xs hover:bg-black/80 transition"
+            >
+              <SkipForward className="h-3.5 w-3.5" />
+              <span>SKIP</span>
+            </button>
+          )}
 
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-black text-slate-800 truncate leading-tight">
-                        {item.name}
-                      </div>
-                      <div className="flex items-center gap-1 mt-1">
-                        <span
-                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                            item.rarity === 3
-                              ? 'bg-amber-100 text-amber-800 font-black'
-                              : item.rarity === 2
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          {item.rarity ? `★${item.rarity}` : '★1'}
-                        </span>
-                        <span className="text-[10px] font-black text-amber-600">
-                          🌟 {cost}こ
-                        </span>
-                      </div>
+          {/* =========================================================
+              1. ガチャステージ本番 ＆ 4段階ドラマチック演出
+             ========================================================= */}
+          {tab === 'stage' && (
+            <div className="flex flex-col items-center">
+              {/* ---------- IDLE（待機中：ピックアップ看板＋宝石箱ステージ） ---------- */}
+              {phase === 'idle' && (
+                <div className="w-full flex flex-col gap-4">
+                  {/* ピックアップ看板ショーケース */}
+                  <div className="relative overflow-hidden rounded-2xl border border-amber-300/40 bg-gradient-to-r from-indigo-900/90 via-purple-900/90 to-pink-900/80 p-3.5 shadow-lg">
+                    <div className="flex items-center gap-3">
+                      {featuredShowcase ? (
+                        <>
+                          <div className="relative shrink-0 rounded-2xl bg-black/40 p-1.5 border border-amber-300/40">
+                            <AvatarRenderer
+                              equippedParts={buildTryOnEquipped(featuredShowcase.partIds)}
+                              size={92}
+                              animate
+                            />
+                            <span className="absolute -top-1.5 -left-1.5 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 px-2 py-0.5 text-[9px] font-black text-white shadow-sm">
+                              PICKUP ★3
+                            </span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 border border-amber-300/40 px-2 py-0.5 text-[10px] font-extrabold text-amber-200">
+                              <Crown className="h-3 w-3 text-amber-300" />
+                              <span>
+                                {featuredShowcase.type === 'coord_set'
+                                  ? '★3 フルコーデ一式排出'
+                                  : '★3 スペシャルパーツ'}
+                              </span>
+                            </div>
+                            <h3 className="mt-1 truncate text-base font-black text-white">
+                              {featuredShowcase.title}
+                            </h3>
+                            <p className="text-xs text-pink-100/90 line-clamp-2">
+                              {featuredShowcase.subtitle}
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                              <span className="rounded-md bg-pink-500/30 border border-pink-300/40 px-2 py-0.5 text-pink-200">
+                                🌈 ★3 SSR: {cfg.rarityRates.r3}%
+                              </span>
+                              <span className="rounded-md bg-amber-500/30 border border-amber-300/40 px-2 py-0.5 text-amber-200">
+                                ✨ ★2 R: {cfg.rarityRates.r2}%
+                              </span>
+                              <span className="rounded-md bg-sky-500/30 border border-sky-300/40 px-2 py-0.5 text-sky-200">
+                                💎 ★1 N: {cfg.rarityRates.r1}%
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-3 py-2">
+                          <GachaIcon type="orb_r3" size={64} />
+                          <div>
+                            <span className="rounded-full bg-pink-500/30 px-2 py-0.5 text-[10px] font-black text-pink-200">
+                              ROYAL JEWEL STAGE
+                            </span>
+                            <h3 className="mt-1 text-base font-black text-white">
+                              限定コーデ＆ごほうびチケットを手に入れよう！
+                            </h3>
+                            <p className="text-xs text-indigo-200">
+                              ダブっても💎スタージュエルが貯まって好きなアイテムと交換できるよ✨
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {isOwned ? (
-                    <div className="w-full text-center py-1.5 rounded-xl bg-slate-200 text-[10px] font-bold text-slate-500 flex items-center justify-center gap-1">
-                      <Check size={12} strokeWidth={3} />
-                      <span>もっているよ</span>
+                  {/* 中央ジュエリーボックス演出エリア */}
+                  <div className="relative flex flex-col items-center justify-center py-5">
+                    <div className="pointer-events-none absolute h-44 w-44 rounded-full bg-gradient-to-r from-amber-400/25 via-pink-500/25 to-cyan-400/25 blur-2xl animate-pulse" />
+                    <div className="relative transition-transform duration-500 hover:scale-105">
+                      <GachaIcon type="box_closed" size={148} />
                     </div>
-                  ) : (
+                    <p className="mt-2 text-xs font-bold text-amber-200/90 flex items-center gap-1">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+                      <span>ボタンを押すと黄金のカギでジュエリーボックスが開くよ！</span>
+                    </p>
+                  </div>
+
+                  {/* 1回ガチャ ＆ 10連ガチャ アクションボタン */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+                    {/* 1回引く */}
                     <button
                       type="button"
-                      disabled={!canAfford}
-                      onClick={() => handleExchange(item.id, cost, item.name)}
-                      className={`btn-pop w-full py-1.5 rounded-xl text-xs font-black transition-all ${
-                        canAfford
-                          ? 'bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-950 shadow-[0_2px_0_#d97706] hover:bg-amber-300'
-                          : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                      }`}
+                      onClick={() => handleStartPull(1)}
+                      disabled={!free && child.coins < cfg.singleCost}
+                      className="relative flex flex-col items-center justify-center rounded-2xl border border-sky-300/50 bg-gradient-to-b from-sky-500 via-blue-600 to-indigo-700 p-3.5 text-white shadow-lg hover:brightness-110 active:scale-98 disabled:opacity-45 transition"
                     >
-                      {canAfford ? 'こうかんする！' : `あと ${cost - (child.starShards ?? 0)}こ`}
+                      {free && (
+                        <span className="absolute -top-2.5 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 px-3 py-0.5 text-[10px] font-black text-slate-950 shadow-sm">
+                          🎁 本日1回無料！
+                        </span>
+                      )}
+                      <span className="text-sm font-black tracking-wide">1回ガチャを引く</span>
+                      <span className="mt-1 rounded-full bg-black/30 px-3 py-0.5 text-xs font-extrabold text-amber-200">
+                        {free ? '🪙 0（無料✨）' : `🪙 ${cfg.singleCost} コイン`}
+                      </span>
                     </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              sound.tap();
-              onClose();
-            }}
-            className="btn-pop mt-3 w-full rounded-2xl bg-slate-100 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-200"
-          >
-            とじる
-          </button>
+                    {/* 10連引く（★2以上1枠確定） */}
+                    <button
+                      type="button"
+                      onClick={() => handleStartPull(10)}
+                      disabled={child.coins < cfg.tenPullCost}
+                      className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-amber-300 bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 p-3.5 text-white shadow-[0_0_25px_rgba(245,158,11,0.45)] hover:brightness-110 active:scale-98 disabled:opacity-45 transition"
+                    >
+                      <span className="absolute -top-2.5 rounded-full bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 px-3 py-0.5 text-[10px] font-black text-slate-950 shadow-sm">
+                        🌈 ★2以上1枠確定！おとく✨
+                      </span>
+                      <span className="text-sm font-black tracking-wide">10連ガチャを引く</span>
+                      <span className="mt-1 rounded-full bg-black/35 px-3 py-0.5 text-xs font-extrabold text-amber-200">
+                        🪙 {cfg.tenPullCost} コイン
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ---------- PHASE 1: OPENING（黄金の鍵で解錠＆光の色変化！） ---------- */}
+              {phase === 'opening' && (
+                <div className="flex flex-col items-center justify-center py-14 text-center animate-fade-in">
+                  <div
+                    className={`relative flex items-center justify-center rounded-full p-8 ${
+                      initialMaxRarity === 3
+                        ? 'bg-gradient-to-r from-pink-500/40 via-amber-400/40 to-cyan-400/40 shadow-[0_0_80px_rgba(236,72,153,0.8)]'
+                        : initialMaxRarity === 2
+                        ? 'bg-amber-400/35 shadow-[0_0_70px_rgba(251,191,36,0.75)]'
+                        : 'bg-sky-400/30 shadow-[0_0_60px_rgba(56,189,248,0.65)]'
+                    }`}
+                  >
+                    <GachaIcon
+                      type="box_open"
+                      size={180}
+                      className="animate-bounce"
+                    />
+                  </div>
+                  <h3 className="mt-6 text-xl font-black tracking-wider text-amber-200 animate-pulse">
+                    ✨ 黄金のカギで解錠中...！！ ✨
+                  </h3>
+                  <p className="mt-1 text-xs font-bold text-indigo-200">
+                    {initialMaxRarity === 3
+                      ? '🌈 なないろの輝きがあふれ出している…！？'
+                      : initialMaxRarity === 2
+                      ? '✨ まぶしい黄金の光が輝いている！'
+                      : '💎 ジュエルオーブが飛び出すよ！'}
+                  </p>
+                </div>
+              )}
+
+              {/* ---------- PHASE 2: ORBS & PROMOTION（オーブ展開＆パリーン昇格演出！） ---------- */}
+              {(phase === 'orbs' || phase === 'promotion') && (
+                <div className="flex flex-col items-center justify-center py-10 w-full text-center animate-fade-in">
+                  {phase === 'promotion' && (
+                    <div className="mb-4 rounded-2xl border-2 border-amber-300 bg-gradient-to-r from-pink-600 via-amber-500 to-purple-600 px-5 py-2 shadow-[0_0_40px_rgba(236,72,153,0.9)] animate-bounce">
+                      <p className="text-base sm:text-lg font-black text-white tracking-wider">
+                        ⚡ パリーン！！ 奇跡の昇格発生！！ 🌈
+                      </p>
+                    </div>
+                  )}
+
+                  {pulls.length === 1 ? (
+                    <div className="my-6 flex flex-col items-center">
+                      <div className="relative p-6 rounded-full bg-white/10 shadow-[0_0_60px_rgba(255,255,255,0.35)]">
+                        <GachaIcon
+                          type={
+                            (promotedVisual ? pulls[0].prize.rarity : pulls[0].initialOrbRarity) === 3
+                              ? 'orb_r3'
+                              : (promotedVisual ? pulls[0].prize.rarity : pulls[0].initialOrbRarity) === 2
+                              ? 'orb_r2'
+                              : 'orb_r1'
+                          }
+                          size={156}
+                          className="animate-pulse"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="my-4 grid grid-cols-5 gap-3 sm:gap-4 max-w-md mx-auto">
+                      {pulls.map((item, idx) => {
+                        const r = promotedVisual ? item.prize.rarity : item.initialOrbRarity;
+                        return (
+                          <div
+                            key={idx}
+                            className={`flex flex-col items-center justify-center rounded-2xl p-2 transition-all duration-300 ${
+                              promotedVisual && item.isFakeoutPromotion
+                                ? 'scale-115 ring-2 ring-amber-300 bg-gradient-to-br from-pink-500/40 to-amber-400/40'
+                                : 'bg-white/5'
+                            }`}
+                          >
+                            <GachaIcon
+                              type={r === 3 ? 'orb_r3' : r === 2 ? 'orb_r2' : 'orb_r1'}
+                              size={56}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <p className="mt-4 text-sm font-extrabold text-amber-200">
+                    {phase === 'promotion'
+                      ? '✨ オーブの色が劇的に変化したよ！！ ✨'
+                      : '✨ ジュエルオーブが光を放っている…！ ✨'}
+                  </p>
+                </div>
+              )}
+
+              {/* ---------- PHASE 3: SSR RUNWAY（★3全画面カットイン＆アバター試着ランウェイ！） ---------- */}
+              {phase === 'ssr_runway' && ssrPulls[ssrRunwayIdx] && (
+                <div className="flex flex-col items-center justify-center py-4 w-full text-center animate-fade-in">
+                  {(() => {
+                    const currentSSR = ssrPulls[ssrRunwayIdx];
+                    const hasAvatarParts = currentSSR.prize.partIds.length > 0;
+
+                    return (
+                      <div className="relative w-full rounded-3xl border-2 border-amber-300 bg-gradient-to-b from-pink-600/30 via-indigo-950 to-purple-950 p-5 shadow-[0_0_60px_rgba(236,72,153,0.6)]">
+                        <div className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-300 via-pink-400 to-cyan-300 px-4 py-1 text-xs font-black text-slate-950 shadow-md">
+                          <Crown className="h-4 w-4" />
+                          <span>
+                            {currentSSR.prize.kind === 'coord_set'
+                              ? '★3 SSR FULL COORD GET!!'
+                              : '★3 SUPER SPECIAL RARE!!'}
+                          </span>
+                        </div>
+
+                        <h3 className="mt-2 text-xl sm:text-2xl font-black text-white drop-shadow-md">
+                          {currentSSR.prize.label}
+                        </h3>
+
+                        {/* ステージランウェイ試着表示 */}
+                        <div className="my-4 flex flex-col items-center justify-center">
+                          {hasAvatarParts ? (
+                            <div className="relative flex flex-col items-center">
+                              <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-tr from-amber-400/30 via-pink-400/30 to-cyan-300/30 blur-xl" />
+                              <AvatarRenderer
+                                equippedParts={buildTryOnEquipped(currentSSR.prize.partIds)}
+                                size={190}
+                                animate
+                                className="relative z-10 drop-shadow-[0_12px_28px_rgba(255,215,0,0.5)]"
+                              />
+                              <span className="mt-2 rounded-full bg-white/15 px-3 py-0.5 text-[11px] font-bold text-amber-200">
+                                👗 ドリームランウェイ試着お披露目中✨
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="py-6 text-6xl">{currentSSR.prize.icon}</div>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (ssrRunwayIdx + 1 < ssrPulls.length) {
+                              setSsrRunwayIdx((i) => i + 1);
+                              sound.fanfare();
+                            } else {
+                              setPhase('result');
+                              sound.success();
+                            }
+                          }}
+                          className="mt-2 w-full rounded-2xl bg-gradient-to-r from-amber-400 via-pink-500 to-indigo-500 py-3 text-sm font-black text-white shadow-lg hover:brightness-110"
+                        >
+                          {ssrRunwayIdx + 1 < ssrPulls.length
+                            ? 'つぎの★3を見る ✨'
+                            : 'リザルト一覧へ進む ✨'}
+                        </button>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* ---------- PHASE 4: RESULT（ホログラムカード一覧＆その場で着替えるボタン） ---------- */}
+              {phase === 'result' && (
+                <div className="flex flex-col gap-4 w-full animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-black text-amber-200 flex items-center gap-1.5">
+                      <Sparkles className="h-4 w-4 text-amber-300" />
+                      <span>ガチャ結果（{pulls.length}連）</span>
+                    </h3>
+                    {wonEquipablePartIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleEquipWonItems}
+                        disabled={equippedDone}
+                        className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-black shadow-md transition ${
+                          equippedDone
+                            ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/40'
+                            : 'bg-gradient-to-r from-pink-500 to-amber-500 text-white hover:brightness-110'
+                        }`}
+                      >
+                        {equippedDone ? (
+                          <>
+                            <Check className="h-3.5 w-3.5" />
+                            <span>お着替え完了✨</span>
+                          </>
+                        ) : (
+                          <>
+                            <Shirt className="h-3.5 w-3.5" />
+                            <span>当たった服に今すぐ着替える！</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* ホログラムカードグリッド */}
+                  <div
+                    className={`grid gap-2.5 ${
+                      pulls.length === 1 ? 'grid-cols-1 max-w-xs mx-auto w-full' : 'grid-cols-2 sm:grid-cols-5'
+                    }`}
+                  >
+                    {pulls.map((r, idx) => {
+                      const partObj = r.prize.partId
+                        ? dressupParts.find((p) => p.id === r.prize.partId)
+                        : undefined;
+                      const isSSR = r.prize.rarity === 3;
+                      const isSR = r.prize.rarity === 2;
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`relative flex flex-col items-center justify-between rounded-2xl border p-2.5 text-center transition ${
+                            isSSR
+                              ? 'border-2 border-amber-300 bg-gradient-to-b from-pink-500/30 via-purple-900/60 to-indigo-950 shadow-[0_0_20px_rgba(236,72,153,0.45)]'
+                              : isSR
+                              ? 'border-amber-300/70 bg-gradient-to-b from-amber-500/20 to-slate-900/90'
+                              : 'border-sky-400/40 bg-slate-900/80'
+                          }`}
+                        >
+                          {/* レア度＆NEWバッジ */}
+                          <div className="flex w-full items-center justify-between text-[10px] font-black">
+                            <span
+                              className={`rounded-md px-1.5 py-0.2 ${
+                                isSSR
+                                  ? 'bg-gradient-to-r from-amber-400 to-pink-500 text-slate-950'
+                                  : isSR
+                                  ? 'bg-amber-400/90 text-slate-950'
+                                  : 'bg-sky-500/40 text-sky-200'
+                              }`}
+                            >
+                              {isSSR ? '★3 SSR' : isSR ? '★2 R' : '★1 N'}
+                            </span>
+                            {r.newlyUnlockedPartIds.length > 0 && (
+                              <span className="rounded-full bg-emerald-400 px-1.5 py-0.2 text-[9px] font-black text-slate-950">
+                                NEW!
+                              </span>
+                            )}
+                          </div>
+
+                          {/* アイテムビジュアル */}
+                          <div className="my-2 flex h-16 w-16 items-center justify-center rounded-xl bg-black/30 p-1">
+                            {r.prize.kind === 'coord_set' ? (
+                              <AvatarRenderer
+                                equippedParts={buildTryOnEquipped(r.prize.partIds)}
+                                size={58}
+                                animate={false}
+                              />
+                            ) : partObj ? (
+                              <img
+                                src={partObj.src}
+                                alt={partObj.name}
+                                className="h-full w-full object-contain"
+                              />
+                            ) : r.prize.kind === 'shards' ? (
+                              <GachaIcon type="star_jewel" size={44} />
+                            ) : (
+                              <span className="text-3xl">{r.prize.icon}</span>
+                            )}
+                          </div>
+
+                          <p className="w-full truncate text-xs font-extrabold text-white">
+                            {r.prize.label}
+                          </p>
+
+                          {/* ダブり変換表示 */}
+                          {r.isDuplicate && (
+                            <span className="mt-1 rounded-md bg-cyan-500/20 border border-cyan-400/30 px-1.5 py-0.5 text-[9px] font-bold text-cyan-200">
+                              💎+{r.refundShards} / 🪙+{r.refundCoins}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* もう1回引く・ステージに戻る */}
+                  <div className="mt-2 grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setPhase('idle')}
+                      className="flex items-center justify-center gap-1.5 rounded-2xl border border-white/20 bg-white/10 py-2.5 text-xs font-extrabold text-white hover:bg-white/15"
+                    >
+                      <Repeat className="h-3.5 w-3.5" />
+                      <span>ガチャステージに戻る</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="rounded-2xl bg-gradient-to-r from-amber-400 to-pink-500 py-2.5 text-xs font-black text-slate-950 shadow-md"
+                    >
+                      とじる
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* =========================================================
+              2. ラインナップ図鑑（提供割合＆試着プレビュー）
+             ========================================================= */}
+          {tab === 'lineup' && (
+            <div className="flex flex-col gap-4">
+              {/* 試着プレビューバー */}
+              {previewTarget && (
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-300/50 bg-indigo-900/70 p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-xl bg-black/40 p-1">
+                      <AvatarRenderer
+                        equippedParts={buildTryOnEquipped(previewTarget.partIds)}
+                        size={76}
+                        animate
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-amber-300">
+                        👗 試着プレビュー中
+                      </span>
+                      <p className="text-sm font-black text-white">{previewTarget.title}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTarget(null)}
+                    className="rounded-lg bg-white/10 px-2.5 py-1 text-xs font-bold text-white/80"
+                  >
+                    閉じる
+                  </button>
+                </div>
+              )}
+
+              {/* 提供割合サマリー */}
+              <div className="rounded-2xl bg-white/5 border border-white/10 p-3 text-xs">
+                <p className="font-extrabold text-amber-200 mb-1.5">📊 レアリティ別提供割合</p>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-xl bg-pink-500/20 border border-pink-400/30 p-2">
+                    <div className="font-black text-pink-200">🌈 ★3 SSR</div>
+                    <div className="text-sm font-black text-white">{cfg.rarityRates.r3}%</div>
+                  </div>
+                  <div className="rounded-xl bg-amber-500/20 border border-amber-400/30 p-2">
+                    <div className="font-black text-amber-200">✨ ★2 R</div>
+                    <div className="text-sm font-black text-white">{cfg.rarityRates.r2}%</div>
+                  </div>
+                  <div className="rounded-xl bg-sky-500/20 border border-sky-400/30 p-2">
+                    <div className="font-black text-sky-200">💎 ★1 N</div>
+                    <div className="text-sm font-black text-white">{cfg.rarityRates.r1}%</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ★3 フルコーデセット一覧 */}
+              {cfg.coordSets.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-black text-pink-300 mb-2 flex items-center gap-1">
+                    <Crown className="h-3.5 w-3.5" />
+                    <span>★3 フルコーデセット（当たると一式まとめてGET！）</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {cfg.coordSets.map((cs) => {
+                      const owned = cs.partIds.every((pid: string) => child.ownedItems.includes(pid));
+                      return (
+                        <button
+                          key={cs.id}
+                          type="button"
+                          onClick={() =>
+                            setPreviewTarget({
+                              title: cs.name,
+                              partIds: cs.partIds,
+                              rarity: 3,
+                            })
+                          }
+                          className="flex items-center gap-3 rounded-2xl border border-amber-300/40 bg-white/5 p-2.5 text-left hover:bg-white/10 transition"
+                        >
+                          <div className="rounded-xl bg-black/40 p-1 shrink-0">
+                            <AvatarRenderer
+                              equippedParts={buildTryOnEquipped(cs.partIds)}
+                              size={60}
+                              animate={false}
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1">
+                              <span className="rounded-md bg-gradient-to-r from-amber-400 to-pink-500 px-1.5 py-0.2 text-[9px] font-black text-slate-950">
+                                ★3 SET
+                              </span>
+                              {owned && (
+                                <span className="rounded-md bg-emerald-400/30 px-1.5 py-0.2 text-[9px] font-bold text-emerald-200">
+                                  コンプ済✨
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-0.5 truncate text-xs font-extrabold text-white">
+                              {cs.name}
+                            </p>
+                            <p className="text-[10px] text-indigo-200/80">
+                              タップで試着プレビュー（{cs.partIds.length}点セット）
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 単体ガチャ限定パーツ一覧 */}
+              <div>
+                <h4 className="text-xs font-black text-amber-200 mb-2">
+                  ✨ ガチャ限定アバターパーツ ({gachaOnlyParts.length}種)
+                </h4>
+                {gachaOnlyParts.length === 0 ? (
+                  <p className="rounded-xl bg-white/5 p-4 text-center text-xs text-indigo-200/70">
+                    現在ガチャ限定に設定されている単体パーツはありません（親モードのガチャ管理から追加できます）
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {gachaOnlyParts.map((part) => {
+                      const st = getEffectivePartGachaSetting(part, cfg);
+                      const owned = child.ownedItems.includes(part.id);
+                      const cat = CATEGORY_META[part.category];
+                      return (
+                        <button
+                          key={part.id}
+                          type="button"
+                          onClick={() =>
+                            setPreviewTarget({
+                              title: part.name,
+                              partIds: [part.id],
+                              rarity: st.rarity,
+                            })
+                          }
+                          className={`flex flex-col items-center rounded-xl border p-2 text-center transition ${
+                            owned
+                              ? 'border-emerald-400/50 bg-emerald-950/30'
+                              : 'border-white/15 bg-white/5 hover:bg-white/10'
+                          }`}
+                        >
+                          <div className="flex w-full items-center justify-between text-[9px] font-black">
+                            <span
+                              className={
+                                st.rarity === 3
+                                  ? 'text-pink-300'
+                                  : st.rarity === 2
+                                  ? 'text-amber-300'
+                                  : 'text-sky-300'
+                              }
+                            >
+                              ★{st.rarity}
+                            </span>
+                            {owned && <span className="text-emerald-300">GET済</span>}
+                          </div>
+                          <div className="my-1 h-12 w-12 rounded-lg bg-black/30 p-1">
+                            <img
+                              src={part.src}
+                              alt={part.name}
+                              className="h-full w-full object-contain"
+                            />
+                          </div>
+                          <span className="text-[9px] text-indigo-300">{cat?.label}</span>
+                          <span className="w-full truncate text-[11px] font-bold text-white">
+                            {part.name}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* =========================================================
+              3. スタージュエル交換所（天井システム）
+             ========================================================= */}
+          {tab === 'exchange' && (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between rounded-2xl border border-cyan-400/40 bg-gradient-to-r from-cyan-950/80 to-indigo-950/80 p-3.5">
+                <div className="flex items-center gap-2.5">
+                  <GachaIcon type="star_jewel" size={40} />
+                  <div>
+                    <h4 className="text-sm font-black text-white">スタージュエル交換所</h4>
+                    <p className="text-[11px] text-cyan-200/80">
+                      ガチャで集めたジュエルで好きな限定コーデと交換できるよ！
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-cyan-200">所持ジュエル</span>
+                  <div className="text-lg font-black text-cyan-300">💎 {starJewels}個</div>
+                </div>
+              </div>
+
+              {/* フルコーデセット交換 */}
+              {cfg.coordSets.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <h5 className="text-xs font-black text-amber-200">
+                    👑 ★3 フルコーデセット一式交換
+                  </h5>
+                  {cfg.coordSets.map((cs) => {
+                    const owned = cs.partIds.every((pid: string) => child.ownedItems.includes(pid));
+                    const cost = cs.exchangeCost ?? cfg.exchangeCosts.r3Set;
+                    const canBuy = !owned && starJewels >= cost;
+
+                    return (
+                      <div
+                        key={cs.id}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-amber-300/30 bg-white/5 p-3"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="rounded-xl bg-black/40 p-1 shrink-0">
+                            <AvatarRenderer
+                              equippedParts={buildTryOnEquipped(cs.partIds)}
+                              size={56}
+                              animate={false}
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black text-white">{cs.name}</p>
+                            <p className="text-[11px] text-indigo-200/80">
+                              {cs.partIds.length}点セット一式
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={!canBuy}
+                          onClick={() =>
+                            handleExchange({ type: 'coord_set', id: cs.id, name: cs.name })
+                          }
+                          className={`shrink-0 rounded-xl px-3.5 py-2 text-xs font-black transition ${
+                            owned
+                              ? 'bg-emerald-500/20 text-emerald-300'
+                              : canBuy
+                              ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 shadow-md hover:brightness-110'
+                              : 'bg-white/10 text-white/40'
+                          }`}
+                        >
+                          {owned ? 'コンプ済✨' : `💎 ${cost}個で交換`}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* 単体パーツ交換 */}
+              <div className="flex flex-col gap-2">
+                <h5 className="text-xs font-black text-cyan-200">
+                  ✨ ガチャ限定パーツ単体交換
+                </h5>
+                {gachaOnlyParts.length === 0 ? (
+                  <p className="rounded-xl bg-white/5 p-4 text-center text-xs text-indigo-200/70">
+                    交換対象のガチャ限定パーツがまだ登録されていません
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {gachaOnlyParts.map((part) => {
+                      const st = getEffectivePartGachaSetting(part, cfg);
+                      const owned = child.ownedItems.includes(part.id);
+                      const cost =
+                        st.exchangeCost ??
+                        (st.rarity === 3
+                          ? cfg.exchangeCosts.r3Part
+                          : st.rarity === 2
+                          ? cfg.exchangeCosts.r2Part
+                          : cfg.exchangeCosts.r1Part);
+                      const canBuy = !owned && starJewels >= cost;
+
+                      return (
+                        <div
+                          key={part.id}
+                          className="flex items-center justify-between gap-2.5 rounded-2xl border border-white/15 bg-white/5 p-2.5"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="h-12 w-12 shrink-0 rounded-xl bg-black/40 p-1">
+                              <img
+                                src={part.src}
+                                alt={part.name}
+                                className="h-full w-full object-contain"
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <span
+                                className={`text-[10px] font-black ${
+                                  st.rarity === 3
+                                    ? 'text-pink-300'
+                                    : st.rarity === 2
+                                    ? 'text-amber-300'
+                                    : 'text-sky-300'
+                                }`}
+                              >
+                                ★{st.rarity}
+                              </span>
+                              <p className="truncate text-xs font-extrabold text-white">
+                                {part.name}
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={!canBuy}
+                            onClick={() =>
+                              handleExchange({ type: 'part', id: part.id, name: part.name })
+                            }
+                            className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                              owned
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : canBuy
+                                ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950'
+                                : 'bg-white/10 text-white/40'
+                            }`}
+                          >
+                            {owned ? '所持済' : `💎 ${cost}`}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

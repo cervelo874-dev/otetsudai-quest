@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import type { Child } from '../types';
-import { updateChildAvatarStudio } from '../actions';
+import { updateChildAvatarStudio, getEffectivePartGachaSetting } from '../actions';
+import { useAppState } from '../store';
 import { sound } from '../sound';
 import { burst } from '../effects';
 import { toast } from './ui';
@@ -218,6 +219,7 @@ export function AvatarMaker({
   // ユーザーが手動でパーツを試着選択したかどうかのフラグ
   const hasUserInteractedRef = useRef(false);
 
+  const appState = useAppState();
   const [sparkleCount, setSparkleCount] = useState(0);
   const [jumping, setJumping] = useState(false);
 
@@ -949,13 +951,8 @@ export function AvatarMaker({
                     : currentEquippedId === part.id;
                 const isParentMade = part.source === 'custom' || !part.id.startsWith('preset_');
 
-                const meta = (part.meta ?? {}) as {
-                  isGachaOnly?: boolean;
-                  isShopOnly?: boolean;
-                  rarity?: 1 | 2 | 3;
-                  locked?: boolean;
-                };
-                const isLocked = meta.locked === true && !child.ownedItems.includes(part.id);
+                const gachaSt = getEffectivePartGachaSetting(part, appState.gachaConfig);
+                const isLocked = gachaSt.isGachaOnly && !child.ownedItems.includes(part.id);
 
                 return (
                   <button
@@ -964,11 +961,11 @@ export function AvatarMaker({
                     onClick={() => {
                       if (isLocked) {
                         sound.tap();
-                        if (meta.isGachaOnly && onOpenGacha) {
-                          toast('ガチャで手に入るアイテムだよ！', '✨');
+                        if (onOpenGacha) {
+                          toast('ジュエルガチャで手に入る限定アイテムだよ！✨', '💎');
                           onOpenGacha();
                         } else {
-                          toast('まだ手に入っていないアイテムだよ！', '🔒');
+                          toast('ガチャで手に入る限定アイテムだよ！', '🔒');
                         }
                         return;
                       }
@@ -982,25 +979,32 @@ export function AvatarMaker({
                         : 'border-slate-200 bg-white hover:border-amber-200 hover:bg-amber-50/30 shadow-sm'
                     }`}
                   >
-                    {/* 💛 親が作った「てづくり」バッジ */}
-                    {isParentMade && (
-                      <span className="absolute top-1.5 left-1.5 z-10 flex items-center gap-0.5 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 px-1.5 sm:px-2 py-0.5 text-[8px] sm:text-[9px] font-black text-white shadow-sm animate-pulse">
-                        <Heart size={9} fill="currentColor" />
-                        <span className="whitespace-nowrap">てづくり</span>
+                    {/* 💛 親が作った「てづくり」＆ガチャレア度バッジ */}
+                    {gachaSt.isGachaOnly ? (
+                      <span
+                        className={`absolute top-1.5 left-1.5 z-10 flex items-center gap-0.5 rounded-full px-1.5 sm:px-2 py-0.5 text-[8px] sm:text-[9px] font-black text-white shadow-sm ${
+                          gachaSt.rarity === 3
+                            ? 'bg-gradient-to-r from-pink-500 via-amber-500 to-indigo-500'
+                            : gachaSt.rarity === 2
+                            ? 'bg-amber-500'
+                            : 'bg-sky-500'
+                        }`}
+                      >
+                        <span>★{gachaSt.rarity} ガチャ</span>
                       </span>
+                    ) : (
+                      isParentMade && (
+                        <span className="absolute top-1.5 left-1.5 z-10 flex items-center gap-0.5 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 px-1.5 sm:px-2 py-0.5 text-[8px] sm:text-[9px] font-black text-white shadow-sm animate-pulse">
+                          <Heart size={9} fill="currentColor" />
+                          <span className="whitespace-nowrap">てづくり</span>
+                        </span>
+                      )
                     )}
 
                     {/* 選択中チェックマーク */}
                     {isSelected && (
                       <span className="absolute top-1.5 right-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-white shadow-md">
                         <Check size={14} strokeWidth={3} />
-                      </span>
-                    )}
-
-                    {/* レア度バッジ（将来拡張） */}
-                    {meta.rarity && meta.rarity > 1 && !isParentMade && (
-                      <span className="absolute top-1.5 left-1.5 z-10 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-black text-amber-950 shadow-sm">
-                        ★{meta.rarity}
                       </span>
                     )}
 
@@ -1016,10 +1020,10 @@ export function AvatarMaker({
 
                     {/* ロック状態のオーバーレイ */}
                     {isLocked && (
-                      <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-slate-900/60 text-white p-1 backdrop-blur-[1px]">
+                      <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-indigo-950/70 text-white p-1 backdrop-blur-[1px]">
                         <Lock size={18} className="mb-0.5 text-amber-300" />
-                        <span className="text-[10px] font-black whitespace-nowrap">
-                          {meta.isGachaOnly ? 'ガチャ' : 'ショップ'}
+                        <span className="text-[10px] font-black text-amber-200 whitespace-nowrap">
+                          💎 ガチャ限定
                         </span>
                       </div>
                     )}

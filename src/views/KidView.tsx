@@ -12,7 +12,7 @@ import { Modal } from '../components/ui';
 import { getRank, displayStreak, themeOf } from '../logic';
 import { sound } from '../sound';
 import { burst } from '../effects';
-import { GachaMachineVisual } from '../components/GachaMachineVisual';
+import { GachaIcon } from '../components/GachaIcons';
 import { claimDailyLoginBonus, canFreeGacha } from '../actions';
 import { Sparkles, Shirt, Award, Flame, Coins, Gift, Smartphone, Check } from 'lucide-react';
 
@@ -137,7 +137,7 @@ export function KidView({
               </div>
             </div>
 
-            {/* スマホ用ガチャマシンボタン（右上に配置） */}
+            {/* スマホ用ジュエルガチャボタン（右上に配置） */}
             <div className="sm:hidden flex flex-col items-center shrink-0">
               <button
                 type="button"
@@ -146,23 +146,27 @@ export function KidView({
                   setGachaTab('spin');
                   setShowGacha(true);
                 }}
-                className="btn-pop group relative flex flex-col items-center focus:outline-none"
-                title="ごほうびガチャをまわす！"
+                className="btn-pop group relative flex flex-col items-center rounded-2xl bg-gradient-to-b from-indigo-950 via-purple-900 to-slate-900 px-2.5 py-1.5 border-2 border-amber-300/80 shadow-md focus:outline-none"
+                title="ドリームジュエルガチャをひらく！"
               >
-                <div className="flex items-center gap-0.5 rounded-full bg-yellow-400 px-2 py-0.5 text-[10px] font-black text-amber-950 shadow-sm border border-white mb-0.5">
-                  <span>🎰</span>
-                  <span>ガチャ</span>
-                </div>
-                <GachaMachineVisual
-                  size="sm"
-                  isFree={isFreeGacha}
-                  className="w-12 h-14"
+                {isFreeGacha && (
+                  <span className="absolute -top-2 -right-1 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 px-1.5 py-0.2 text-[9px] font-black text-slate-950 shadow-xs">
+                    無料✨
+                  </span>
+                )}
+                <GachaIcon
+                  type="box_closed"
+                  size={40}
+                  className="transition-transform group-hover:scale-110"
                 />
+                <span className="mt-0.5 text-[10px] font-black text-amber-200 whitespace-nowrap">
+                  ジュエルガチャ
+                </span>
               </button>
             </div>
           </div>
 
-          {/* 下段（スマホ時）/ 中央（PC時）: コイン・ほしのかけら・連続達成メーター */}
+          {/* 下段（スマホ時）/ 中央（PC時）: コイン・スタージュエル・連続達成メーター */}
           <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 sm:gap-2.5 w-full sm:flex-1">
             {/* コイン */}
             <div className="flex-1 sm:flex-none flex items-center justify-center gap-1 sm:gap-1.5 rounded-2xl bg-white/95 px-3 py-1.5 font-black text-amber-800 shadow-xs">
@@ -173,7 +177,7 @@ export function KidView({
               <span className="text-[11px] sm:text-xs text-amber-900">コイン</span>
             </div>
 
-            {/* 🌟 ほしのかけら（タップで交換所へ直行！） */}
+            {/* 💎 スタージュエル（タップで交換所へ直行！） */}
             <button
               type="button"
               onClick={() => {
@@ -181,16 +185,16 @@ export function KidView({
                 setGachaTab('exchange');
                 setShowGacha(true);
               }}
-              className="flex-1 sm:flex-none btn-pop flex items-center justify-center gap-1 rounded-2xl bg-gradient-to-r from-amber-100 to-yellow-100 px-3 py-1.5 font-black text-amber-950 shadow-xs border border-amber-300 hover:scale-105 transition-all"
-              title="ほしのかけら交換所をひらく"
+              className="flex-1 sm:flex-none btn-pop flex items-center justify-center gap-1 rounded-2xl bg-gradient-to-r from-indigo-950 via-purple-950 to-slate-900 px-3 py-1.5 font-black text-cyan-200 shadow-xs border border-cyan-300/60 hover:scale-105 transition-all"
+              title="スタージュエル交換所をひらく"
             >
-              <span className="text-base sm:text-xl text-amber-500">🌟</span>
-              <span className="text-sm sm:text-lg text-amber-600">
+              <GachaIcon type="star_jewel" size={20} />
+              <span className="text-sm sm:text-lg text-cyan-300">
                 {currentChild.starShards ?? 0}
               </span>
-              <span className="text-[11px] sm:text-xs text-amber-900">こ</span>
-              <span className="text-[9px] sm:text-[10px] bg-amber-400 text-amber-950 px-1 py-0.2 rounded-full font-bold whitespace-nowrap">
-                つかう➔
+              <span className="text-[11px] sm:text-xs text-cyan-100">ジュエル</span>
+              <span className="text-[9px] sm:text-[10px] bg-gradient-to-r from-cyan-400 to-amber-300 text-slate-950 px-1.5 py-0.2 rounded-full font-black whitespace-nowrap">
+                交換所➔
               </span>
             </button>
 
@@ -202,7 +206,7 @@ export function KidView({
             </div>
           </div>
 
-          {/* PC・タブレット用ガチャマシン（sm以上で右端に配置） */}
+          {/* PC・タブレット用ジュエルガチャボックス（sm以上で右端に配置） */}
           <div className="hidden sm:flex flex-col items-center shrink-0 ml-auto">
             <button
               type="button"
@@ -211,18 +215,22 @@ export function KidView({
                 setGachaTab('spin');
                 setShowGacha(true);
               }}
-              className="btn-pop group relative flex flex-col items-center focus:outline-none"
-              title="ごほうびガチャをまわす！"
+              className="btn-pop group relative flex flex-col items-center rounded-2xl bg-gradient-to-b from-indigo-950 via-purple-900 to-slate-950 px-4 py-2 border-2 border-amber-300/80 shadow-lg focus:outline-none"
+              title="ドリームジュエルガチャをひらく！"
             >
-              <div className="flex items-center gap-1 rounded-full bg-yellow-400 px-3 py-1 text-xs font-black text-amber-950 shadow-md group-hover:scale-105 transition-transform mb-1 border-2 border-white">
-                <span className="text-sm">🎰</span>
-                <span>ガチャ！</span>
-              </div>
-              <GachaMachineVisual
-                size="sm"
-                isFree={isFreeGacha}
+              {isFreeGacha && (
+                <span className="absolute -top-2.5 -right-2 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-sm animate-bounce">
+                  🎁 無料1回！
+                </span>
+              )}
+              <GachaIcon
+                type="box_closed"
+                size={54}
                 className="transition-transform group-hover:scale-110"
               />
+              <div className="mt-1 flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-300 via-pink-300 to-cyan-300 px-2.5 py-0.5 text-[11px] font-black text-slate-950 shadow-sm">
+                <span>✨ ジュエルガチャ</span>
+              </div>
             </button>
           </div>
         </div>
@@ -328,19 +336,14 @@ export function KidView({
         />
       </Modal>
 
-      {/* ガチャモーダル（独自ヘッダーで閉じるボタンを持つためhideClose=true） */}
-      <Modal
-        open={showGacha}
-        onClose={() => setShowGacha(false)}
-        className="max-w-md p-4 sm:p-6"
-        hideClose={true}
-      >
+      {/* ドリームジュエルガチャモーダル */}
+      {showGacha && (
         <GachaModal
           child={currentChild}
           initialTab={gachaTab}
           onClose={() => setShowGacha(false)}
         />
-      </Modal>
+      )}
 
       {/* まいにちログインボーナスモーダル */}
       <Modal

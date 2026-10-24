@@ -17,8 +17,10 @@ import {
 import { toast } from './ui';
 import { sound } from '../sound';
 import { updateAllChildrenAvatarBody } from '../actions';
+import { GachaAdminStudio } from './GachaAdminStudio';
+import { GachaIcon } from './GachaIcons';
 
-type StudioSectionView = 'studio' | 'closet';
+type StudioSectionView = 'studio' | 'closet' | 'gacha';
 
 const PARENT_STUDIO_EQUIPPED_KEY = 'mobage_avatar_current_equipped_v2';
 const PARENT_STUDIO_ADJUSTMENTS_KEY = 'mobage_avatar_current_adjustments_v2';
@@ -172,12 +174,12 @@ export function AvatarStudioSection() {
           </div>
         </div>
 
-        {/* スマホ用2タブ切り替え */}
-        <nav className="grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 border border-zinc-200/60">
+        {/* スマホ用3タブ切り替え */}
+        <nav className="grid grid-cols-3 gap-1 rounded-xl bg-zinc-100 p-1 border border-zinc-200/60">
           <button
             type="button"
             onClick={() => setView('studio')}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${
+            className={`flex items-center justify-center gap-1 rounded-lg py-2 text-xs font-bold transition ${
               view === 'studio'
                 ? 'bg-white text-zinc-900 shadow-xs'
                 : 'text-zinc-500 hover:text-zinc-800'
@@ -189,7 +191,7 @@ export function AvatarStudioSection() {
           <button
             type="button"
             onClick={() => setView('closet')}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${
+            className={`flex items-center justify-center gap-1 rounded-lg py-2 text-xs font-bold transition ${
               view === 'closet'
                 ? 'bg-white text-zinc-900 shadow-xs'
                 : 'text-zinc-500 hover:text-zinc-800'
@@ -197,9 +199,18 @@ export function AvatarStudioSection() {
           >
             <Shirt className="h-3.5 w-3.5 text-amber-600" />
             <span>クローゼット</span>
-            <span className="rounded-full bg-zinc-200/80 px-1.5 py-0.2 text-[10px] font-semibold text-zinc-700">
-              {parts.length}
-            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('gacha')}
+            className={`flex items-center justify-center gap-1 rounded-lg py-2 text-xs font-bold transition ${
+              view === 'gacha'
+                ? 'bg-white text-zinc-900 shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-800'
+            }`}
+          >
+            <GachaIcon type="box_closed" size={16} />
+            <span>ガチャ管理</span>
           </button>
         </nav>
       </div>
@@ -225,7 +236,7 @@ export function AvatarStudioSection() {
               </span>
             </div>
             <p className="text-xs text-zinc-500">
-              AI生成画像やイラストを取り込んで登録できます。保存したパーツは子どもがクローゼットで着せ替え可能です！
+              AI生成画像やイラストを取り込んで登録できます。ガチャ限定化や★3フルコーデ設定も管理できます！
             </p>
           </div>
         </div>
@@ -260,13 +271,28 @@ export function AvatarStudioSection() {
                 {parts.length}
               </span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setView('gacha')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                view === 'gacha'
+                  ? 'bg-white text-zinc-900 shadow-sm font-semibold'
+                  : 'text-zinc-600 hover:text-zinc-900'
+              }`}
+            >
+              <GachaIcon type="box_closed" size={16} />
+              <span>ガチャ運営スタジオ</span>
+            </button>
           </nav>
         </div>
       </div>
 
       {/* メイン制作・調整画面（開発したコンポーネントをそのまま描画） */}
       <div>
-        {view === 'closet' ? (
+        {view === 'gacha' ? (
+          <GachaAdminStudio parts={parts} />
+        ) : view === 'closet' ? (
           <AvatarCloset
             ownedParts={parts}
             equippedParts={equippedParts}

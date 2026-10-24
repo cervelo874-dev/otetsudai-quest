@@ -147,6 +147,94 @@ export interface DoneRecord {
   date: string;
 }
 
+export type GachaRarity = 1 | 2 | 3; // 1: ★1(N), 2: ★2(R), 3: ★3(SSR)
+
+/** パーツ個別のガチャ設定 */
+export interface GachaPartSetting {
+  partId: string;
+  /** true の場合「ガチャ限定（未所持ならロック🔒）」、false の場合「初期所持（誰でも着られる）」 */
+  isGachaOnly: boolean;
+  /** レアリティ: 1 (★1 N) | 2 (★2 R) | 3 (★3 SSR) */
+  rarity: GachaRarity;
+  /** ピックアップ対象（同レア度内で排出率2.5倍＆バナー表示） */
+  isPickup?: boolean;
+  /** 交換所での個別必要ジュエル数（未設定時はレア度別標準値） */
+  exchangeCost?: number;
+}
+
+/** ★3 SSR フルコーデセット（一式まとめて排出枠） */
+export interface GachaCoordSet {
+  id: string;
+  name: string;
+  description?: string;
+  /** セットに含まれる自作パーツIDのリスト */
+  partIds: string[];
+  /** ピックアップ対象か */
+  isPickup?: boolean;
+  /** 交換所での必要スタージュエル数（未設定時は r3Set 標準値） */
+  exchangeCost?: number;
+  createdAt: number;
+}
+
+/** ガチャ全体の運営設定（親モードで自由に変更可能） */
+export interface GachaConfig {
+  /** バナータイトル（例: 「ロイヤル・ジュエルステージ」） */
+  bannerTitle: string;
+  /** バナーサブタイトル */
+  bannerSubtitle: string;
+  /** 1回ガチャのコイン価格（デフォルト: 50） */
+  singleCost: number;
+  /** 10連ガチャのコイン価格（デフォルト: 450） */
+  tenPullCost: number;
+  /** 1日1回無料ガチャを有効にするか（デフォルト: true） */
+  enableDailyFree: boolean;
+  /** レア度別の排出確率（合計100%: デフォルト ★3: 6%, ★2: 34%, ★1: 60%） */
+  rarityRates: {
+    r3: number;
+    r2: number;
+    r1: number;
+  };
+  /** 各レア度内で「アバターパーツ（またはセット）」が選ばれる確率(%)（残りはチケットやコイン等の副賞） */
+  avatarWeightPercent: {
+    r3: number;
+    r2: number;
+    r1: number;
+  };
+  /** 副賞の中で「ショップごほうびチケット」と「コイン＆ジュエル」の比率（チケット側%） */
+  ticketSubWeightPercent: number;
+  /** 副賞として排出を許可するショップチケットIDリスト */
+  enabledShopTicketIds: string[];
+  /** 副賞コイン＆ジュエル設定 */
+  subPrizeCoins: {
+    r3Coins: number;
+    r3Shards: number;
+    r2Coins: number;
+    r2Shards: number;
+    r1Coins: number;
+    r1Shards: number;
+  };
+  /** ダブり時の自動変換（補填）設定 */
+  duplicateRefund: {
+    r3Coins: number;
+    r3Shards: number;
+    r2Coins: number;
+    r2Shards: number;
+    r1Coins: number;
+    r1Shards: number;
+  };
+  /** 天井（スタージュエル交換所）の必要ジュエル数 */
+  exchangeCosts: {
+    r3Set: number;
+    r3Part: number;
+    r2Part: number;
+    r1Part: number;
+  };
+  /** パーツIDごとのガチャ設定マップ */
+  partSettings: Record<string, GachaPartSetting>;
+  /** ★3 フルコーデセット（一式排出）リスト */
+  coordSets: GachaCoordSet[];
+}
+
 export interface NotificationSettings {
   /** チケット使用通知（子ども ➔ 親） */
   ticketUsed: boolean;
@@ -176,6 +264,8 @@ export interface AppState {
   logs: LogEntry[];
   done: DoneRecord[];
   notificationSettings: NotificationSettings;
+  /** ガチャ運営設定（ラインナップ・確率・補填・フルコーデセット） */
+  gachaConfig: GachaConfig;
   /** 意図的に削除された子どものID（別端末同期時のゾンビ復活防止） */
   deletedChildIds?: string[];
   /** 意図的に削除されたお手伝いのID（別端末同期時のゾンビ復活防止） */

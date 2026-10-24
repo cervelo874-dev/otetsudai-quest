@@ -3,6 +3,7 @@ import type { AppState, Child, Quest, ShopItem, Ticket } from './types';
 import {
   DEFAULT_AVATAR,
   DEFAULT_CHILD_PROPS,
+  DEFAULT_GACHA_CONFIG,
   createInitialState,
   STATE_VERSION,
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -68,6 +69,35 @@ export function normalize(p: Partial<AppState>): AppState {
     notificationSettings: {
       ...DEFAULT_NOTIFICATION_SETTINGS,
       ...(p.notificationSettings || {}),
+    },
+    gachaConfig: {
+      ...DEFAULT_GACHA_CONFIG,
+      ...(p.gachaConfig || {}),
+      rarityRates: {
+        ...DEFAULT_GACHA_CONFIG.rarityRates,
+        ...(p.gachaConfig?.rarityRates || {}),
+      },
+      avatarWeightPercent: {
+        ...DEFAULT_GACHA_CONFIG.avatarWeightPercent,
+        ...(p.gachaConfig?.avatarWeightPercent || {}),
+      },
+      enabledShopTicketIds: Array.isArray(p.gachaConfig?.enabledShopTicketIds)
+        ? p.gachaConfig.enabledShopTicketIds
+        : [...DEFAULT_GACHA_CONFIG.enabledShopTicketIds],
+      subPrizeCoins: {
+        ...DEFAULT_GACHA_CONFIG.subPrizeCoins,
+        ...(p.gachaConfig?.subPrizeCoins || {}),
+      },
+      duplicateRefund: {
+        ...DEFAULT_GACHA_CONFIG.duplicateRefund,
+        ...(p.gachaConfig?.duplicateRefund || {}),
+      },
+      exchangeCosts: {
+        ...DEFAULT_GACHA_CONFIG.exchangeCosts,
+        ...(p.gachaConfig?.exchangeCosts || {}),
+      },
+      partSettings: p.gachaConfig?.partSettings ? { ...p.gachaConfig.partSettings } : {},
+      coordSets: Array.isArray(p.gachaConfig?.coordSets) ? [...p.gachaConfig.coordSets] : [],
     },
     version: STATE_VERSION,
     lastUpdatedAt: typeof p.lastUpdatedAt === 'number' ? p.lastUpdatedAt : Date.now(),
@@ -184,6 +214,9 @@ export function mergeStates(local: AppState, remote: Partial<AppState>): { merge
     }
   });
 
+  const remoteIsNewer = (normRemote.lastUpdatedAt || 0) > (local.lastUpdatedAt || 0);
+  const baseGachaConfig = remoteIsNewer ? normRemote.gachaConfig : local.gachaConfig;
+
   const merged: AppState = {
     ...normRemote,
     parentPin: local.parentPin || normRemote.parentPin,
@@ -191,6 +224,15 @@ export function mergeStates(local: AppState, remote: Partial<AppState>): { merge
     shop: Array.from(shopMap.values()),
     quests: Array.from(questMap.values()),
     tickets: Array.from(ticketMap.values()),
+    gachaConfig: {
+      ...baseGachaConfig,
+      partSettings: {
+        ...(normRemote.gachaConfig?.partSettings || {}),
+        ...(local.gachaConfig?.partSettings || {}),
+        ...(baseGachaConfig?.partSettings || {}),
+      },
+      coordSets: baseGachaConfig?.coordSets ?? local.gachaConfig?.coordSets ?? normRemote.gachaConfig?.coordSets ?? [],
+    },
     // タイマーや申請は最新のリモートを採用（他端末のリアルタイム操作に追従）
     timers: normRemote.timers,
     submissions: normRemote.submissions,
@@ -338,6 +380,8 @@ if (typeof window !== 'undefined') {
 export function useStore(): AppState {
   return useSyncExternalStore(subscribe, getState, getState);
 }
+
+export const useAppState = useStore;
 
 export function useSyncStatus(): SyncStatus {
   return useSyncExternalStore(subscribeSyncStatus, getSyncStatus, getSyncStatus);

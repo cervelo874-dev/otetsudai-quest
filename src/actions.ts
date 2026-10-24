@@ -1,10 +1,22 @@
 import { getState, setState, flushSync } from './store';
-import type { AppState, AvatarSlot, Child, NotificationSettings, Quest, ShopItem, Ticket } from './types';
+import type {
+  AppState,
+  AvatarSlot,
+  Child,
+  GachaConfig,
+  GachaCoordSet,
+  GachaPartSetting,
+  GachaRarity,
+  NotificationSettings,
+  Quest,
+  ShopItem,
+  Ticket,
+} from './types';
 import { uid, todayKey, yesterdayKey } from './utils';
 import { BONUS_COINS, BONUS_WINDOW_MS, GACHA_COST, rewardFor } from './logic';
-import { AVATAR_OPTIONS, findOption, isUnlockableAvatarItem, isDefaultAvatarItem, getShardCost } from './avatar';
-import { createInitialState } from './presets';
-import { DEFAULT_EQUIPPED, toEquippedIdMap } from './features/avatar';
+import { findOption } from './avatar';
+import { createInitialState, DEFAULT_GACHA_CONFIG } from './presets';
+import { DEFAULT_EQUIPPED, toEquippedIdMap, type AvatarPart } from './features/avatar';
 
 /* ---------------- helpers ---------------- */
 
@@ -420,240 +432,613 @@ export function giftBonus(childId: string, coins: number, shopItemId: string | n
   });
 }
 
-/* ---------------- gacha (アップグレード版) ---------------- */
+/* ---------------- gacha (ジュエルステージ＆ガチャ運営スタジオ版) ---------------- */
 
 export type RarityNumber = 1 | 2 | 3;
 
 export interface GachaPrize {
-  kind: 'coins' | 'ticket' | 'avatar' | 'shards';
+  kind: 'coord_set' | 'custom_part' | 'ticket' | 'shards' | 'coins';
   icon: string;
   label: string;
   rarity: RarityNumber;
   coins: number;
   shards: number;
   shopItemId: string | null;
-  avatarItemId: string | null;
+  partId: string | null;
+  coordSetId: string | null;
+  partIds: string[];
+  isPickup: boolean;
 }
 
-export type GachaOutcome =
+export interface GachaPullItemResult {
+  prize: GachaPrize;
+  initialOrbRarity: RarityNumber;
+  isFakeoutPromotion: boolean;
+  isDuplicate: boolean;
+  refundCoins: number;
+  refundShards: number;
+  newlyUnlockedPartIds: string[];
+}
+
+export type GachaPullsOutcome =
   | {
       ok: true;
-      prize: GachaPrize;
+      pulls: GachaPullItemResult[];
       free: boolean;
-      isDuplicate: boolean;
-      refundCoins: number;
-      refundShards: number;
+      costPaid: number;
+      highestRarity: RarityNumber;
+      hasPromotion: boolean;
     }
   | { ok: false; reason: 'nocoins' | 'error' };
 
 export function canFreeGacha(c: Child): boolean {
+  const s = getState();
+  if (!s.gachaConfig?.enableDailyFree) return false;
   return c.lastFreeGacha !== todayKey();
 }
 
-function shardsPrize(shards: number, coins: number, rarity: RarityNumber, label: string): GachaPrize {
-  return { kind: 'shards', icon: '🌟', label, rarity, coins, shards, shopItemId: null, avatarItemId: null };
+/**
+ * パーツのガチャ設定を取得する。
+ * 既存の自作パーツはデフォルトで isGachaOnly: false（初期所持）とし、
+ * 管理画面でガチャ限定に切り替えたものだけロック対象とする。
+ */
+export function getEffectivePartGachaSetting(
+  part: AvatarPart,
+  gachaConfig?: GachaConfig,
+): GachaPartSetting {
+  const cfg = gachaConfig ?? getState().gachaConfig ?? DEFAULT_GACHA_CONFIG;
+  const saved = cfg.partSettings?.[part.id];
+  if (saved) return saved;
+
+  const metaRarity = part.meta?.rarity;
+  const defaultRarity: GachaRarity =
+    metaRarity === 'SSR' || metaRarity === 'SR'
+      ? 3
+      : metaRarity === 'R'
+      ? 2
+      : 1;
+
+  return {
+    partId: part.id,
+    isGachaOnly: false,
+    rarity: defaultRarity,
+    isPickup: false,
+  };
 }
 
-function rollPrize(s: AppState): GachaPrize {
-  const r = Math.random() * 100;
+/**
+ * 子どもがその自作パーツを着用可能（所持済み、または初期所持パーツ）か判定する
+ */
+export function isCustomPartUnlockedForChild(
+  part: AvatarPart,
+  child: Child | undefined,
+  gachaConfig?: GachaConfig,
+): boolean {
+  if (!child) return true;
+  const setting = getEffectivePartGachaSetting(part, gachaConfig);
+  if (!setting.isGachaOnly) return true;
+  return child.ownedItems.includes(part.id);
+}
 
-  // ---------------- ★3 レジェンド (10%: 90 <= r < 100) ----------------
-  if (r >= 90) {
-    const sub = Math.random() * 100;
-
-    // 1. レジェンドアバターアイテム直撃 (60%)
-    if (sub < 60) {
-      const legendAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 3 && isUnlockableAvatarItem(o));
-      if (legendAvatarOptions.length > 0) {
-        const pick = legendAvatarOptions[Math.floor(Math.random() * legendAvatarOptions.length)];
-        return {
-          kind: 'avatar',
-          icon: pick.icon,
-          label: pick.name,
-          rarity: 3,
-          coins: 0,
-          shards: 0,
-          shopItemId: null,
-          avatarItemId: pick.id,
-        };
-      }
-    }
-
-    // 2. 🌟 ほしのかけら 4個 ＋ 50コイン (25%)
-    if (sub < 85) {
-      return shardsPrize(4, 50, 3, '★3 ほしのかけら×4 ＋ 50コイン！');
-    }
-
-    // 3. レジェンドチケット (15%)
-    const dinner = s.shop.find((x) => x.id === 'sh-dinner');
-    if (dinner) {
-      return { kind: 'ticket', icon: dinner.icon, label: dinner.name, rarity: 3, coins: 0, shards: 0, shopItemId: dinner.id, avatarItemId: null };
-    }
-    const outing = s.shop.find((x) => x.id === 'sh-outing');
-    if (outing) {
-      return { kind: 'ticket', icon: outing.icon, label: outing.name, rarity: 3, coins: 0, shards: 0, shopItemId: outing.id, avatarItemId: null };
-    }
-
-    return shardsPrize(4, 50, 3, '★3 ほしのかけら×4 ＋ 50コイン！');
+function pickWeighted<T>(items: T[], getWeight: (item: T) => number): T {
+  const total = items.reduce((sum, it) => sum + Math.max(1, getWeight(it)), 0);
+  let r = Math.random() * total;
+  for (const it of items) {
+    const w = Math.max(1, getWeight(it));
+    if (r < w) return it;
+    r -= w;
   }
+  return items[items.length - 1];
+}
 
-  // ---------------- ★2 レア (35%: 55 <= r < 90) ----------------
-  if (r >= 55) {
-    const sub = Math.random() * 100;
+function rollTargetRarity(cfg: GachaConfig, guaranteeAtLeastRare: boolean): RarityNumber {
+  const r3 = Math.max(0, cfg.rarityRates.r3);
+  const r2 = Math.max(0, cfg.rarityRates.r2);
+  const r1 = guaranteeAtLeastRare ? 0 : Math.max(0, cfg.rarityRates.r1);
+  const total = r3 + r2 + r1;
+  if (total <= 0) return guaranteeAtLeastRare ? 2 : 1;
 
-    // 1. レアアバターアイテム直撃 (45%)
-    if (sub < 45) {
-      const rareAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 2 && isUnlockableAvatarItem(o));
-      if (rareAvatarOptions.length > 0) {
-        const pick = rareAvatarOptions[Math.floor(Math.random() * rareAvatarOptions.length)];
-        return {
-          kind: 'avatar',
-          icon: pick.icon,
-          label: `★2 ${pick.name}`,
-          rarity: 2,
-          coins: 0,
-          shards: 0,
-          shopItemId: null,
-          avatarItemId: pick.id,
-        };
-      }
-    }
+  const roll = Math.random() * total;
+  if (roll < r3) return 3;
+  if (roll < r3 + r2) return 2;
+  return guaranteeAtLeastRare ? 2 : 1;
+}
 
-    // 2. 🌟 ほしのかけら 2個 ＋ 20コイン (35%)
-    if (sub < 80) {
-      return shardsPrize(2, 20, 2, '★2 ほしのかけら×2 ＋ 20コイン！');
-    }
+function rollSinglePrizeForRarity(
+  s: AppState,
+  rarity: RarityNumber,
+  catalogParts: AvatarPart[],
+): GachaPrize {
+  const cfg = s.gachaConfig ?? DEFAULT_GACHA_CONFIG;
 
-    // 3. レアチケット (20%)
-    const candidates = s.shop.filter((x) => ['sh-tab15', 'sh-snack-up', 'sh-book'].includes(x.id));
-    if (candidates.length > 0) {
-      const t = candidates[Math.floor(Math.random() * candidates.length)];
-      return { kind: 'ticket', icon: t.icon, label: `★2 ${t.name}`, rarity: 2, coins: 0, shards: 0, shopItemId: t.id, avatarItemId: null };
-    }
+  // ガチャ限定に設定されているパーツ群を抽出
+  const gachaPartsForRarity = catalogParts.filter((p) => {
+    const st = getEffectivePartGachaSetting(p, cfg);
+    return st.isGachaOnly && st.rarity === rarity;
+  });
 
-    return shardsPrize(2, 20, 2, '★2 ほしのかけら×2 ＋ 20コイン！');
-  }
+  // ★3の場合はフルコーデセットも候補
+  const coordSets = rarity === 3
+    ? (cfg.coordSets ?? []).filter((cs) => cs.partIds.length > 0)
+    : [];
 
-  // ---------------- ★1 ノーマル (55%: 0 <= r < 55) ----------------
-  const sub = Math.random() * 100;
+  const hasCustomCandidates = gachaPartsForRarity.length > 0 || coordSets.length > 0;
+  const partShare = rarity === 3
+    ? cfg.avatarWeightPercent.r3
+    : rarity === 2
+    ? cfg.avatarWeightPercent.r2
+    : cfg.avatarWeightPercent.r1;
 
-  // 1. 🌟 ほしのかけら 1個 ＋ 15コイン (65%)
-  if (sub < 65) {
-    return shardsPrize(1, 15, 1, '★1 ほしのかけら×1 ＋ 15コイン');
-  }
-
-  // 2. ノーマルアバターアイテム (20%)
-  if (sub < 85) {
-    const normalAvatarOptions = AVATAR_OPTIONS.filter((o) => o.rarity === 1 && isUnlockableAvatarItem(o));
-    if (normalAvatarOptions.length > 0) {
-      const pick = normalAvatarOptions[Math.floor(Math.random() * normalAvatarOptions.length)];
+  // 1. パーツ or フルコーデセット抽選（主役！）
+  if (hasCustomCandidates && Math.random() * 100 < partShare) {
+    if (rarity === 3 && coordSets.length > 0 && (gachaPartsForRarity.length === 0 || Math.random() < 0.55)) {
+      const pickedSet = pickWeighted(coordSets, (cs) => cs.isPickup ? 220 : 100);
       return {
-        kind: 'avatar',
-        icon: pick.icon,
-        label: `★1 ${pick.name}`,
-        rarity: 1,
+        kind: 'coord_set',
+        icon: '👑',
+        label: pickedSet.name,
+        rarity: 3,
         coins: 0,
         shards: 0,
         shopItemId: null,
-        avatarItemId: pick.id,
+        partId: pickedSet.partIds[0] ?? null,
+        coordSetId: pickedSet.id,
+        partIds: [...pickedSet.partIds],
+        isPickup: Boolean(pickedSet.isPickup),
+      };
+    }
+
+    if (gachaPartsForRarity.length > 0) {
+      const pickedPart = pickWeighted(gachaPartsForRarity, (p) => {
+        const st = getEffectivePartGachaSetting(p, cfg);
+        return st.isPickup ? 220 : 100;
+      });
+      const st = getEffectivePartGachaSetting(pickedPart, cfg);
+      return {
+        kind: 'custom_part',
+        icon: '✨',
+        label: pickedPart.name,
+        rarity,
+        coins: 0,
+        shards: 0,
+        shopItemId: null,
+        partId: pickedPart.id,
+        coordSetId: null,
+        partIds: [pickedPart.id],
+        isPickup: Boolean(st.isPickup),
       };
     }
   }
 
-  // 3. プチチケット (15%)
-  const candidates = s.shop.filter((x) => ['sh-tab10', 'sh-snack'].includes(x.id));
-  if (candidates.length > 0) {
-    const t = candidates[Math.floor(Math.random() * candidates.length)];
-    return { kind: 'ticket', icon: t.icon, label: `★1 ${t.name}`, rarity: 1, coins: 0, shards: 0, shopItemId: t.id, avatarItemId: null };
+  // 2. 控えめ確率でのショップごほうびチケット or スタージュエル＋コイン
+  const subRoll = Math.random() * 100;
+  const enabledShopTickets = s.shop.filter((x) => cfg.enabledShopTicketIds.includes(x.id));
+
+  if (rarity === 3) {
+    const ticketPool = enabledShopTickets.filter((x) => x.price >= 120 || ['sh-dinner', 'sh-outing'].includes(x.id));
+    const pool = ticketPool.length > 0 ? ticketPool : enabledShopTickets;
+    if (pool.length > 0 && subRoll < cfg.ticketSubWeightPercent) {
+      const t = pool[Math.floor(Math.random() * pool.length)];
+      return {
+        kind: 'ticket',
+        icon: t.icon,
+        label: t.name,
+        rarity: 3,
+        coins: 0,
+        shards: 0,
+        shopItemId: t.id,
+        partId: null,
+        coordSetId: null,
+        partIds: [],
+        isPickup: false,
+      };
+    }
+    return {
+      kind: 'shards',
+      icon: '💎',
+      label: `スタージュエル×${cfg.subPrizeCoins.r3Shards} ＋ ${cfg.subPrizeCoins.r3Coins}コイン`,
+      rarity: 3,
+      coins: cfg.subPrizeCoins.r3Coins,
+      shards: cfg.subPrizeCoins.r3Shards,
+      shopItemId: null,
+      partId: null,
+      coordSetId: null,
+      partIds: [],
+      isPickup: false,
+    };
   }
 
-  return shardsPrize(1, 15, 1, '★1 ほしのかけら×1 ＋ 15コイン');
+  if (rarity === 2) {
+    const ticketPool = enabledShopTickets.filter((x) => x.price >= 40 && x.price < 150);
+    const pool = ticketPool.length > 0 ? ticketPool : enabledShopTickets;
+    if (pool.length > 0 && subRoll < cfg.ticketSubWeightPercent) {
+      const t = pool[Math.floor(Math.random() * pool.length)];
+      return {
+        kind: 'ticket',
+        icon: t.icon,
+        label: t.name,
+        rarity: 2,
+        coins: 0,
+        shards: 0,
+        shopItemId: t.id,
+        partId: null,
+        coordSetId: null,
+        partIds: [],
+        isPickup: false,
+      };
+    }
+    return {
+      kind: 'shards',
+      icon: '💎',
+      label: `スタージュエル×${cfg.subPrizeCoins.r2Shards} ＋ ${cfg.subPrizeCoins.r2Coins}コイン`,
+      rarity: 2,
+      coins: cfg.subPrizeCoins.r2Coins,
+      shards: cfg.subPrizeCoins.r2Shards,
+      shopItemId: null,
+      partId: null,
+      coordSetId: null,
+      partIds: [],
+      isPickup: false,
+    };
+  }
+
+  // ★1 N
+  const ticketPool1 = enabledShopTickets.filter((x) => x.price <= 60);
+  const pool1 = ticketPool1.length > 0 ? ticketPool1 : enabledShopTickets;
+  if (pool1.length > 0 && subRoll < Math.min(25, cfg.ticketSubWeightPercent)) {
+    const t = pool1[Math.floor(Math.random() * pool1.length)];
+    return {
+      kind: 'ticket',
+      icon: t.icon,
+      label: t.name,
+      rarity: 1,
+      coins: 0,
+      shards: 0,
+      shopItemId: t.id,
+      partId: null,
+      coordSetId: null,
+      partIds: [],
+      isPickup: false,
+    };
+  }
+  if (subRoll < 70) {
+    return {
+      kind: 'shards',
+      icon: '💎',
+      label: `スタージュエル×${cfg.subPrizeCoins.r1Shards} ＋ ${cfg.subPrizeCoins.r1Coins}コイン`,
+      rarity: 1,
+      coins: cfg.subPrizeCoins.r1Coins,
+      shards: cfg.subPrizeCoins.r1Shards,
+      shopItemId: null,
+      partId: null,
+      coordSetId: null,
+      partIds: [],
+      isPickup: false,
+    };
+  }
+  return {
+    kind: 'coins',
+    icon: '🪙',
+    label: `${cfg.subPrizeCoins.r1Coins}コイン`,
+    rarity: 1,
+    coins: cfg.subPrizeCoins.r1Coins,
+    shards: 0,
+    shopItemId: null,
+    partId: null,
+    coordSetId: null,
+    partIds: [],
+    isPickup: false,
+  };
 }
 
-export function spinGacha(childId: string): GachaOutcome {
+/**
+ * 1回または10連ガチャを実行する
+ */
+export function spinGachaPulls(
+  childId: string,
+  count: 1 | 10,
+  catalogParts: AvatarPart[],
+): GachaPullsOutcome {
   const s0 = getState();
   const c0 = findChild(s0, childId);
   if (!c0) return { ok: false, reason: 'error' };
-  const free = canFreeGacha(c0);
-  if (!free && c0.coins < GACHA_COST) return { ok: false, reason: 'nocoins' };
 
-  const prize = rollPrize(s0);
-  let isDuplicate = false;
-  let refundCoins = 0;
-  let refundShards = 0;
+  const cfg = s0.gachaConfig ?? DEFAULT_GACHA_CONFIG;
+  const free = count === 1 && canFreeGacha(c0);
+  const cost = free ? 0 : count === 10 ? cfg.tenPullCost : cfg.singleCost;
+
+  if (!free && c0.coins < cost) {
+    return { ok: false, reason: 'nocoins' };
+  }
+
+  const results: GachaPullItemResult[] = [];
 
   setState((s) => {
     const c = findChild(s, childId);
     if (!c) return;
-    if (!free && c.coins < GACHA_COST) return;
+    if (!free && c.coins < cost) return;
 
     if (free) c.lastFreeGacha = todayKey();
-    else c.coins -= GACHA_COST;
+    else c.coins -= cost;
 
-    if (prize.kind === 'shards') {
-      c.starShards = (c.starShards ?? 0) + prize.shards;
-      c.coins += prize.coins;
-    } else if (prize.kind === 'coins') {
-      c.coins += prize.coins;
-    } else if (prize.kind === 'ticket' && prize.shopItemId) {
-      const it = s.shop.find((x) => x.id === prize.shopItemId);
-      if (it) grantShopItem(s, c, it);
-    } else if (prize.kind === 'avatar' && prize.avatarItemId) {
-      if (!c.ownedItems.includes(prize.avatarItemId)) {
-        c.ownedItems.push(prize.avatarItemId);
-      } else {
-        // ダブり救済ロジック：ほしのかけら＋コインに変換！
-        isDuplicate = true;
-        refundShards = prize.rarity === 3 ? 3 : prize.rarity === 2 ? 2 : 1;
-        refundCoins = prize.rarity === 3 ? 30 : prize.rarity === 2 ? 15 : 10;
-        c.starShards = (c.starShards ?? 0) + refundShards;
-        c.coins += refundCoins;
+    let hasRareOrAbove = false;
+
+    for (let i = 0; i < count; i++) {
+      // 10連の最後の1枠でまだ★2以上が出ていなければ★2以上確定！
+      const guaranteeRare = count === 10 && i === 9 && !hasRareOrAbove;
+      const rarity = rollTargetRarity(cfg, guaranteeRare);
+      if (rarity >= 2) hasRareOrAbove = true;
+
+      const prize = rollSinglePrizeForRarity(s, rarity, catalogParts);
+
+      // 昇格演出（フェイクアウト）判定
+      let initialOrbRarity: RarityNumber = rarity;
+      let isFakeoutPromotion = false;
+      if (rarity === 3 && Math.random() < 0.45) {
+        initialOrbRarity = 2; // 金オーブに見せかけて虹へ昇格！
+        isFakeoutPromotion = true;
+      } else if (rarity === 2 && Math.random() < 0.25) {
+        initialOrbRarity = 1; // 青オーブに見せかけて金へ昇格！
+        isFakeoutPromotion = true;
       }
+
+      let isDuplicate = false;
+      let refundCoins = 0;
+      let refundShards = 0;
+      const newlyUnlockedPartIds: string[] = [];
+
+      if (prize.kind === 'coord_set' || prize.kind === 'custom_part') {
+        const targetIds = prize.partIds;
+        let allOwned = true;
+        for (const pid of targetIds) {
+          if (!c.ownedItems.includes(pid)) {
+            c.ownedItems.push(pid);
+            newlyUnlockedPartIds.push(pid);
+            allOwned = false;
+          }
+        }
+        if (allOwned) {
+          isDuplicate = true;
+          refundShards =
+            rarity === 3
+              ? cfg.duplicateRefund.r3Shards
+              : rarity === 2
+              ? cfg.duplicateRefund.r2Shards
+              : cfg.duplicateRefund.r1Shards;
+          refundCoins =
+            rarity === 3
+              ? cfg.duplicateRefund.r3Coins
+              : rarity === 2
+              ? cfg.duplicateRefund.r2Coins
+              : cfg.duplicateRefund.r1Coins;
+          c.starShards = (c.starShards ?? 0) + refundShards;
+          c.coins += refundCoins;
+        }
+      } else if (prize.kind === 'ticket' && prize.shopItemId) {
+        const it = s.shop.find((x) => x.id === prize.shopItemId);
+        if (it) grantShopItem(s, c, it);
+      } else if (prize.kind === 'shards') {
+        c.starShards = (c.starShards ?? 0) + prize.shards;
+        c.coins += prize.coins;
+      } else if (prize.kind === 'coins') {
+        c.coins += prize.coins;
+      }
+
+      results.push({
+        prize,
+        initialOrbRarity,
+        isFakeoutPromotion,
+        isDuplicate,
+        refundCoins,
+        refundShards,
+        newlyUnlockedPartIds,
+      });
     }
 
-    if (isDuplicate) {
-      addLog(s, '🎰', `${c.name}がガチャ${free ? '（無料）' : ''}で「${prize.label}」（もっているので🌟ほしのかけら+${refundShards}個＆+${refundCoins}コインにへんかん✨）`);
-    } else if (prize.kind === 'shards') {
-      addLog(s, '🎰', `${c.name}がガチャ${free ? '（無料）' : ''}で「🌟ほしのかけら×${prize.shards} ＋ ${prize.coins}コイン」をゲット！`);
-    } else {
-      addLog(s, '🎰', `${c.name}がガチャ${free ? '（無料）' : ''}で「${prize.label}」をゲット！`);
-    }
+    const best = results.reduce((max, r) => (r.prize.rarity > max ? r.prize.rarity : max), 1 as RarityNumber);
+    const summaryLabel =
+      count === 10
+        ? `10連ジュエルガチャ（最高★${best}・「${results[0]?.prize.label}」ほか）`
+        : `ジュエルガチャ${free ? '（無料）' : ''}で「${results[0]?.prize.label}」`;
+    addLog(s, '💎', `${c.name}が${summaryLabel}をゲット！`);
   });
 
-  return { ok: true, prize, free, isDuplicate, refundCoins, refundShards };
+  if (results.length === 0) return { ok: false, reason: 'error' };
+
+  const highestRarity = results.reduce(
+    (max, r) => (r.prize.rarity > max ? r.prize.rarity : max),
+    1 as RarityNumber,
+  );
+  const hasPromotion = results.some((r) => r.isFakeoutPromotion);
+
+  return {
+    ok: true,
+    pulls: results,
+    free,
+    costPaid: cost,
+    highestRarity,
+    hasPromotion,
+  };
 }
 
-/* ---------------- ほしのかけら交換所 ---------------- */
+/**
+ * 旧互換の1回ガチャラッパー
+ */
+export function spinGacha(childId: string, catalogParts: AvatarPart[] = []): GachaPullsOutcome {
+  return spinGachaPulls(childId, 1, catalogParts);
+}
 
-export function exchangeStarShards(
+/* ---------------- スタージュエル交換所（天井） ---------------- */
+
+export function exchangeGachaItem(
   childId: string,
-  avatarItemId: string
-): 'ok' | 'not_enough' | 'owned' | 'default' | 'error' {
+  target: { type: 'coord_set' | 'part'; id: string },
+  catalogParts: AvatarPart[],
+): 'ok' | 'not_enough' | 'owned' | 'error' {
   const s0 = getState();
   const c0 = findChild(s0, childId);
   if (!c0) return 'error';
-  if (c0.ownedItems.includes(avatarItemId)) return 'owned';
+  const cfg = s0.gachaConfig ?? DEFAULT_GACHA_CONFIG;
 
-  const opt = findOption(avatarItemId);
-  if (!opt) return 'error';
+  if (target.type === 'coord_set') {
+    const cs = cfg.coordSets.find((x) => x.id === target.id);
+    if (!cs || cs.partIds.length === 0) return 'error';
+    const allOwned = cs.partIds.every((pid) => c0.ownedItems.includes(pid));
+    if (allOwned) return 'owned';
+    const cost = cs.exchangeCost ?? cfg.exchangeCosts.r3Set;
+    if ((c0.starShards ?? 0) < cost) return 'not_enough';
 
-  // デフォルトで最初から持っているアイテムは交換不要
-  if (isDefaultAvatarItem(opt)) return 'default';
+    setState((s) => {
+      const c = findChild(s, childId);
+      if (!c) return;
+      c.starShards = (c.starShards ?? 0) - cost;
+      for (const pid of cs.partIds) {
+        if (!c.ownedItems.includes(pid)) c.ownedItems.push(pid);
+      }
+      addLog(s, '💎', `${c.name}がスタージュエル${cost}個でフルコーデ「${cs.name}」を交換！`);
+      addNotice(s, c.id, '💎', `スタージュエルでフルコーデ「${cs.name}」を手に入れたよ！`);
+    });
+    return 'ok';
+  }
 
-  const cost = getShardCost(opt.rarity);
+  const part = catalogParts.find((p) => p.id === target.id);
+  if (!part) return 'error';
+  const st = getEffectivePartGachaSetting(part, cfg);
+  if (!st.isGachaOnly || c0.ownedItems.includes(part.id)) return 'owned';
+
+  const cost =
+    st.exchangeCost ??
+    (st.rarity === 3
+      ? cfg.exchangeCosts.r3Part
+      : st.rarity === 2
+      ? cfg.exchangeCosts.r2Part
+      : cfg.exchangeCosts.r1Part);
+
   if ((c0.starShards ?? 0) < cost) return 'not_enough';
 
   setState((s) => {
     const c = findChild(s, childId);
     if (!c) return;
     c.starShards = (c.starShards ?? 0) - cost;
-    c.ownedItems.push(avatarItemId);
-    addLog(s, '🌟', `${c.name}が🌟ほしのかけら${cost}個で「${opt.name}」を交換！`);
-    addNotice(s, c.id, '🌟', `ほしのかけらで「${opt.name}」を手に入れたよ！`);
+    if (!c.ownedItems.includes(part.id)) c.ownedItems.push(part.id);
+    addLog(s, '💎', `${c.name}がスタージュエル${cost}個で「${part.name}」を交換！`);
+    addNotice(s, c.id, '💎', `スタージュエルで「${part.name}」を手に入れたよ！`);
   });
 
   return 'ok';
 }
+
+/* ---------------- 親用：ガチャ運営スタジオ管理アクション ---------------- */
+
+export function updateGachaConfig(patch: Partial<GachaConfig>): void {
+  setState((s) => {
+    s.gachaConfig = {
+      ...(s.gachaConfig ?? DEFAULT_GACHA_CONFIG),
+      ...patch,
+    };
+  });
+}
+
+export function setGachaPartSetting(
+  partId: string,
+  patch: Partial<Omit<GachaPartSetting, 'partId'>>,
+  defaultFallback?: AvatarPart,
+): void {
+  setState((s) => {
+    if (!s.gachaConfig) s.gachaConfig = { ...DEFAULT_GACHA_CONFIG };
+    const prev = defaultFallback
+      ? getEffectivePartGachaSetting(defaultFallback, s.gachaConfig)
+      : s.gachaConfig.partSettings[partId] ?? {
+          partId,
+          isGachaOnly: false,
+          rarity: 1 as GachaRarity,
+          isPickup: false,
+        };
+    s.gachaConfig.partSettings[partId] = {
+      ...prev,
+      ...patch,
+      partId,
+    };
+  });
+}
+
+export function saveGachaCoordSet(
+  coordSet: Omit<GachaCoordSet, 'id' | 'createdAt'> & { id?: string },
+): void {
+  setState((s) => {
+    if (!s.gachaConfig) s.gachaConfig = { ...DEFAULT_GACHA_CONFIG };
+    const existingIdx = coordSet.id
+      ? s.gachaConfig.coordSets.findIndex((x) => x.id === coordSet.id)
+      : -1;
+    if (existingIdx >= 0 && coordSet.id) {
+      s.gachaConfig.coordSets[existingIdx] = {
+        ...s.gachaConfig.coordSets[existingIdx],
+        name: coordSet.name.trim() || 'スペシャルコーデ',
+        description: (coordSet.description ?? '').trim(),
+        partIds: [...coordSet.partIds],
+        isPickup: Boolean(coordSet.isPickup),
+      };
+    } else {
+      s.gachaConfig.coordSets.push({
+        id: coordSet.id || uid(),
+        name: coordSet.name.trim() || 'スペシャルコーデ',
+        description: (coordSet.description ?? '').trim(),
+        partIds: [...coordSet.partIds],
+        isPickup: Boolean(coordSet.isPickup),
+        createdAt: Date.now(),
+      });
+    }
+  });
+}
+
+export function deleteGachaCoordSet(coordSetId: string): void {
+  setState((s) => {
+    if (!s.gachaConfig) return;
+    s.gachaConfig.coordSets = s.gachaConfig.coordSets.filter((x) => x.id !== coordSetId);
+  });
+}
+
+/**
+ * ガチャで当たったパーツ（またはフルコーデ一式）をその場で子どものアバターに着用させる
+ */
+export function equipGachaPartsToChild(
+  childId: string,
+  partIds: string[],
+  catalogParts: AvatarPart[],
+): void {
+  setState((s) => {
+    const c = findChild(s, childId);
+    if (!c) return;
+    const prevEquipped = { ...(c.avatarStudio?.equipped ?? {}) };
+    const prevAdjustments = { ...(c.avatarStudio?.adjustments ?? {}) };
+    let prevHands = Array.isArray(c.avatarStudio?.hand_items)
+      ? [...c.avatarStudio.hand_items]
+      : prevEquipped.hand_item
+      ? [prevEquipped.hand_item]
+      : [];
+
+    for (const pid of partIds) {
+      const part = catalogParts.find((p) => p.id === pid);
+      if (!part) continue;
+      if (part.category === 'hand_item') {
+        if (!prevHands.includes(part.id)) {
+          prevHands = [...prevHands, part.id].slice(-3);
+        }
+        prevEquipped.hand_item = prevHands[prevHands.length - 1] ?? part.id;
+      } else {
+        prevEquipped[part.category] = part.id;
+      }
+    }
+
+    c.avatarStudio = {
+      equipped: prevEquipped,
+      adjustments: prevAdjustments,
+      hand_items: prevHands,
+    };
+  });
+  flushSync();
+}
+
 
 /* ---------------- avatar ---------------- */
 
