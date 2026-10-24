@@ -3,6 +3,7 @@ import { AVATAR_LAYERS } from '../types';
 import type {
   AvatarCategory,
   AvatarPart,
+  BodyMaskStroke,
   CropRect,
   EquippedPartMap,
   EquippedParts,
@@ -296,6 +297,70 @@ export function createSleeveMaskStyle(
     maskImage: combined,
     WebkitMaskComposite: 'source-in',
     maskComposite: 'intersect',
+  };
+}
+
+/**
+ * 手描きの素体なぞり消しゴム・戻しブラシ (bodyMaskStrokes) および長袖マスクを
+ * 0ms・リアルタイムで反映する SVG アルファマスク (CSS mask-image) に変換する
+ */
+export function createBodyMaskStrokesStyle(
+  strokes?: BodyMaskStroke[],
+  sleeveMask?: { cx: number; cy: number; radius: number },
+): CSSProperties | undefined {
+  const hasStrokes = Boolean(strokes && strokes.length > 0);
+  if (!hasStrokes) {
+    return sleeveMask ? createSleeveMaskStyle(sleeveMask) : undefined;
+  }
+
+  const elements: string[] = [];
+  if (sleeveMask) {
+    elements.push(
+      `<circle cx="${sleeveMask.cx.toFixed(1)}" cy="${sleeveMask.cy.toFixed(1)}" r="${(sleeveMask.radius + 3).toFixed(1)}" fill="#000"/>`,
+    );
+  }
+
+  for (const stroke of strokes ?? []) {
+    if (!stroke.points || stroke.points.length < 2) continue;
+    const color = stroke.mode === 'restore' ? '#fff' : '#000';
+    const r = Math.max(1, stroke.radius);
+    const drawPass = (mirror: boolean) => {
+      const tx = (x: number) => (mirror ? AVATAR_CANVAS_SIZE - x : x).toFixed(1);
+      const ty = (y: number) => y.toFixed(1);
+      if (stroke.points.length === 2) {
+        elements.push(
+          `<circle cx="${tx(stroke.points[0])}" cy="${ty(stroke.points[1])}" r="${r.toFixed(1)}" fill="${color}"/>`,
+        );
+      } else {
+        let d = `M${tx(stroke.points[0])} ${ty(stroke.points[1])}`;
+        for (let i = 2; i + 1 < stroke.points.length; i += 2) {
+          d += `L${tx(stroke.points[i])} ${ty(stroke.points[i + 1])}`;
+        }
+        elements.push(
+          `<path d="${d}" fill="none" stroke="${color}" stroke-width="${(r * 2).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round"/>`,
+        );
+      }
+    };
+    drawPass(false);
+    if (stroke.mirror) {
+      drawPass(true);
+    }
+  }
+
+  if (elements.length === 0) {
+    return sleeveMask ? createSleeveMaskStyle(sleeveMask) : undefined;
+  }
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${AVATAR_CANVAS_SIZE} ${AVATAR_CANVAS_SIZE}" width="${AVATAR_CANVAS_SIZE}" height="${AVATAR_CANVAS_SIZE}"><defs><mask id="m"><rect width="${AVATAR_CANVAS_SIZE}" height="${AVATAR_CANVAS_SIZE}" fill="#fff"/>${elements.join('')}</mask></defs><rect width="${AVATAR_CANVAS_SIZE}" height="${AVATAR_CANVAS_SIZE}" fill="#000" mask="url(#m)"/></svg>`;
+  const url = `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+
+  return {
+    WebkitMaskImage: url,
+    maskImage: url,
+    WebkitMaskSize: '100% 100%',
+    maskSize: '100% 100%',
+    WebkitMaskRepeat: 'no-repeat',
+    maskRepeat: 'no-repeat',
   };
 }
 

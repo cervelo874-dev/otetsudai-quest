@@ -50,6 +50,7 @@ export {
   getOrderedCharacterBodyLayers,
   resolveAvatarLayerOrder,
   adjustmentToLayerStyle,
+  createBodyMaskStrokesStyle,
   createEmptyEquippedMap,
   normalizeEquippedParts,
   toEquippedIdMap,

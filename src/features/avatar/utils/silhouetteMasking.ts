@@ -7,7 +7,7 @@
  *   服の輪郭から外側へ突き抜けてしまう素体（肩の上・脇腹・背中・腰・太もも・足先）を自動で透明化します。
  * - <AvatarRenderer /> のリアルタイムプレビューと PNG書き出し (composeAvatar.ts) の双方で共通利用します。
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   AvatarCategory,
   AvatarPart,
@@ -502,9 +502,13 @@ export function buildClippedWorldCanvasesFromImages(
   equippedParts: EquippedParts,
   solved: SolvedAvatarRigResult,
   excludedLayers: Set<AvatarCategory> = new Set(),
+  options?: { onlyRestoreManualStrokes?: boolean },
 ): ClippedWorldCanvases {
   const clipMode = solved.activeBodyClipMode;
-  const maskStrokes = solved.activeBodyMaskStrokes ?? [];
+  const rawStrokes = solved.activeBodyMaskStrokes ?? [];
+  const maskStrokes = options?.onlyRestoreManualStrokes
+    ? rawStrokes.filter((s) => s.mode === 'restore')
+    : rawStrokes;
   const hasManualStrokes = maskStrokes.length > 0;
 
   if (clipMode === 'off' && !hasManualStrokes) return {};
@@ -1254,8 +1258,12 @@ export function useSilhouetteClippedSources(
   const insetPx = solvedRig.activeBodyClipInsetPx;
   const activeSleeveMode = solvedRig.activeSleeveMode;
   const maskStrokes = solvedRig.activeBodyMaskStrokes ?? [];
-  const strokesSignature = maskStrokes
-    .map((s) => `${s.mode}:${s.radius}:${s.mirror ? 1 : 0}:${s.points.length}:${s.points[s.points.length - 2] ?? 0},${s.points[s.points.length - 1] ?? 0}`)
+  const restoreStrokes = maskStrokes.filter((s) => s.mode === 'restore');
+  const restoreStrokesSignature = restoreStrokes
+    .map(
+      (s) =>
+        `${s.radius}:${s.mirror ? 1 : 0}:${s.points.length}:${s.points[s.points.length - 2] ?? 0},${s.points[s.points.length - 1] ?? 0}`,
+    )
     .join(';');
 
   const adjSignature = (['body', 'leg_left', 'leg_right', 'tops', 'bottoms', 'shoes'] as const)
@@ -1265,8 +1273,11 @@ export function useSilhouetteClippedSources(
     })
     .join('|');
 
+  const latestRef = useRef({ equippedParts, solvedRig, hiddenSet });
+  latestRef.current = { equippedParts, solvedRig, hiddenSet };
+
   useEffect(() => {
-    if (clipMode === 'off' && maskStrokes.length === 0) {
+    if (clipMode === 'off' && restoreStrokes.length === 0) {
       setClippedUrls({});
       return;
     }
@@ -1275,7 +1286,7 @@ export function useSilhouetteClippedSources(
       return;
     }
     if (
-      maskStrokes.length === 0 &&
+      restoreStrokes.length === 0 &&
       !topsSrc &&
       !bottomsSrc &&
       !shoesSrc &&
@@ -1309,11 +1320,18 @@ export function useSilhouetteClippedSources(
           imageMap[cat] = img;
         }
 
+        const {
+          equippedParts: curEquipped,
+          solvedRig: curSolved,
+          hiddenSet: curHidden,
+        } = latestRef.current;
+
         const canvases = buildClippedWorldCanvasesFromImages(
           imageMap,
-          equippedParts,
-          solvedRig,
-          hiddenSet,
+          curEquipped,
+          curSolved,
+          curHidden,
+          { onlyRestoreManualStrokes: true },
         );
         if (cancelled) return;
 
@@ -1322,12 +1340,13 @@ export function useSilhouetteClippedSources(
         if (canvases.leg_left) nextUrls.leg_left = canvases.leg_left.toDataURL('image/png');
         if (canvases.leg_right) nextUrls.leg_right = canvases.leg_right.toDataURL('image/png');
         setClippedUrls(nextUrls);
-      } catch {
+      } catch (err) {
+        console.warn('Silhouette clipping skipped due to error:', err);
         if (!cancelled) {
           setClippedUrls({});
         }
       }
-    }, 10);
+    }, 15);
 
     return () => {
       cancelled = true;
@@ -1345,11 +1364,8 @@ export function useSilhouetteClippedSources(
     clipMode,
     insetPx,
     activeSleeveMode,
-    strokesSignature,
+    restoreStrokesSignature,
     adjSignature,
-    equippedParts,
-    solvedRig,
-    hiddenSet,
   ]);
 
   return clippedUrls;

@@ -3,6 +3,7 @@ import { AVATAR_LAYERS } from '../types';
 import type {
   AvatarCategory,
   AvatarSize,
+  BodyMaskStroke,
   CropRect,
   EquippedParts,
   ItemLayerPlacement,
@@ -12,7 +13,7 @@ import type {
 import { DEFAULT_LAYER_ADJUSTMENT, FACE_CROP, FULL_CROP, SIZE_PRESET_PX } from '../constants';
 import {
   adjustmentToLayerStyle,
-  createSleeveMaskStyle,
+  createBodyMaskStrokesStyle,
   cropToStageStyle,
   getEffectivePairAdjustment,
   getOrderedCharacterBodyLayers,
@@ -70,6 +71,7 @@ function LayerImg({
   adjustment,
   customPivot,
   sleeveMask,
+  bodyMaskStrokes,
   highlighted,
 }: {
   src: string;
@@ -77,10 +79,11 @@ function LayerImg({
   adjustment?: LayerAdjustment;
   customPivot?: { x: number; y: number };
   sleeveMask?: { cx: number; cy: number; radius: number };
+  bodyMaskStrokes?: BodyMaskStroke[];
   highlighted?: boolean;
 }) {
   const adjStyle = adjustmentToLayerStyle(category, adjustment, customPivot);
-  const maskStyle = createSleeveMaskStyle(sleeveMask);
+  const maskStyle = createBodyMaskStrokesStyle(bodyMaskStrokes, sleeveMask);
 
   const imgNode = (
     <img
@@ -202,6 +205,14 @@ export const AvatarRenderer = memo(function AvatarRenderer({
       category === 'arm_left' || category === 'arm_right'
         ? solvedRig.armSleeveMasks[category]
         : undefined;
+    const bodyMaskStrokes =
+      category === 'body' ||
+      category === 'leg_left' ||
+      category === 'leg_right' ||
+      category === 'arm_left' ||
+      category === 'arm_right'
+        ? solvedRig.activeBodyMaskStrokes
+        : undefined;
     return (
       <LayerImg
         key={category}
@@ -210,6 +221,7 @@ export const AvatarRenderer = memo(function AvatarRenderer({
         adjustment={clippedWorldSrc ? undefined : solvedRig.effectiveAdjustments[category]}
         customPivot={clippedWorldSrc ? undefined : solvedRig.customPivots[category]}
         sleeveMask={sleeveMask}
+        bodyMaskStrokes={bodyMaskStrokes}
         highlighted={highlightLayer === category}
       />
     );

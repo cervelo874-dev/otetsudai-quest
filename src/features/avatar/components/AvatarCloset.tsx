@@ -456,20 +456,28 @@ export function AvatarCloset({
   } | null>(null);
 
   const parentSignature = getEquippedSignature(equippedParts, initialAdjustments);
+  const externalParentKey = useMemo(() => {
+    const idTokens = AVATAR_LAYERS.map((cat) => `${cat}:${resolvePartKey(equippedParts[cat])}`).join(
+      '|',
+    );
+    return `${idTokens}__${getEquippedSignature(createEmptyEquippedMap(), initialAdjustments)}`;
+  }, [equippedParts, initialAdjustments]);
   const tryOnId = initialTryOnPart?.id ?? '';
 
   useEffect(() => {
-    setDraft(buildInitialDraft());
-    setDraftAdjustments({ ...initialAdjustments });
+    const nextDraft = buildInitialDraft();
+    setDraft(nextDraft);
+    setDraftAdjustments(resolveEffectiveAdjustments(nextDraft, initialAdjustments));
     if (initialTryOnPart) {
       setActiveCategory(initialTryOnPart.category);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parentSignature, tryOnId]);
+  }, [externalParentKey, tryOnId]);
 
   // カタログパーツ（ownedParts）が非同期ロードされた際、draft や equippedParts の自作パーツを即座に再照合・完全復元
   useEffect(() => {
     if (ownedParts.length === 0) return;
+    const newlyMatchedAdjustments: Partial<Record<AvatarCategory, LayerAdjustment>> = {};
     setDraft((prevDraft) => {
       let changed = false;
       const nextDraft = { ...prevDraft };
@@ -484,11 +492,28 @@ export function AvatarCloset({
           if (matched && (!curVal || typeof curVal !== 'object' || !curVal.src || curVal !== matched)) {
             nextDraft[cat] = matched;
             changed = true;
+            if (matched.defaultAdjustment) {
+              newlyMatchedAdjustments[cat] = matched.defaultAdjustment;
+            }
           }
         }
       }
       return changed ? nextDraft : prevDraft;
     });
+    if (Object.keys(newlyMatchedAdjustments).length > 0) {
+      setDraftAdjustments((prevAdj) => {
+        const nextAdj = { ...prevAdj };
+        for (const [cat, defAdj] of Object.entries(newlyMatchedAdjustments)) {
+          const c = cat as AvatarCategory;
+          if (!nextAdj[c] || !hasCustomAdjustment(nextAdj[c])) {
+            nextAdj[c] = { ...DEFAULT_LAYER_ADJUSTMENT, ...defAdj };
+          } else if (defAdj?.bodyMaskStrokes?.length && !nextAdj[c]?.bodyMaskStrokes?.length) {
+            nextAdj[c] = { ...nextAdj[c]!, bodyMaskStrokes: defAdj.bodyMaskStrokes };
+          }
+        }
+        return nextAdj;
+      });
+    }
   }, [ownedParts, equippedParts]);
 
   const draftCallbackRef = useRef(onDraftChange);
@@ -703,13 +728,6 @@ export function AvatarCloset({
         const shoesKey = resolvePartKey(curShoesPart);
         if (shoesKey) {
           partAdjustmentsCacheRef.current.set(shoesKey, nextShoesAdj);
-          if (curShoesPart && typeof curShoesPart === 'object') {
-            curShoesPart.defaultAdjustment = nextShoesAdj;
-          }
-          const matchingOwned = ownedParts.find((p) => p.id === shoesKey);
-          if (matchingOwned) {
-            matchingOwned.defaultAdjustment = nextShoesAdj;
-          }
         }
 
         return {
@@ -728,18 +746,11 @@ export function AvatarCloset({
         rotation: patch.rotation !== undefined ? round1(patch.rotation) : current.rotation,
       };
 
-      // 装着中のパーツがあれば、セッションキャッシュおよびオブジェクトへ即座に反映
+      // 装着中のパーツがあれば、セッションキャッシュへ即座に反映（元オブジェクトを直接破壊しない）
       const curPart = draft[activeCategory];
       const curKey = resolvePartKey(curPart);
       if (curKey) {
         partAdjustmentsCacheRef.current.set(curKey, next);
-        if (curPart && typeof curPart === 'object') {
-          curPart.defaultAdjustment = next;
-        }
-        const matchingOwned = ownedParts.find((p) => p.id === curKey);
-        if (matchingOwned) {
-          matchingOwned.defaultAdjustment = next;
-        }
       }
 
       return {
@@ -849,13 +860,6 @@ export function AvatarCloset({
     const curKey = resolvePartKey(curPart);
     if (curKey) {
       partAdjustmentsCacheRef.current.set(curKey, nextAdj);
-      if (curPart && typeof curPart === 'object') {
-        curPart.defaultAdjustment = nextAdj;
-      }
-      const matchingOwned = ownedParts.find((p) => p.id === curKey);
-      if (matchingOwned) {
-        matchingOwned.defaultAdjustment = nextAdj;
-      }
     }
   };
 
@@ -1054,11 +1058,16 @@ export function AvatarCloset({
 
   // ==================== プレビュー画面上での直接ドラッグ＆なぞり消しゴム＆ホイール微調整 ====================
   const handlePreviewPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
 
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
 
     if (previewToolMode === 'erase_body' || previewToolMode === 'restore_body') {
+      e.preventDefault();
       const pt = getPointerWorldCoords(e);
       if (pt) {
         setBrushCursor(pt);
@@ -1834,8 +1843,9 @@ export function AvatarCloset({
   };
 
   const handleResetAllToSaved = () => {
-    setDraft(normalizeEquippedParts(equippedParts, ownedParts));
-    setDraftAdjustments({ ...initialAdjustments });
+    const nextDraft = normalizeEquippedParts(equippedParts, ownedParts);
+    setDraft(nextDraft);
+    setDraftAdjustments(resolveEffectiveAdjustments(nextDraft, initialAdjustments));
   };
 
   // 左右対称カテゴリ（左腕↔右腕、左脚↔右脚）の反対側カテゴリと基準パーツ
