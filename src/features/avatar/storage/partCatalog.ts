@@ -16,8 +16,73 @@ const DB_NAME = 'mobage_avatar_studio_db';
 const STORE_NAME = 'custom_parts';
 const DB_VERSION = 1;
 const LS_FALLBACK_KEY = 'mobage_avatar_custom_parts_v1';
+/** 削除済みパーツの墓標（tombstone）: { [partId]: deletedAt(ms) } */
+const LS_DELETED_KEY = 'mobage_avatar_deleted_parts_v1';
+/** 墓標の保持期間（これより古い墓標は自動的に掃除） */
+const TOMBSTONE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 
 export const PART_CATALOG_UPDATED_EVENT = 'avatar-part-catalog:updated';
+
+export type DeletedPartMap = Record<string, number>;
+
+// ---------------------------------------------------------------------------
+// 削除墓標（tombstone）管理
+// 他端末やクラウドに古いコピーが残っていても、削除したパーツが復活しないようにする
+// ---------------------------------------------------------------------------
+
+export function readDeletedParts(): DeletedPartMap {
+  try {
+    const raw = localStorage.getItem(LS_DELETED_KEY);
+    const parsed = raw ? (JSON.parse(raw) as DeletedPartMap) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDeletedParts(map: DeletedPartMap): void {
+  try {
+    const now = Date.now();
+    const pruned: DeletedPartMap = {};
+    for (const [id, at] of Object.entries(map)) {
+      if (typeof at === 'number' && now - at < TOMBSTONE_TTL_MS) {
+        pruned[id] = at;
+      }
+    }
+    localStorage.setItem(LS_DELETED_KEY, JSON.stringify(pruned));
+  } catch {
+    // ignore
+  }
+}
+
+/** 墓標を追加・統合（同じIDはより新しい削除時刻を採用）。変化があれば true */
+export function mergeDeletedParts(incoming: DeletedPartMap | undefined | null): boolean {
+  if (!incoming || typeof incoming !== 'object') return false;
+  const current = readDeletedParts();
+  let changed = false;
+  for (const [id, at] of Object.entries(incoming)) {
+    if (typeof at !== 'number') continue;
+    if (!current[id] || current[id] < at) {
+      current[id] = at;
+      changed = true;
+    }
+  }
+  if (changed) writeDeletedParts(current);
+  return changed;
+}
+
+/**
+ * パーツが削除済みかどうか判定
+ * パーツIDは作成ごとに一意（part_カテゴリ_時刻_乱数）なので、墓標にあるIDは二度と復活させない。
+ * （クローゼットの「保存」などで装着中の古いパーツが自動再保存されても復活しないよう、時刻比較はしない）
+ */
+export function isPartDeleted(part: Pick<AvatarPart, 'id'>, deleted: DeletedPartMap = readDeletedParts()): boolean {
+  return typeof deleted[part.id] === 'number';
+}
+
+export function filterDeletedParts(parts: AvatarPart[], deleted: DeletedPartMap = readDeletedParts()): AvatarPart[] {
+  return parts.filter((p) => !isPartDeleted(p, deleted));
+}
 
 let cachedDbPromise: Promise<IDBDatabase> | null = null;
 
@@ -53,7 +118,8 @@ function notifyCatalogUpdated(): void {
 export function readFallbackParts(): AvatarPart[] {
   try {
     const raw = localStorage.getItem(LS_FALLBACK_KEY);
-    return raw ? (JSON.parse(raw) as AvatarPart[]) : [];
+    const parts = raw ? (JSON.parse(raw) as AvatarPart[]) : [];
+    return filterDeletedParts(parts);
   } catch {
     return [];
   }
@@ -67,18 +133,83 @@ export function writeFallbackParts(parts: AvatarPart[]): void {
   }
 }
 
-/** 保存済みの全パーツを登録日時順に取得 */
-export async function listCatalogParts(): Promise<AvatarPart[]> {
+/** IndexedDB から指定IDを物理削除 */
+async function deleteFromDatabase(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
   try {
     const db = await openPartDatabase();
-    const parts = await new Promise<AvatarPart[]>((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      for (const id of ids) store.delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * 墓標に該当するパーツをローカル（IndexedDB / LocalStorage）から完全に消去する
+ * 他端末で削除されたパーツをこの端末からも消すために使用。削除があれば true
+ */
+export async function purgeDeletedPartsFromLocal(): Promise<boolean> {
+  const deleted = readDeletedParts();
+  if (Object.keys(deleted).length === 0) return false;
+
+  let removed = false;
+  try {
+    const db = await openPartDatabase();
+    const all = await new Promise<AvatarPart[]>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const req = tx.objectStore(STORE_NAME).getAll() as IDBRequest<AvatarPart[]>;
       tx.oncomplete = () => resolve(req.result ?? []);
       tx.onerror = () => reject(tx.error);
     });
+    const targets = all.filter((p) => isPartDeleted(p, deleted)).map((p) => p.id);
+    if (targets.length > 0) {
+      await deleteFromDatabase(targets);
+      removed = true;
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const raw = localStorage.getItem(LS_FALLBACK_KEY);
+    const lsParts = raw ? (JSON.parse(raw) as AvatarPart[]) : [];
+    const kept = lsParts.filter((p) => !isPartDeleted(p, deleted));
+    if (kept.length !== lsParts.length) {
+      writeFallbackParts(kept);
+      removed = true;
+    }
+  } catch {
+    // ignore
+  }
+
+  if (removed) notifyCatalogUpdated();
+  return removed;
+}
+
+/** 保存済みの全パーツを登録日時順に取得（削除済みパーツは除外＆物理削除） */
+export async function listCatalogParts(): Promise<AvatarPart[]> {
+  const deleted = readDeletedParts();
+  try {
+    const db = await openPartDatabase();
+    const rawParts = await new Promise<AvatarPart[]>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).getAll() as IDBRequest<AvatarPart[]>;
+      tx.oncomplete = () => resolve(req.result ?? []);
+      tx.onerror = () => reject(tx.error);
+    });
+    const zombieIds = rawParts.filter((p) => isPartDeleted(p, deleted)).map((p) => p.id);
+    if (zombieIds.length > 0) {
+      void deleteFromDatabase(zombieIds);
+    }
+    const parts = rawParts.filter((p) => !isPartDeleted(p, deleted));
     // IndexedDBから取得できたらLocalStorageフォールバックにもキャッシュ同期
-    if (parts.length > 0) {
+    if (parts.length > 0 || zombieIds.length > 0) {
       writeFallbackParts(parts);
     }
     return parts.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
@@ -87,14 +218,32 @@ export async function listCatalogParts(): Promise<AvatarPart[]> {
   }
 }
 
-/** パーツをカタログに保存・更新 */
-export async function saveCatalogPart(part: AvatarPart): Promise<AvatarPart> {
+export interface SaveCatalogPartOptions {
+  /**
+   * クラウドから取り込む場合 true。
+   * - 取り込み起因のクラウド再アップロードを行わない
+   */
+  fromCloud?: boolean;
+}
+
+/** パーツをカタログに保存・更新（削除済みIDのパーツは保存しない） */
+export async function saveCatalogPart(
+  part: AvatarPart,
+  options?: SaveCatalogPartOptions,
+): Promise<AvatarPart> {
   const now = Date.now();
+  const fromCloud = Boolean(options?.fromCloud);
   const normalized: AvatarPart = {
     ...part,
     createdAt: part.createdAt ?? now,
     updatedAt: part.updatedAt ?? now,
   };
+
+  // 削除済みのパーツは、クラウド取り込み・装着中パーツの自動再保存などで復活させない
+  if (isPartDeleted(normalized)) {
+    return normalized;
+  }
+
   try {
     const db = await openPartDatabase();
     await new Promise<void>((resolve, reject) => {
@@ -117,7 +266,9 @@ export async function saveCatalogPart(part: AvatarPart): Promise<AvatarPart> {
   }
 
   notifyCatalogUpdated();
-  void import('./cloudCatalogSync').then((m) => m.scheduleCloudCatalogUpload()).catch(() => {});
+  if (!fromCloud) {
+    void import('./cloudCatalogSync').then((m) => m.scheduleCloudCatalogUpload()).catch(() => {});
+  }
   return normalized;
 }
 
@@ -190,29 +341,36 @@ export async function duplicateCatalogPart(
   return saveCatalogPart(mirroredPart);
 }
 
-/** 指定IDのパーツをカタログから削除 */
+/** 指定IDのパーツをカタログから削除（墓標を残し、全端末・クラウドから完全に消す） */
 export async function removeCatalogPart(partId: string): Promise<void> {
+  // 1. 削除墓標を記録（他端末・クラウドに残る古いコピーの復活を防ぐ）
+  mergeDeletedParts({ [partId]: Date.now() });
+
+  // 2. ローカル（IndexedDB / LocalStorage）から物理削除
+  await deleteFromDatabase([partId]);
   try {
-    const db = await openPartDatabase();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      tx.objectStore(STORE_NAME).delete(partId);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
+    const raw = localStorage.getItem(LS_FALLBACK_KEY);
+    const lsParts = raw ? (JSON.parse(raw) as AvatarPart[]) : [];
+    writeFallbackParts(lsParts.filter((p) => p.id !== partId));
   } catch {
-    // fallback handled below
-  }
-  const current = readFallbackParts();
-  if (current.length > 0) {
-    writeFallbackParts(current.filter((p) => p.id !== partId));
+    // ignore
   }
   notifyCatalogUpdated();
-  void import('./cloudCatalogSync').then((m) => m.scheduleCloudCatalogUpload()).catch(() => {});
+
+  // 3. デバウンスを待たず即座にクラウドへ削除を反映
+  void import('./cloudCatalogSync')
+    .then((m) => m.uploadCatalogToCloud())
+    .catch(() => {});
 }
 
-/** カタログ内のパーツをすべて消去 */
+/** カタログ内のパーツをすべて消去（全パーツに墓標を残す） */
 export async function clearCatalogParts(): Promise<void> {
+  const existing = await listCatalogParts();
+  const now = Date.now();
+  const tombstones: DeletedPartMap = {};
+  for (const p of existing) tombstones[p.id] = now;
+  mergeDeletedParts(tombstones);
+
   try {
     const db = await openPartDatabase();
     await new Promise<void>((resolve, reject) => {
@@ -230,6 +388,8 @@ export async function clearCatalogParts(): Promise<void> {
     // ignore
   }
   notifyCatalogUpdated();
-  void import('./cloudCatalogSync').then((m) => m.scheduleCloudCatalogUpload()).catch(() => {});
+  void import('./cloudCatalogSync')
+    .then((m) => m.uploadCatalogToCloud())
+    .catch(() => {});
 }
 

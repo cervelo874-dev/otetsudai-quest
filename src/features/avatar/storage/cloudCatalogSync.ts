@@ -6,7 +6,15 @@
  */
 import { supabase, isSupabaseConfigured, getRoomId } from '../../../supabase';
 import type { AvatarPart } from '../types';
-import { listCatalogParts, PART_CATALOG_UPDATED_EVENT } from './partCatalog';
+import {
+  listCatalogParts,
+  PART_CATALOG_UPDATED_EVENT,
+  readDeletedParts,
+  mergeDeletedParts,
+  filterDeletedParts,
+  purgeDeletedPartsFromLocal,
+  type DeletedPartMap,
+} from './partCatalog';
 
 export const NEW_AVATAR_PARTS_DETECTED_EVENT = 'avatar-new-parts:detected';
 
@@ -21,6 +29,8 @@ export interface CloudCatalogState {
   parts: AvatarPart[];
   updatedAt: number;
   deviceId?: string;
+  /** 削除済みパーツの墓標 { [partId]: deletedAt } */
+  deletedParts?: DeletedPartMap;
 }
 
 // 端末固有のランダムID（自端末の更新による二重通知を防止）
@@ -47,9 +57,13 @@ let lastKnownCloudUpdatedAt = 0;
 let isApplyingCloudSync = false;
 
 /**
- * クラウドから最新の自作パーツ一覧を取得
+ * クラウドの生データ（墓標込み）を取得
  */
-export async function fetchCloudCatalog(): Promise<{ parts: AvatarPart[]; updatedAt: number } | null> {
+async function fetchCloudCatalogRaw(): Promise<{
+  parts: AvatarPart[];
+  updatedAt: number;
+  deletedParts: DeletedPartMap;
+} | null> {
   if (!supabase || !isSupabaseConfigured) return null;
   const catalogRoomId = getCatalogRoomId();
 
@@ -66,16 +80,33 @@ export async function fetchCloudCatalog(): Promise<{ parts: AvatarPart[]; update
     }
 
     if (data?.state) {
-      const payload = data.state as { parts?: AvatarPart[]; updatedAt?: number; deviceId?: string };
+      const payload = data.state as CloudCatalogState;
       const parts = Array.isArray(payload.parts) ? payload.parts : [];
       const updatedAt = typeof payload.updatedAt === 'number' ? payload.updatedAt : Date.now();
-      return { parts, updatedAt };
+      const deletedParts =
+        payload.deletedParts && typeof payload.deletedParts === 'object' ? payload.deletedParts : {};
+      return { parts, updatedAt, deletedParts };
     }
-    return { parts: [], updatedAt: 0 };
+    return { parts: [], updatedAt: 0, deletedParts: {} };
   } catch (err) {
     console.warn('Cloud catalog network error:', err);
     return null;
   }
+}
+
+/**
+ * クラウドから最新の自作パーツ一覧を取得
+ * - クラウドの削除墓標をローカルへ統合し、他端末で削除されたパーツをこの端末からも完全に消去
+ * - 返却するパーツ一覧からは削除済みパーツを除外
+ */
+export async function fetchCloudCatalog(): Promise<{ parts: AvatarPart[]; updatedAt: number } | null> {
+  const raw = await fetchCloudCatalogRaw();
+  if (!raw) return null;
+
+  mergeDeletedParts(raw.deletedParts);
+  await purgeDeletedPartsFromLocal();
+
+  return { parts: filterDeletedParts(raw.parts), updatedAt: raw.updatedAt };
 }
 
 /**
@@ -130,13 +161,15 @@ export async function importCloudPartsToLocal(partsToImport?: AvatarPart[]): Pro
     if (!cloudData) return 0;
     targetParts = cloudData.parts;
   }
+  // 削除済み（墓標あり）のパーツは絶対に取り込まない
+  targetParts = filterDeletedParts(targetParts);
   if (targetParts.length === 0) return 0;
 
   isApplyingCloudSync = true;
   try {
     const { saveCatalogPart } = await import('./partCatalog');
     for (const part of targetParts) {
-      await saveCatalogPart(part);
+      await saveCatalogPart(part, { fromCloud: true });
     }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(PART_CATALOG_UPDATED_EVENT));
@@ -151,15 +184,36 @@ export async function importCloudPartsToLocal(partsToImport?: AvatarPart[]): Pro
 
 /**
  * ローカルのパーツ一覧を Supabase クラウドへアップロード
+ * - クラウド側にある他端末のパーツは消さずにマージ（同じIDは新しい方を採用）
+ * - 削除墓標を統合して保存し、削除済みパーツはクラウドからも取り除く
  */
 export async function uploadCatalogToCloud(customParts?: AvatarPart[]): Promise<boolean> {
   if (!supabase || !isSupabaseConfigured || isApplyingCloudSync) return false;
   const catalogRoomId = getCatalogRoomId();
 
-  let parts = customParts;
-  if (!parts) {
-    parts = await listCatalogParts();
+  // 最新のクラウド状態（墓標込み）を取得してローカル墓標へ統合
+  const cloudRaw = await fetchCloudCatalogRaw();
+  if (cloudRaw) {
+    mergeDeletedParts(cloudRaw.deletedParts);
+    await purgeDeletedPartsFromLocal();
   }
+  const deletedParts = readDeletedParts();
+
+  let localParts = customParts;
+  if (!localParts) {
+    localParts = await listCatalogParts();
+  }
+
+  // ID単位でマージ（新しい方を優先）
+  const merged = new Map<string, AvatarPart>();
+  for (const cp of cloudRaw?.parts ?? []) merged.set(cp.id, cp);
+  for (const lp of localParts) {
+    const existing = merged.get(lp.id);
+    const lpTime = Math.max(lp.updatedAt ?? 0, lp.createdAt ?? 0);
+    const exTime = existing ? Math.max(existing.updatedAt ?? 0, existing.createdAt ?? 0) : -1;
+    if (!existing || lpTime >= exTime) merged.set(lp.id, lp);
+  }
+  const parts = filterDeletedParts(Array.from(merged.values()), deletedParts);
 
   const now = Date.now();
   lastKnownCloudUpdatedAt = now;
@@ -168,6 +222,7 @@ export async function uploadCatalogToCloud(customParts?: AvatarPart[]): Promise<
     parts,
     updatedAt: now,
     deviceId: DEVICE_ID,
+    deletedParts,
   };
 
   try {
@@ -227,19 +282,30 @@ export async function startCloudCatalogSync(): Promise<() => void> {
 
   const catalogRoomId = getCatalogRoomId();
 
-  // 1. 初回差分チェック
+  // 1. 初回差分チェック（クラウドの削除墓標もここでローカルへ反映される）
   const initialDiff = await checkNewCloudItems();
   if (initialDiff && initialDiff.newCount > 0) {
     emitNewPartsEvent(initialDiff);
-  } else {
-    // ローカルにパーツがあってクラウドが空の場合、自動でクラウドへ初期同期
-    const localParts = await listCatalogParts();
-    if (localParts.length > 0) {
-      const cloudData = await fetchCloudCatalog();
-      if (!cloudData || cloudData.parts.length === 0) {
+  }
+
+  // ローカルにしかないパーツ・削除墓標があればクラウドへマージ同期
+  try {
+    const cloudRaw = await fetchCloudCatalogRaw();
+    if (cloudRaw) {
+      const localParts = await listCatalogParts();
+      const localDeleted = readDeletedParts();
+      const cloudIds = new Set(cloudRaw.parts.map((p) => p.id));
+      const hasLocalOnlyPart = localParts.some((p) => !cloudIds.has(p.id));
+      const hasUnsyncedTombstone = Object.entries(localDeleted).some(
+        ([id, at]) => (cloudRaw.deletedParts[id] ?? 0) < at,
+      );
+      const cloudHasZombie = filterDeletedParts(cloudRaw.parts, localDeleted).length !== cloudRaw.parts.length;
+      if (hasLocalOnlyPart || hasUnsyncedTombstone || cloudHasZombie) {
         await uploadCatalogToCloud(localParts);
       }
     }
+  } catch (err) {
+    console.warn('Initial avatar catalog merge sync failed:', err);
   }
 
   // 2. Realtime 購読開始（他端末で作成されたパーツを即座にキャッチ）

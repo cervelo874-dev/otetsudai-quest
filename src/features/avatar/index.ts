@@ -95,6 +95,8 @@ export {
   duplicateCatalogPart,
   removeCatalogPart,
   clearCatalogParts,
+  isPartDeleted,
+  readDeletedParts,
   PART_CATALOG_UPDATED_EVENT,
   type DuplicateCatalogPartOptions,
 } from './storage/partCatalog';
@@ -161,6 +163,7 @@ export {
 import { PRESET_PARTS, PRESET_BODY, DEFAULT_EQUIPPED } from './presets/svgParts';
 import type { AvatarCategory, AvatarPart, EquippedParts, EquippedPartMap } from './types';
 import { isDressOrOnePiecePart } from './utils/parts';
+import { isPartDeleted } from './storage/partCatalog';
 
 export function resolveChildEquippedParts(
   avatarStudio?: {
@@ -182,7 +185,7 @@ export function resolveChildEquippedParts(
       const raw = localStorage.getItem('mobage_avatar_current_equipped_v2');
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed.body && typeof parsed.body === 'object' && parsed.body.src) {
+        if (parsed.body && typeof parsed.body === 'object' && parsed.body.src && !isPartDeleted(parsed.body)) {
           parentStudioBodyPart = parsed.body as AvatarPart;
         } else if (parsed.body && typeof parsed.body === 'string') {
           parentStudioBodyPart = allPartsMap.get(parsed.body) ?? null;
