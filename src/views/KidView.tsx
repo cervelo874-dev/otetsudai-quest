@@ -13,6 +13,7 @@ import { getRank, displayStreak, themeOf } from '../logic';
 import { sound } from '../sound';
 import { burst } from '../effects';
 import { GachaIcon } from '../components/GachaIcons';
+import { KidIcon, SmartTicketIcon, type KidIconKey } from '../components/KidIcons';
 import { claimDailyLoginBonus, canFreeGacha } from '../actions';
 import { Sparkles, Shirt, Award, Flame, Coins, Gift, Smartphone, Check } from 'lucide-react';
 
@@ -51,27 +52,27 @@ export function KidView({
     key: 'quests' | 'shop' | 'tickets';
     label: string;
     shortLabel: string;
-    icon: string;
+    iconKey: KidIconKey;
     count?: number;
   }[] = [
     {
       key: 'quests',
       label: 'おてつだい',
       shortLabel: 'おてつだい',
-      icon: '⚔️',
+      iconKey: 'tab_quests',
       count: state.quests.filter((q) => q.assignedTo.includes(currentChild.id)).length,
     },
     {
       key: 'shop',
       label: 'ごほうびショップ',
       shortLabel: 'ショップ',
-      icon: '🏪',
+      iconKey: 'tab_shop',
     },
     {
       key: 'tickets',
       label: 'もちもの＆じかん',
       shortLabel: 'もちもの',
-      icon: '🎟️',
+      iconKey: 'tab_tickets',
       count: state.tickets.filter((t) => t.childId === currentChild.id && t.status === 'owned').length,
     },
   ];
@@ -170,7 +171,7 @@ export function KidView({
           <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 sm:gap-2.5 w-full sm:flex-1">
             {/* コイン */}
             <div className="flex-1 sm:flex-none flex items-center justify-center gap-1 sm:gap-1.5 rounded-2xl bg-white/95 px-3 py-1.5 font-black text-amber-800 shadow-xs">
-              <span className="text-lg sm:text-xl">🪙</span>
+              <KidIcon iconKey="ui_coin" size={24} />
               <span className="text-base sm:text-2xl text-amber-600">
                 {currentChild.coins}
               </span>
@@ -264,13 +265,13 @@ export function KidView({
               sound.tap();
               setActiveTab(tab.key);
             }}
-            className={`btn-pop flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-2xl sm:rounded-3xl py-2.5 sm:py-3 px-1.5 sm:px-2 text-center font-black transition-all ${
+            className={`btn-pop flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-2xl sm:rounded-3xl py-2 sm:py-2.5 px-1.5 sm:px-3 text-center font-black transition-all ${
               activeTab === tab.key
                 ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow-[0_4px_0_#c2410c]'
                 : 'bg-white text-slate-600 hover:bg-slate-100 shadow-[0_3px_0_#cbd5e1] border border-slate-200'
             }`}
           >
-            <span className="text-xl sm:text-2xl">{tab.icon}</span>
+            <KidIcon iconKey={tab.iconKey} size={32} className="shrink-0" />
             <span className="text-xs sm:text-base whitespace-nowrap">
               <span className="hidden sm:inline">{tab.label}</span>
               <span className="sm:hidden">{tab.shortLabel}</span>
@@ -353,8 +354,7 @@ export function KidView({
       >
         <div className="flex flex-col items-center p-2 sm:p-4 text-center">
           <div className="relative mb-3">
-            <span className="text-6xl animate-bounce inline-block">🎁</span>
-            <span className="absolute -top-1 -right-2 text-2xl animate-spin">✨</span>
+            <KidIcon iconKey="ui_chest" size={76} className="animate-bounce" />
           </div>
 
           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800 mb-2">
@@ -367,8 +367,17 @@ export function KidView({
           </h3>
 
           <div className="my-4 flex w-full flex-col items-center rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 p-4 border-2 border-amber-300 shadow-sm">
-            <div className="flex items-center gap-3">
-              <span className="text-4xl">📱</span>
+            <div className="flex items-center gap-3.5">
+              <SmartTicketIcon
+                item={{
+                  name: '【まいにち】タブレット1時間券',
+                  icon: 'ticket_tab_king',
+                  category: 'tablet',
+                  minutes: 60,
+                  isDaily: true,
+                }}
+                size={56}
+              />
               <div className="text-left">
                 <div className="text-base font-black text-amber-950">
                   【まいにち】タブレット1時間券

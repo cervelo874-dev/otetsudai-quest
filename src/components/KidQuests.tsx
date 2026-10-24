@@ -4,6 +4,7 @@ import { submitQuest } from '../actions';
 import { sound } from '../sound';
 import { burstFromElement } from '../effects';
 import { todayKey } from '../utils';
+import { KidIcon, resolveQuestIconKey } from './KidIcons';
 import { CheckCircle2, Clock, Sparkles } from 'lucide-react';
 
 export function KidQuests({
@@ -62,10 +63,10 @@ export function KidQuests({
                   : 'border-slate-100 bg-white hover:border-amber-200 shadow-md'
             }`}
           >
-            <div className="flex items-center gap-3 w-full sm:w-auto min-w-0 flex-1">
-              <span className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-2xl sm:text-3xl shadow-inner border border-amber-200/60">
-                {quest.icon}
-              </span>
+            <div className="flex items-center gap-3.5 w-full sm:w-auto min-w-0 flex-1">
+              <div className="flex h-13 w-13 sm:h-15 sm:w-15 shrink-0 items-center justify-center rounded-2xl bg-amber-50/90 shadow-inner border border-amber-200/70 p-1">
+                <KidIcon iconKey={resolveQuestIconKey(quest)} size={46} />
+              </div>
 
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-base sm:text-lg font-black text-slate-800 break-words leading-tight">
@@ -73,7 +74,7 @@ export function KidQuests({
                 </span>
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className="inline-flex items-center gap-1 text-xs sm:text-sm font-black text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
-                    <span>🪙</span>
+                    <KidIcon iconKey="ui_coin" size={16} />
                     <span className="whitespace-nowrap">+{reward} コイン</span>
                   </span>
                 </div>

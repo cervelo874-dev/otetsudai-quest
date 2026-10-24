@@ -5,7 +5,9 @@ import { sound } from '../sound';
 import { toast } from './ui';
 import { burst } from '../effects';
 import { CATEGORY_LABEL } from '../logic';
-import { Check, ShoppingCart, Sparkles } from 'lucide-react';
+import { GachaIcon } from './GachaIcons';
+import { KidIcon, SmartTicketIcon, type KidIconKey } from './KidIcons';
+import { Check, ShoppingCart } from 'lucide-react';
 
 export function KidShop({
   child,
@@ -18,9 +20,10 @@ export function KidShop({
 }) {
   const [filter, setFilter] = useState<ShopCategory | 'all'>('all');
 
+  const nonAvatarItems = shopItems.filter((i) => i.category !== 'avatar');
   const filteredItems = filter === 'all'
-    ? shopItems
-    : shopItems.filter((i) => i.category === filter);
+    ? nonAvatarItems
+    : nonAvatarItems.filter((i) => i.category === filter);
 
   const handleBuy = (item: ShopItem) => {
     const res = buyItem(child.id, item.id);
@@ -37,25 +40,26 @@ export function KidShop({
     }
   };
 
-  const categories: { key: ShopCategory | 'all'; label: string; icon: string }[] = [
-    { key: 'all', label: 'ぜんぶ', icon: '🌟' },
-    { key: 'tablet', label: CATEGORY_LABEL.tablet.kid, icon: CATEGORY_LABEL.tablet.icon },
-    { key: 'real', label: CATEGORY_LABEL.real.kid, icon: CATEGORY_LABEL.real.icon },
-    { key: 'avatar', label: CATEGORY_LABEL.avatar.kid, icon: CATEGORY_LABEL.avatar.icon },
+  const categories: { key: ShopCategory | 'all'; label: string; iconKey: KidIconKey }[] = [
+    { key: 'all', label: 'ぜんぶ', iconKey: 'tab_shop' },
+    { key: 'tablet', label: CATEGORY_LABEL.tablet.kid, iconKey: 'ticket_tab_std' },
+    { key: 'real', label: CATEGORY_LABEL.real.kid, iconKey: 'reward_cookie' },
   ];
 
   return (
     <div className="flex flex-col gap-4">
-      {/* ガチャバナー（スマホで潰れないレスポンシブ配置） */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-3xl bg-gradient-to-r from-pink-400 via-rose-400 to-amber-400 p-4 text-white shadow-md">
+      {/* ジュエルガチャバナー（スマホで潰れないレスポンシブ配置） */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-3xl bg-gradient-to-r from-indigo-950 via-purple-900 to-pink-900 p-4 text-white shadow-md border-2 border-amber-300/60">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/30 text-3xl shadow-inner">
-            🎰
-          </span>
+          <div className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl bg-black/35 border border-amber-300/40 p-1 shadow-inner">
+            <GachaIcon type="box_closed" size={44} />
+          </div>
           <div className="min-w-0">
-            <div className="text-base sm:text-lg font-black truncate">ごほうびガチャ</div>
-            <div className="text-xs font-bold text-pink-100 line-clamp-1">
-              1にち1かい むりょう！レアアイテムが あたるかも！？
+            <div className="text-base sm:text-lg font-black text-amber-200 truncate">
+              ドリームジュエルガチャ
+            </div>
+            <div className="text-xs font-bold text-indigo-100 line-clamp-1">
+              黄金のカギで宝石箱をあけて限定コーデ＆ごほうびをゲット！
             </div>
           </div>
         </div>
@@ -64,9 +68,9 @@ export function KidShop({
             sound.tap();
             onOpenGacha();
           }}
-          className="btn-pop shrink-0 rounded-2xl bg-white px-5 py-2.5 text-sm font-black text-rose-600 shadow-[0_4px_0_#fda4af] hover:bg-rose-50 text-center whitespace-nowrap active:translate-y-1 active:shadow-none"
+          className="btn-pop shrink-0 rounded-2xl bg-gradient-to-r from-amber-300 via-pink-300 to-cyan-300 px-5 py-2.5 text-sm font-black text-slate-950 shadow-[0_4px_0_#b45309] hover:brightness-105 text-center whitespace-nowrap active:translate-y-1 active:shadow-none"
         >
-          まわす！✨
+          ガチャへ！✨
         </button>
       </div>
 
@@ -85,7 +89,7 @@ export function KidShop({
                 : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            <span>{c.icon}</span>
+            <KidIcon iconKey={c.iconKey} size={22} />
             <span className="whitespace-nowrap">{c.label}</span>
           </button>
         ))}
@@ -106,16 +110,16 @@ export function KidShop({
               key={item.id}
               className="card flex flex-col justify-between p-4 border-2 border-slate-100 hover:border-amber-200 shadow-sm"
             >
-              <div className="flex items-start gap-3">
-                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-3xl shadow-inner border border-amber-100">
-                  {item.icon}
-                </span>
+              <div className="flex items-start gap-3.5">
+                <div className="flex h-15 w-15 shrink-0 items-center justify-center rounded-2xl bg-amber-50/80 shadow-inner border border-amber-100 p-1">
+                  <SmartTicketIcon item={item} size={48} />
+                </div>
                 <div className="flex flex-col min-w-0 flex-1">
                   <span className="text-base font-black text-slate-800 break-words leading-tight">
                     {item.name}
                   </span>
                   <div className="mt-1.5 flex items-center gap-1 text-sm font-black text-amber-600">
-                    <span>🪙</span>
+                    <KidIcon iconKey="ui_coin" size={18} />
                     <span>{item.price} コイン</span>
                   </div>
                 </div>

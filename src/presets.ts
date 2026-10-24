@@ -175,11 +175,13 @@ export function createInitialState(): AppState {
   ];
 
   const quests: Quest[] = [
-    { id: 'q-shoes', title: 'くつを そろえる', icon: '👟', reward: 30, assignedTo: ['c-imouto', 'c-niito'], rewardOverrides: {} },
-    { id: 'q-toys', title: 'おもちゃを かたづける', icon: '🧸', reward: 40, assignedTo: ['c-imouto', 'c-niito', 'c-nene'], rewardOverrides: {} },
-    { id: 'q-dishes', title: 'おさらを はこぶ', icon: '🍽️', reward: 50, assignedTo: ['c-niito', 'c-nene'], rewardOverrides: {} },
-    { id: 'q-laundry', title: 'せんたくものを たたむ', icon: '👕', reward: 80, assignedTo: ['c-nene'], rewardOverrides: {} },
-    { id: 'q-teeth', title: 'はみがき・ねんねの じゅんび', icon: '🪥', reward: 50, assignedTo: ['c-imouto', 'c-niito', 'c-nene'], rewardOverrides: {} },
+    { id: 'q-shoes', title: 'くつを そろえる', icon: 'quest_shoes', reward: 30, assignedTo: ['c-imouto', 'c-niito'], rewardOverrides: {} },
+    { id: 'q-toys', title: 'おもちゃを かたづける', icon: 'quest_toys', reward: 40, assignedTo: ['c-imouto', 'c-niito', 'c-nene'], rewardOverrides: {} },
+    { id: 'q-dishes', title: 'おさらを はこぶ', icon: 'quest_dishes', reward: 50, assignedTo: ['c-niito', 'c-nene'], rewardOverrides: {} },
+    { id: 'q-laundry', title: 'せんたくものを たたむ', icon: 'quest_laundry', reward: 80, assignedTo: ['c-nene'], rewardOverrides: {} },
+    { id: 'q-teeth', title: 'はみがき・ねんねの じゅんび', icon: 'quest_teeth', reward: 50, assignedTo: ['c-imouto', 'c-niito', 'c-nene'], rewardOverrides: {} },
+    { id: 'q-bath', title: 'おふろそうじを する', icon: 'quest_bath', reward: 70, assignedTo: ['c-nene'], rewardOverrides: {} },
+    { id: 'q-study', title: 'しゅくだい・おべんきょう', icon: 'quest_study', reward: 60, assignedTo: ['c-nene'], rewardOverrides: {} },
   ];
 
   const tab = (id: string, name: string, icon: string, price: number, minutes: number): ShopItem => ({
@@ -188,31 +190,17 @@ export function createInitialState(): AppState {
   const real = (id: string, name: string, icon: string, price: number): ShopItem => ({
     id, name, icon, price, category: 'real', minutes: 0, avatarItemId: null,
   });
-  const av = (id: string, name: string, icon: string, price: number, avatarItemId: string): ShopItem => ({
-    id, name, icon, price, category: 'avatar', minutes: 0, avatarItemId,
-  });
 
   const shop: ShopItem[] = [
-    tab('sh-tab10', 'タブレット ちょい足し10ぷん券', '⏱️', 35, 10),
-    tab('sh-tab15', 'タブレット 15ふん チケット', '⏱️', 50, 15),
-    tab('sh-tab30', 'タブレット 30ぷん チケット', '📱', 90, 30),
-    real('sh-snack', 'おやつ 1こ ついかチケット', '🍪', 60),
-    real('sh-snack-up', 'おやつ グレードアップ券', '🍰', 70),
-    real('sh-book', 'ねるまえ えほん もう1さつ券', '📖', 40),
-    real('sh-juice', 'すきな ジュース チケット', '🧃', 80),
-    real('sh-dinner', '★3 ばんごはん リクエスト券', '🍛', 250),
-    real('sh-outing', 'おでかけ リクエストけん', '🎡', 300),
-    av('sh-crown', 'おうかん', '👑', 120, 'crown'),
-    av('sh-wizard', 'まほうつかいの ぼうし', '🧙', 150, 'wizard'),
-    av('sh-sunglasses', 'サングラス', '🕶️', 80, 'sunglasses'),
-    av('sh-dino', 'きょうりゅう パーカー', '🦖', 200, 'dino'),
-    av('sh-princess', 'プリンセス ドレス', '👗', 200, 'princess'),
-    av('sh-knight', 'ゆうしゃの よろい', '🛡️', 180, 'knight'),
-    av('sh-shiba', 'あいぼう しばいぬ', '🐕', 180, 'shiba'),
-    av('sh-dragon', 'あいぼう ドラゴン', '🐉', 250, 'dragon'),
-    av('sh-penguin', 'あいぼう ペンギン', '🐧', 180, 'penguin'),
-    av('sh-kirakira', 'キラキラ はいけい', '✨', 150, 'kirakira'),
-    av('sh-space', 'うちゅう はいけい', '🪐', 120, 'space'),
+    tab('sh-tab10', 'タブレット ちょい足し10ぷん券', 'ticket_tab_plus', 35, 10),
+    tab('sh-tab15', 'タブレット 15ふん チケット', 'ticket_tab_std', 50, 15),
+    tab('sh-tab30', 'タブレット 30ぷん チケット', 'ticket_tab_std', 90, 30),
+    real('sh-snack', 'おやつ 1こ ついかチケット', 'reward_cookie', 60),
+    real('sh-snack-up', 'おやつ グレードアップ券', 'reward_cake', 70),
+    real('sh-book', 'ねるまえ えほん もう1さつ券', 'reward_book', 40),
+    real('sh-juice', 'すきな ジュース チケット', 'reward_juice', 80),
+    real('sh-dinner', '★3 ばんごはん リクエスト券', 'reward_dinner', 250),
+    real('sh-outing', 'おでかけ リクエストけん', 'reward_outing', 300),
   ];
 
   return {

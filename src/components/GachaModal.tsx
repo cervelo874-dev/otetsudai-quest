@@ -23,6 +23,7 @@ import {
   type EquippedParts,
 } from '../features/avatar';
 import { GachaIcon } from './GachaIcons';
+import { KidIcon, SmartTicketIcon } from './KidIcons';
 import { sound } from '../sound';
 import { burst } from '../effects';
 import { toast } from './ui';
@@ -626,8 +627,22 @@ export function GachaModal({
                                 👗 ドリームランウェイ試着お披露目中✨
                               </span>
                             </div>
+                          ) : currentSSR.prize.kind === 'shards' ? (
+                            <div className="py-4">
+                              <GachaIcon type="star_jewel" size={110} />
+                            </div>
                           ) : (
-                            <div className="py-6 text-6xl">{currentSSR.prize.icon}</div>
+                            <div className="py-4">
+                              <SmartTicketIcon
+                                item={{
+                                  name: currentSSR.prize.label,
+                                  icon: currentSSR.prize.icon,
+                                  category: 'real',
+                                  minutes: 0,
+                                }}
+                                size={96}
+                              />
+                            </div>
                           )}
                         </div>
 
@@ -748,8 +763,22 @@ export function GachaModal({
                               />
                             ) : r.prize.kind === 'shards' ? (
                               <GachaIcon type="star_jewel" size={44} />
+                            ) : r.prize.kind === 'coins' ? (
+                              <KidIcon iconKey="ui_coin" size={44} />
                             ) : (
-                              <span className="text-3xl">{r.prize.icon}</span>
+                              <SmartTicketIcon
+                                item={{
+                                  name: r.prize.label,
+                                  icon: r.prize.icon,
+                                  category:
+                                    r.prize.label.includes('タブレット') ||
+                                    r.prize.label.includes('ゲーム')
+                                      ? 'tablet'
+                                      : 'real',
+                                  minutes: 0,
+                                }}
+                                size={46}
+                              />
                             )}
                           </div>
 

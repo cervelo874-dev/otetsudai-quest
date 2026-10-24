@@ -3,6 +3,7 @@ import type { Chest } from '../types';
 import { openChest } from '../actions';
 import { sound } from '../sound';
 import { burst } from '../effects';
+import { KidIcon, SmartTicketIcon } from './KidIcons';
 import { Sparkles, ArrowRight, Check, X } from 'lucide-react';
 
 export function ChestModal({
@@ -147,11 +148,11 @@ export function ChestModal({
               <button
                 onClick={handleOpen}
                 disabled={opening}
-                className={`btn-pop relative flex h-36 w-36 items-center justify-center rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 text-7xl shadow-[0_12px_0_#c2410c] active:shadow-none ${
+                className={`btn-pop relative flex h-36 w-36 items-center justify-center rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 p-3 shadow-[0_12px_0_#c2410c] active:shadow-none ${
                   opening ? 'animate-wobble' : 'animate-shake'
                 }`}
               >
-                <span>🎁</span>
+                <KidIcon iconKey="ui_chest" size={110} />
                 <span className="absolute -top-3 -right-3 flex h-10 w-10 items-center justify-center rounded-full bg-rose-500 text-xl font-black text-white shadow-lg animate-bounce">
                   ✨
                 </span>
@@ -179,7 +180,7 @@ export function ChestModal({
                 手に入れた コイン
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-4xl animate-bounce">🪙</span>
+                <KidIcon iconKey="ui_coin" size={44} className="animate-bounce" />
                 <span className="text-5xl font-black text-amber-600 tracking-tight">
                   +{openedResult.coins}
                 </span>
@@ -221,10 +222,18 @@ export function ChestModal({
                   </span>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-3xl shadow-sm border border-orange-200 shrink-0">
-                    {openedResult.ticketIcon ?? '🎟️'}
-                  </span>
+                <div className="flex items-center gap-3.5">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white p-1 shadow-sm border border-orange-200 shrink-0">
+                    <SmartTicketIcon
+                      item={{
+                        name: openedResult.ticketName,
+                        icon: openedResult.ticketIcon ?? 'ticket_golden',
+                        category: openedResult.ticketCategory ?? 'real',
+                        minutes: openedResult.ticketMinutes ?? 0,
+                      }}
+                      size={46}
+                    />
+                  </div>
                   <div>
                     <div className="font-black text-slate-800 text-base">
                       {openedResult.ticketName}

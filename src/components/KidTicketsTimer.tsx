@@ -15,7 +15,8 @@ import {
 import { ensureNotificationPermission, notify } from '../notify';
 import { BONUS_COINS, BONUS_WINDOW_MS } from '../logic';
 import { formatClock, formatHMKana, todayKey } from '../utils';
-import { Play, Pause, Sparkles, PictureInPicture2, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { KidIcon, SmartTicketIcon } from './KidIcons';
+import { Play, Pause, Sparkles, PictureInPicture2, CheckCircle } from 'lucide-react';
 
 export function KidTicketsTimer({
   child,
@@ -196,9 +197,7 @@ export function KidTicketsTimer({
           }`}
         >
           <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-3xl animate-bounce">
-              {isTimeOver ? '⏰' : '📱'}
-            </span>
+            <KidIcon iconKey="ui_timer" size={38} className="animate-bounce" />
             <span className="text-xl font-black text-slate-800">
               {currentTimer.name}
             </span>
@@ -294,8 +293,8 @@ export function KidTicketsTimer({
           </div>
         </div>
       ) : (
-        <div className="rounded-3xl bg-sky-50/70 p-6 text-center border-2 border-dashed border-sky-200">
-          <span className="text-4xl mb-2 inline-block">⏱️</span>
+        <div className="rounded-3xl bg-sky-50/70 p-6 text-center border-2 border-dashed border-sky-200 flex flex-col items-center">
+          <KidIcon iconKey="ui_timer" size={58} className="mb-1.5" />
           <h4 className="text-base font-black text-slate-700">
             いまは タブレットを つかっていないよ
           </h4>
@@ -308,13 +307,13 @@ export function KidTicketsTimer({
       {/* もちものチケット一覧 */}
       <div>
         <h3 className="mb-3 text-lg font-black text-slate-700 flex items-center gap-2">
-          <span>🎟️</span>
+          <KidIcon iconKey="tab_tickets" size={28} />
           <span>もっている チケット</span>
         </h3>
 
         {unusedTickets.length === 0 && requestedTickets.length === 0 ? (
-          <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
-            <span className="text-4xl mb-2 inline-block">🎒</span>
+          <div className="rounded-3xl bg-white p-8 text-center shadow-sm flex flex-col items-center">
+            <KidIcon iconKey="tab_tickets" size={56} className="mb-2" />
             <p className="font-black text-slate-600">チケットは まだないよ</p>
             <p className="mt-1 text-xs font-bold text-slate-400">
               ショップで コインをつかって ゲットしよう！
@@ -328,18 +327,18 @@ export function KidTicketsTimer({
                 key={ticket.id}
                 className="card flex items-center justify-between p-4 border-2 border-amber-300 bg-amber-50/70"
               >
-                <div className="flex items-center gap-3">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-2xl">
-                    {ticket.icon}
-                  </span>
+                <div className="flex items-center gap-3.5">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-100/90 border border-amber-200 p-1">
+                    <SmartTicketIcon item={ticket} size={46} />
+                  </div>
                   <div>
                     <div className="font-black text-slate-800">{ticket.name}</div>
                     <div className="text-xs font-bold text-amber-700">
-                      おうちのひとに おねがい中…🍪
+                      おうちのひとに おねがい中…✨
                     </div>
                   </div>
                 </div>
-                <div className="rounded-xl bg-amber-200 px-3 py-1.5 text-xs font-black text-amber-900">
+                <div className="rounded-xl bg-amber-200 px-3 py-1.5 text-xs font-black text-amber-900 shrink-0">
                   おねがい中
                 </div>
               </div>
@@ -357,17 +356,17 @@ export function KidTicketsTimer({
                       : 'border-slate-100 hover:border-amber-200'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`flex h-12 w-12 items-center justify-center rounded-2xl text-2xl border ${
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div
+                      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border p-1 ${
                         isDaily
-                          ? 'bg-amber-100 border-amber-300 shadow-sm'
-                          : 'bg-amber-50 border-amber-100'
+                          ? 'bg-gradient-to-br from-amber-100 to-yellow-100 border-amber-300 shadow-xs'
+                          : 'bg-amber-50/80 border-amber-100'
                       }`}
                     >
-                      {ticket.icon}
-                    </span>
-                    <div>
+                      <SmartTicketIcon item={ticket} size={46} />
+                    </div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-black text-slate-800">{ticket.name}</span>
                         {isDaily && (
@@ -432,7 +431,7 @@ export function KidTicketsTimer({
             {/* 残り時間返却の案内 */}
             {bonusModal.refundMinutes && bonusModal.refundMinutes >= 1 && (
               <div className="my-3 flex items-center gap-2.5 rounded-2xl bg-sky-50 border-2 border-sky-200 p-3 text-left w-full">
-                <span className="text-3xl">🎫</span>
+                <KidIcon iconKey="ticket_tab_std" size={38} />
                 <div>
                   <div className="text-xs font-black text-sky-950">
                     のこりじかん（{bonusModal.refundMinutes}ぷん）を チケットに もどしたよ！
@@ -450,7 +449,7 @@ export function KidTicketsTimer({
                   じかんを しっかり まもった ごほうびだよ！
                 </span>
                 <div className="mt-2 flex items-center gap-2">
-                  <span className="text-4xl">🪙</span>
+                  <KidIcon iconKey="ui_coin" size={42} />
                   <span className="text-4xl font-black text-amber-600">
                     +{bonusModal.coins}
                   </span>

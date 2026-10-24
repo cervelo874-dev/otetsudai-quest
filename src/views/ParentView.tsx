@@ -65,26 +65,68 @@ import {
   sendBrowserNotification,
 } from '../notifications';
 import { usePartCatalog } from '../features/avatar';
+import {
+  KidIcon,
+  SmartTicketIcon,
+  resolveQuestIconKey,
+  resolveShopOrTicketIconKey,
+  KID_ICON_KEYS,
+  KID_ICON_META,
+  type KidIconKey,
+} from '../components/KidIcons';
 
 const TICKET_TEMPLATES: {
   category: 'tablet' | 'real';
   name: string;
-  icon: string;
+  icon: KidIconKey;
   price: number;
   minutes: number;
 }[] = [
-  { category: 'tablet', name: 'タブレット30分券', icon: '📱', price: 60, minutes: 30 },
-  { category: 'tablet', name: 'ゲーム20分券', icon: '🎮', price: 40, minutes: 20 },
-  { category: 'tablet', name: 'YouTube 15分券', icon: '📺', price: 30, minutes: 15 },
-  { category: 'tablet', name: 'アニメ1話（25分）', icon: '🎬', price: 50, minutes: 25 },
-  { category: 'real', name: 'すきなおやつ券', icon: '🍪', price: 50, minutes: 0 },
-  { category: 'real', name: 'アイスクリーム券', icon: '🍦', price: 80, minutes: 0 },
-  { category: 'real', name: 'マンガ・本1さつ', icon: '📚', price: 150, minutes: 0 },
-  { category: 'real', name: 'よるふかし30分', icon: '🛌', price: 100, minutes: 0 },
+  { category: 'tablet', name: 'タブレット30分券', icon: 'ticket_tab_std', price: 60, minutes: 30 },
+  { category: 'tablet', name: 'タブレット15分券', icon: 'ticket_tab_std', price: 30, minutes: 15 },
+  { category: 'tablet', name: 'ちょい足し10分追加券', icon: 'ticket_tab_plus', price: 20, minutes: 10 },
+  { category: 'tablet', name: 'たっぷり1時間券', icon: 'ticket_tab_king', price: 120, minutes: 60 },
+  { category: 'tablet', name: 'ゲーム20分券', icon: 'ticket_game', price: 40, minutes: 20 },
+  { category: 'tablet', name: 'YouTube・アニメ20分券', icon: 'ticket_video', price: 40, minutes: 20 },
+  { category: 'real', name: 'すきなおやつ1こ追加券', icon: 'reward_cookie', price: 50, minutes: 0 },
+  { category: 'real', name: 'アイスクリーム券', icon: 'reward_icecream', price: 80, minutes: 0 },
+  { category: 'real', name: '特別ケーキ・デザート券', icon: 'reward_cake', price: 120, minutes: 0 },
+  { category: 'real', name: 'すきなジュース券', icon: 'reward_juice', price: 50, minutes: 0 },
+  { category: 'real', name: 'すきな晩ごはんリクエスト券', icon: 'reward_dinner', price: 150, minutes: 0 },
+  { category: 'real', name: '絵本・マンガ1さつ券', icon: 'reward_book', price: 150, minutes: 0 },
+  { category: 'real', name: 'よるふかし30分券', icon: 'reward_night', price: 100, minutes: 0 },
+  { category: 'real', name: '休日おでかけリクエスト券', icon: 'reward_outing', price: 200, minutes: 0 },
 ];
 
-const PRESET_ICONS = ['📱', '🎮', '📺', '🎬', '🍪', '🍦', '🍰', '📚', '🛌', '🎪', '🛹', '🧩', '🎯', '🎁'];
-const PRICE_PRESETS = [30, 50, 80, 100, 150, 200];
+const QUEST_TEMPLATES: {
+  title: string;
+  icon: KidIconKey;
+  reward: number;
+  tag: '保育園・幼児' | '小学生' | 'みんな';
+}[] = [
+  { title: 'おふろそうじを する', icon: 'quest_bath', reward: 80, tag: '小学生' },
+  { title: 'しゅくだい・べんきょうを する', icon: 'quest_study', reward: 60, tag: '小学生' },
+  { title: 'あしたの がっこう・ほいくえん じゅんび', icon: 'quest_bag', reward: 50, tag: 'みんな' },
+  { title: 'くつを きれいに そろえる', icon: 'quest_shoes', reward: 30, tag: '保育園・幼児' },
+  { title: 'おもちゃを かたづける', icon: 'quest_toys', reward: 40, tag: '保育園・幼児' },
+  { title: 'てあらい・うがいを する', icon: 'quest_washhands', reward: 20, tag: '保育園・幼児' },
+  { title: 'はみがきを しっかり する', icon: 'quest_teeth', reward: 30, tag: 'みんな' },
+  { title: 'おさらを はこぶ・あらう', icon: 'quest_dishes', reward: 50, tag: 'みんな' },
+  { title: 'せんたくものを たたむ', icon: 'quest_laundry', reward: 60, tag: 'みんな' },
+  { title: 'おへやの そうじ・ごみすて', icon: 'quest_clean', reward: 60, tag: '小学生' },
+  { title: 'おはなの みずやり・ペットのおせわ', icon: 'quest_watering', reward: 40, tag: 'みんな' },
+  { title: 'ピアノ・うんどうの れんしゅう', icon: 'quest_practice', reward: 60, tag: 'みんな' },
+];
+
+const QUEST_ICON_KEYS: KidIconKey[] = KID_ICON_KEYS.filter(
+  (k) => KID_ICON_META[k].group === 'quest'
+);
+const SHOP_ICON_KEYS: KidIconKey[] = KID_ICON_KEYS.filter(
+  (k) =>
+    KID_ICON_META[k].group === 'tablet' ||
+    KID_ICON_META[k].group === 'reward'
+);
+const PRICE_PRESETS = [20, 30, 50, 60, 80, 100, 150, 200];
 
 export function ParentView({ state }: { state: AppState }) {
   // タイマーが稼働している時だけ 1秒更新を行い、タイマーがない時は無駄な再描画を完全に停止
@@ -598,7 +640,10 @@ export function ParentView({ state }: { state: AppState }) {
                           </span>
                         </div>
                         <div className="mt-1 flex items-center gap-1.5 text-sm font-bold text-slate-700">
-                          <span className="text-xl">{quest.icon}</span>
+                          <KidIcon
+                            iconKey={resolveQuestIconKey(quest)}
+                            size={28}
+                          />
                           <span>{quest.title}</span>
                         </div>
                       </div>
@@ -662,7 +707,10 @@ export function ParentView({ state }: { state: AppState }) {
                         className="card flex items-center justify-between p-4 border-2 border-orange-200 bg-orange-50"
                       >
                         <div className="flex items-center gap-3">
-                          <span className="text-3xl">{t.icon}</span>
+                          <SmartTicketIcon
+                            item={t}
+                            size={44}
+                          />
                           <div>
                             <span className="text-sm font-black text-orange-950">
                               {child?.name} が「{t.name}」を使いたいそうです！
@@ -855,7 +903,7 @@ export function ParentView({ state }: { state: AppState }) {
                 setEditingQuest({
                   id: `q-${uid()}`,
                   title: '',
-                  icon: '⭐',
+                  icon: 'quest_bath',
                   reward: 50,
                   assignedTo: state.children.map((c) => c.id),
                   rewardOverrides: {},
@@ -909,8 +957,11 @@ export function ParentView({ state }: { state: AppState }) {
                       <GripVertical size={20} />
                     </div>
 
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-2xl">
-                      {quest.icon}
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 p-1 shadow-sm">
+                      <KidIcon
+                        iconKey={resolveQuestIconKey(quest)}
+                        size={40}
+                      />
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="font-black text-slate-800 text-base truncate">
@@ -1010,7 +1061,7 @@ export function ParentView({ state }: { state: AppState }) {
                 setEditingShopItem({
                   id: `sh-${uid()}`,
                   name: 'タブレット30分券',
-                  icon: '📱',
+                  icon: 'ticket_tab_std',
                   price: 60,
                   category: 'tablet',
                   minutes: 30,
@@ -1066,8 +1117,11 @@ export function ParentView({ state }: { state: AppState }) {
                         <GripVertical size={20} />
                       </div>
 
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-2xl border border-amber-100">
-                        {item.icon}
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-50/70 border border-amber-100 p-0.5">
+                        <SmartTicketIcon
+                          item={item}
+                          size={44}
+                        />
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="font-black text-slate-800 text-sm truncate">{item.name}</div>
@@ -1588,10 +1642,44 @@ export function ParentView({ state }: { state: AppState }) {
       {/* ---------------- クエスト編集モーダル ---------------- */}
       <Modal open={Boolean(editingQuest)} onClose={() => setEditingQuest(null)}>
         {editingQuest && (
-          <form onSubmit={handleSaveQuestSubmit} className="flex flex-col gap-4">
+          <form onSubmit={handleSaveQuestSubmit} className="flex flex-col gap-4 max-h-[82vh] overflow-y-auto pr-1">
             <h3 className="text-xl font-black text-slate-800">
               {state.quests.some((q) => q.id === editingQuest.id) ? 'お手伝いの編集' : '新しいお手伝い'}
             </h3>
+
+            {/* 保育園・小学生向け ワンタップお手伝いテンプレート */}
+            <div>
+              <label className="label flex items-center justify-between">
+                <span>かんたん定番テンプレート（保育園・小学生）</span>
+                <span className="text-[11px] font-normal text-slate-400">タップで自動入力</span>
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1 max-h-40 overflow-y-auto p-1 rounded-xl bg-slate-50 border border-slate-200">
+                {QUEST_TEMPLATES.map((tpl) => (
+                  <button
+                    type="button"
+                    key={tpl.title}
+                    onClick={() =>
+                      setEditingQuest({
+                        ...editingQuest,
+                        title: tpl.title,
+                        icon: tpl.icon,
+                        reward: tpl.reward,
+                      })
+                    }
+                    className="btn-pop flex items-center gap-2 rounded-xl bg-white hover:bg-indigo-50 border border-slate-200 px-2.5 py-1.5 text-left transition-all"
+                  >
+                    <KidIcon iconKey={tpl.icon} size={30} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-black text-slate-700 truncate">{tpl.title}</div>
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+                        <span className="rounded bg-indigo-50 px-1 text-indigo-600">{tpl.tag}</span>
+                        <span className="text-amber-600">🪙{tpl.reward}</span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div>
               <label className="label">タイトル（子ども向けひらがな推奨）</label>
@@ -1601,40 +1689,55 @@ export function ParentView({ state }: { state: AppState }) {
                 onChange={(e) => setEditingQuest({ ...editingQuest, title: e.target.value })}
                 required
                 className="input font-bold"
-                placeholder="例: くつを そろえる"
+                placeholder="例: おふろそうじを する"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">アイコン（絵文字）</label>
-                <input
-                  type="text"
-                  value={editingQuest.icon}
-                  onChange={(e) => setEditingQuest({ ...editingQuest, icon: e.target.value })}
-                  required
-                  className="input font-bold text-center text-2xl"
-                />
+            {/* イラストアイコン選択 */}
+            <div>
+              <label className="label">お手伝いアイコンを選択</label>
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-1 p-2 rounded-2xl bg-slate-50 border border-slate-200">
+                {QUEST_ICON_KEYS.map((key) => {
+                  const selectedKey = resolveQuestIconKey(editingQuest);
+                  const isSelected = editingQuest.icon === key || selectedKey === key;
+                  return (
+                    <button
+                      type="button"
+                      key={key}
+                      onClick={() => setEditingQuest({ ...editingQuest, icon: key })}
+                      className={`btn-pop flex flex-col items-center justify-center gap-1 rounded-xl p-1.5 border-2 transition-all ${
+                        isSelected
+                          ? 'border-indigo-600 bg-indigo-50 shadow-sm scale-105'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <KidIcon iconKey={key} size={38} />
+                      <span className="text-[10px] font-bold text-slate-600 truncate w-full text-center">
+                        {KID_ICON_META[key].label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
+            </div>
 
-              <div>
-                <label className="label">基本報酬コイン</label>
-                <input
-                  type="number"
-                  value={editingQuest.reward === 0 ? '' : editingQuest.reward}
-                  onChange={(e) =>
-                    setEditingQuest({
-                      ...editingQuest,
-                      reward: e.target.value === '' ? 0 : Number(e.target.value),
-                    })
-                  }
-                  onFocus={(e) => e.target.select()}
-                  required
-                  min={1}
-                  className="input font-bold"
-                  placeholder="0"
-                />
-              </div>
+            <div>
+              <label className="label">基本報酬コイン</label>
+              <input
+                type="number"
+                value={editingQuest.reward === 0 ? '' : editingQuest.reward}
+                onChange={(e) =>
+                  setEditingQuest({
+                    ...editingQuest,
+                    reward: e.target.value === '' ? 0 : Number(e.target.value),
+                  })
+                }
+                onFocus={(e) => e.target.select()}
+                required
+                min={1}
+                className="input font-bold"
+                placeholder="50"
+              />
             </div>
 
             <div>
@@ -1787,10 +1890,10 @@ export function ParentView({ state }: { state: AppState }) {
                           minutes: tpl.minutes,
                         })
                       }
-                      className="btn-pop rounded-xl bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700"
+                      className="btn-pop flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700"
                     >
-                      <span>{tpl.icon}</span>
-                      <span className="ml-1">{tpl.name}</span>
+                      <KidIcon iconKey={tpl.icon} size={22} />
+                      <span>{tpl.name}</span>
                     </button>
                   )
                 )}
@@ -1799,22 +1902,29 @@ export function ParentView({ state }: { state: AppState }) {
 
             {/* アイコン選択 */}
             <div>
-              <label className="label">アイコン</label>
-              <div className="flex flex-wrap gap-1.5 mt-1 mb-2">
-                {PRESET_ICONS.map((ic) => (
-                  <button
-                    type="button"
-                    key={ic}
-                    onClick={() => setEditingShopItem({ ...editingShopItem, icon: ic })}
-                    className={`btn-pop h-9 w-9 rounded-xl text-lg flex items-center justify-center border-2 transition-all ${
-                      editingShopItem.icon === ic
-                        ? 'border-indigo-600 bg-indigo-50'
-                        : 'border-slate-100 bg-white hover:bg-slate-50'
-                    }`}
-                  >
-                    {ic}
-                  </button>
-                ))}
+              <label className="label">アイコンを選択</label>
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 mt-1 mb-2 p-2 rounded-2xl bg-slate-50 border border-slate-200">
+                {SHOP_ICON_KEYS.map((ic) => {
+                  const resolvedCurrent = resolveShopOrTicketIconKey(editingShopItem);
+                  const isSelected = editingShopItem.icon === ic || resolvedCurrent === ic;
+                  return (
+                    <button
+                      type="button"
+                      key={ic}
+                      onClick={() => setEditingShopItem({ ...editingShopItem, icon: ic })}
+                      className={`btn-pop flex flex-col items-center justify-center gap-0.5 rounded-xl p-1.5 border-2 transition-all ${
+                        isSelected
+                          ? 'border-indigo-600 bg-indigo-50 shadow-sm scale-105'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <KidIcon iconKey={ic} size={34} />
+                      <span className="text-[9px] font-bold text-slate-600 truncate w-full text-center">
+                        {KID_ICON_META[ic].label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
