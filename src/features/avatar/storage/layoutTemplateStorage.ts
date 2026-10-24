@@ -83,6 +83,26 @@ export function sanitizeLayerAdjustment(raw: unknown): LayerAdjustment | null {
   if (typeof obj.bodyClipInsetPx === 'number' && Number.isFinite(obj.bodyClipInsetPx)) {
     adj.bodyClipInsetPx = Math.round(obj.bodyClipInsetPx);
   }
+  if (Array.isArray(obj.bodyMaskStrokes) && obj.bodyMaskStrokes.length > 0) {
+    adj.bodyMaskStrokes = obj.bodyMaskStrokes
+      .filter(
+        (s: unknown): s is NonNullable<LayerAdjustment['bodyMaskStrokes']>[number] =>
+          Boolean(
+            s &&
+              typeof s === 'object' &&
+              ((s as { mode?: string }).mode === 'erase' ||
+                (s as { mode?: string }).mode === 'restore') &&
+              Array.isArray((s as { points?: unknown }).points) &&
+              (s as { points: number[] }).points.length >= 2,
+          ),
+      )
+      .map((s) => ({
+        mode: s.mode,
+        radius: Math.max(2, Math.min(64, Math.round(Number(s.radius) || 12))),
+        mirror: Boolean(s.mirror),
+        points: s.points.map((n) => Math.round(Number(n) || 0)),
+      }));
+  }
   if (
     obj.sleeveModeOverride === 'short_or_sleeveless' ||
     obj.sleeveModeOverride === 'long_sleeve_mask' ||

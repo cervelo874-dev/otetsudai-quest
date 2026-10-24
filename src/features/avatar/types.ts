@@ -96,6 +96,20 @@ export type HandHoldMode = 'grip_fist' | 'behind_hand' | 'in_front';
 export type BodySilhouetteClipMode = 'auto' | 'strict' | 'off';
 
 /**
+ * クローゼットのプレビュー上で直接なぞって素体（および独立脚）のはみ出しを消去・復元する手描きマスクストローク
+ */
+export interface BodyMaskStroke {
+  /** 'erase': はみ出た素体を透明化して隠す / 'restore': 自動カットや消しゴムで消えた素体を元に戻す */
+  mode: 'erase' | 'restore';
+  /** 512x512 ワールド座標系でのブラシ直径/半径（px単位の半径） */
+  radius: number;
+  /** 左右対称（X=256基準）で同時に反対側もマスクするか */
+  mirror?: boolean;
+  /** 512x512 座標系での連続座標列 [x0, y0, x1, y1, ...] */
+  points: number[];
+}
+
+/**
  * 持ち物着用時にステッキ等の柄の手前に重ねる「小さな指先チップ（3層サンドイッチ用）」の種類
  * - 'chibi_single': ちび丸指チップ（1つ丸・手首側の主線なしで素体の手に溶け込む標準チップ）
  * - 'chibi_double': ちょこんと2つ指チップ（小さな2つの丸指で柄を軽く押さえるチップ）
@@ -283,10 +297,12 @@ export interface LayerAdjustment {
   gripFlipX?: boolean;
   /** 指先チップの上下反転（初期値 false） */
   gripFlipY?: boolean;
-  /** 服着用時の「素体・脚のはみ出し自動カッティング」モード（bodyレイヤーで保持、デフォルト: 'auto'） */
+  /** 服着用時の「素体・脚のはみ出し自動カッティング」モード（body/tops/bottomsレイヤーで保持、デフォルト: 'auto'） */
   bodyClipMode?: BodySilhouetteClipMode;
-  /** 素体カッティング時の服輪郭からの内側食い込み幅（px単位、-4〜+8、デフォルト: 2） */
+  /** 素体カッティング時の服輪郭からの内側食い込み幅（px単位、-4〜+12、デフォルト: 2） */
   bodyClipInsetPx?: number;
+  /** プレビュー上で直接なぞって指定した「素体消しゴム／素体復元」ストローク配列 */
+  bodyMaskStrokes?: BodyMaskStroke[];
   /** 上下にふわふわ浮遊動（ボビング）アニメーションを行うか（初期値 false） */
   bobbing?: boolean;
   /**

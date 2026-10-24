@@ -9,6 +9,7 @@ import { AVATAR_LAYERS } from '../types';
 import type {
   AvatarCategory,
   AvatarPart,
+  BodyMaskStroke,
   BodySilhouetteClipMode,
   EquippedParts,
   HandHoldMode,
@@ -802,6 +803,8 @@ export interface SolvedAvatarRigResult {
   activeBodyClipMode: BodySilhouetteClipMode;
   /** 素体カッティング時の服輪郭からの内側食い込み幅 (px) */
   activeBodyClipInsetPx: number;
+  /** 手描きで追加された素体マスク（消しゴム・復元ブラシ）ストローク配列 */
+  activeBodyMaskStrokes: BodyMaskStroke[];
   /** 素体のワールドソケット座標（シルエットカッティング用） */
   worldBodySockets: SolvedWorldBodySockets;
 }
@@ -954,12 +957,35 @@ export function solveAutoRigAdjustments(
   }
 
   const bodyAdj = effectiveAdjustments.body ?? DEFAULT_LAYER_ADJUSTMENT;
-  const activeBodyClipMode: BodySilhouetteClipMode = bodyAdj.bodyClipMode ?? 'auto';
-  const activeBodyClipInsetPx: number = clamp(bodyAdj.bodyClipInsetPx ?? 2, -4, 8);
-
   const topsManual = getLayerAdjustment(manualAdjustments, 'tops');
+  const bottomsManual = getLayerAdjustment(manualAdjustments, 'bottoms');
+
+  const activeBodyClipMode: BodySilhouetteClipMode =
+    topsManual.bodyClipMode ??
+    bodyAdj.bodyClipMode ??
+    topsPart?.defaultAdjustment?.bodyClipMode ??
+    bodyPart?.defaultAdjustment?.bodyClipMode ??
+    'auto';
+  const rawClipInsetPx =
+    topsManual.bodyClipInsetPx ??
+    bodyAdj.bodyClipInsetPx ??
+    topsPart?.defaultAdjustment?.bodyClipInsetPx ??
+    bodyPart?.defaultAdjustment?.bodyClipInsetPx ??
+    2;
+  const activeBodyClipInsetPx: number = clamp(rawClipInsetPx, -4, 14);
+
+  // 素体(body)・トップス(tops)・ボトムス(bottoms) に保存されている手描きマスクストロークを順番に統合
+  const activeBodyMaskStrokes: BodyMaskStroke[] = [
+    ...(bodyAdj.bodyMaskStrokes ?? bodyPart?.defaultAdjustment?.bodyMaskStrokes ?? []),
+    ...(topsManual.bodyMaskStrokes ?? topsPart?.defaultAdjustment?.bodyMaskStrokes ?? []),
+    ...(bottomsManual.bodyMaskStrokes ?? bottomsPart?.defaultAdjustment?.bodyMaskStrokes ?? []),
+  ];
+
   const activeSleeveMode: TopSleeveMode =
-    topsManual.sleeveModeOverride ?? topsPart?.rig?.sleeveMode ?? 'short_or_sleeveless';
+    topsManual.sleeveModeOverride ??
+    topsPart?.defaultAdjustment?.sleeveModeOverride ??
+    topsPart?.rig?.sleeveMode ??
+    'short_or_sleeveless';
 
   // 1. 素体 (body) のワールドソケット座標（アバターの右＝向かって左 X<256、アバターの左＝向かって右 X>256）
   const bodySockets = normalizeAnatomicalSockets(bodyPart?.rig?.sockets);
@@ -1043,6 +1069,26 @@ export function solveAutoRigAdjustments(
     leftAnkle: worldBodyLeftAnkle,
     feet: worldBodyFeet,
   };
+
+  if (topsPart) {
+    if (activeSleeveMode === 'hide_arms') {
+      autoHiddenLayers.add('arm_left');
+      autoHiddenLayers.add('arm_right');
+    } else if (activeSleeveMode === 'long_sleeve_mask') {
+      const maskRadius = topsPart.rig?.sleeveMaskRadius ?? 54;
+      armSleeveMasks.arm_right = {
+        cx: worldBodyRightShoulder.x,
+        cy: worldBodyRightShoulder.y,
+        radius: maskRadius,
+      };
+      armSleeveMasks.arm_left = {
+        cx: worldBodyLeftShoulder.x,
+        cy: worldBodyLeftShoulder.y,
+        radius: maskRadius,
+      };
+    }
+  }
+
   // ★ユーザー要望により関節吸着（自動スナップ）を完全廃止。常にユーザーの手動調整値をそのまま100%反映
   const manualSolvedHandItems: SolvedHandItem[] = [];
     let manualGripFist: SolvedHandGripFist | null = null;
@@ -1091,6 +1137,7 @@ export function solveAutoRigAdjustments(
       activeSleeveMode,
       activeBodyClipMode,
       activeBodyClipInsetPx,
+      activeBodyMaskStrokes,
       worldBodySockets,
   };
 }

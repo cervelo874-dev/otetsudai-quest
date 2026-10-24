@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import type {
   AvatarCategory,
   AvatarPart,
+  BodyMaskStroke,
   EquippedParts,
   LayerAdjustment,
   OpaqueBounds,
@@ -262,13 +263,22 @@ export function detectHeadAndChinAnatomy(
   const avgShoulderY = Math.round((leftShoulderY + rightShoulderY) / 2);
 
   // 1. 各行で中心 (neckX) 付近から左右に繋がっている頭・首・胴体の幅を実測
-  const minSearchY = clamp(Math.round(neckY - 30), 0, S - 1);
-  const maxSearchY = clamp(Math.round(avgShoulderY + 24), minSearchY + 10, S - 1);
+  //    髪がキャンバス上端まである3頭身素体では実際の首のくびれが y=250..278 付近になるため探索範囲を十分に確保
+  const minSearchY = clamp(Math.round(neckY - 28), 0, S - 1);
+  const maxSearchY = clamp(
+    Math.max(Math.round(avgShoulderY + 42), Math.round(neckY + 56)),
+    minSearchY + 14,
+    320,
+  );
 
   let minNeckWidth = 999;
   let minNeckRowY = Math.round(neckY);
   let bestNeckL = Math.round(neckX - 22);
   let bestNeckR = Math.round(neckX + 22);
+
+  const rowWidths = new Int16Array(S).fill(999);
+  const rowLefts = new Int16Array(S).fill(Math.round(neckX - 22));
+  const rowRights = new Int16Array(S).fill(Math.round(neckX + 22));
 
   for (let y = minSearchY; y <= maxSearchY; y++) {
     const rowOffset = y * S * 4;
@@ -300,7 +310,11 @@ export function detectHeadAndChinAnatomy(
     }
 
     const width = r - l;
-    if (width >= 16 && width < minNeckWidth) {
+    rowWidths[y] = width;
+    rowLefts[y] = l;
+    rowRights[y] = r;
+
+    if (width >= 14 && width < minNeckWidth) {
       minNeckWidth = width;
       minNeckRowY = y;
       bestNeckL = l;
@@ -308,15 +322,23 @@ export function detectHeadAndChinAnatomy(
     }
   }
 
-  // 顎の下端（chinBottomY）：首の最狭部から少し上、または顎の丸みライン
-  // 肩の開始位置（shoulderStartY）：首のくびれが終わり、肩幅へと急激に広がり始めるY座標
+  // 首の最狭部 (minNeckRowY) から下へ走査し、肩に向かって横幅が広がり始める行を特定
+  let detectedShoulderStartY = minNeckRowY + 4;
+  for (let y = minNeckRowY; y <= maxSearchY; y++) {
+    if (rowWidths[y] !== 999 && rowWidths[y] >= minNeckWidth + 8) {
+      detectedShoulderStartY = y;
+      break;
+    }
+  }
+
+  // 顎の下端（chinBottomY）：首のくびれの最狭部直上（これより上の顔・顎・頬・髪は100%保護）
   const chinBottomY = clamp(
-    Math.max(minNeckRowY - 2, Math.round(neckY + 4), Math.round(avgShoulderY - 14)),
+    Math.min(minNeckRowY - 1, detectedShoulderStartY - 2),
     minSearchY,
     maxSearchY,
   );
   const shoulderStartY = clamp(
-    Math.max(minNeckRowY + 4, chinBottomY + 2, Math.round(avgShoulderY - 8)),
+    Math.max(detectedShoulderStartY, chinBottomY + 2),
     chinBottomY + 1,
     S - 1,
   );
@@ -324,8 +346,8 @@ export function detectHeadAndChinAnatomy(
   return {
     chinBottomY,
     shoulderStartY,
-    neckLeftX: clamp(bestNeckL, Math.round(neckX - 34), Math.round(neckX - 8)),
-    neckRightX: clamp(bestNeckR, Math.round(neckX + 8), Math.round(neckX + 34)),
+    neckLeftX: clamp(bestNeckL, Math.round(neckX - 36), Math.round(neckX - 8)),
+    neckRightX: clamp(bestNeckR, Math.round(neckX + 8), Math.round(neckX + 36)),
     neckMidX: Math.round((bestNeckL + bestNeckR) / 2),
   };
 }
@@ -358,6 +380,111 @@ function softenCutBoundaries(data: Uint8ClampedArray, erasedMask: Uint8Array, yS
   }
 }
 
+/**
+ * 手描きの素体マスクストローク（消しゴム 'erase' ／ 復元ブラシ 'restore'）を
+ * 512x512 RGBA ピクセル配列へ適用する
+ */
+export function applyBodyMaskStrokesToLayer(
+  data: Uint8ClampedArray,
+  originalData: Uint8ClampedArray,
+  erasedMask: Uint8Array,
+  strokes: BodyMaskStroke[],
+): void {
+  if (!strokes || strokes.length === 0) return;
+
+  const stampCircle = (cx: number, cy: number, radius: number, mode: 'erase' | 'restore') => {
+    const r = clamp(radius, 2, 64);
+    const minX = clamp(Math.floor(cx - r - 1), 0, S - 1);
+    const maxX = clamp(Math.ceil(cx + r + 1), 0, S - 1);
+    const minY = clamp(Math.floor(cy - r - 1), 0, S - 1);
+    const maxY = clamp(Math.ceil(cy + r + 1), 0, S - 1);
+    const innerR = Math.max(0.5, r - 1.5);
+    const innerRSq = innerR * innerR;
+    const outerRSq = r * r;
+
+    for (let y = minY; y <= maxY; y++) {
+      const dy = y - cy;
+      const dySq = dy * dy;
+      const rowOffset = y * S;
+      for (let x = minX; x <= maxX; x++) {
+        const dx = x - cx;
+        const distSq = dx * dx + dySq;
+        if (distSq > outerRSq) continue;
+
+        const idx = rowOffset + x;
+        const base = idx * 4;
+        if (mode === 'erase') {
+          if (distSq <= innerRSq) {
+            if (data[base + 3] > 0) {
+              data[base + 3] = 0;
+              erasedMask[idx] = 1;
+            }
+          } else {
+            const dist = Math.sqrt(distSq);
+            const t = clamp((r - dist) / Math.max(0.5, r - innerR), 0, 1);
+            data[base + 3] = Math.min(data[base + 3], Math.round(data[base + 3] * (1 - t)));
+            if (data[base + 3] < 12) {
+              data[base + 3] = 0;
+              erasedMask[idx] = 1;
+            }
+          }
+        } else {
+          // 'restore': 自動カットや以前の消しゴムで消された素体ピクセルを元画像から復元
+          data[base] = originalData[base];
+          data[base + 1] = originalData[base + 1];
+          data[base + 2] = originalData[base + 2];
+          data[base + 3] = originalData[base + 3];
+          erasedMask[idx] = 0;
+        }
+      }
+    }
+  };
+
+  const drawSegment = (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+    radius: number,
+    mode: 'erase' | 'restore',
+  ) => {
+    const dist = Math.hypot(x1 - x0, y1 - y0);
+    const step = Math.max(1, radius * 0.25);
+    const steps = Math.max(1, Math.ceil(dist / step));
+    for (let i = 0; i <= steps; i++) {
+      const t = steps === 0 ? 0 : i / steps;
+      stampCircle(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, radius, mode);
+    }
+  };
+
+  for (const stroke of strokes) {
+    const pts = stroke.points;
+    if (!pts || pts.length < 2) continue;
+    const radius = clamp(stroke.radius || 14, 2, 64);
+    const mode = stroke.mode === 'restore' ? 'restore' : 'erase';
+    const mirror = Boolean(stroke.mirror);
+
+    if (pts.length === 2) {
+      stampCircle(pts[0], pts[1], radius, mode);
+      if (mirror) {
+        stampCircle(S - pts[0], pts[1], radius, mode);
+      }
+      continue;
+    }
+
+    for (let i = 0; i + 3 < pts.length; i += 2) {
+      const x0 = pts[i];
+      const y0 = pts[i + 1];
+      const x1 = pts[i + 2];
+      const y1 = pts[i + 3];
+      drawSegment(x0, y0, x1, y1, radius, mode);
+      if (mirror) {
+        drawSegment(S - x0, y0, S - x1, y1, radius, mode);
+      }
+    }
+  }
+}
+
 export interface ClippedWorldCanvases {
   body?: HTMLCanvasElement;
   leg_left?: HTMLCanvasElement;
@@ -367,7 +494,7 @@ export interface ClippedWorldCanvases {
 /**
  * 読み込み済みの画像マップと SolvedAvatarRigResult から、
  * 服（tops / bottoms / shoes）および独立手足のシルエットに合わせて
- * 素体 (body) と脚 (leg_left / leg_right) のはみ出しピクセルを自動カッティングした
+ * 素体 (body) と脚 (leg_left / leg_right) のはみ出しピクセルを自動カッティング＋手描きマスク適用した
  * 512x512 ワールド座標キャンバスを生成する
  */
 export function buildClippedWorldCanvasesFromImages(
@@ -377,7 +504,10 @@ export function buildClippedWorldCanvasesFromImages(
   excludedLayers: Set<AvatarCategory> = new Set(),
 ): ClippedWorldCanvases {
   const clipMode = solved.activeBodyClipMode;
-  if (clipMode === 'off') return {};
+  const maskStrokes = solved.activeBodyMaskStrokes ?? [];
+  const hasManualStrokes = maskStrokes.length > 0;
+
+  if (clipMode === 'off' && !hasManualStrokes) return {};
 
   const insetPx = solved.activeBodyClipInsetPx;
   const hasTops = Boolean(images.tops && !excludedLayers.has('tops'));
@@ -443,7 +573,7 @@ export function buildClippedWorldCanvasesFromImages(
   const neckY = Math.round(sockets.neck.y);
 
   // ==========================================================================
-  // 1. 素体 (body) のはみ出し自動カッティング処理
+  // 1. 素体 (body) のはみ出し自動カッティング＆手描きマスク処理
   // ==========================================================================
   if (images.body && !excludedLayers.has('body')) {
     const bodyCanvas = renderLayerToWorldCanvas(
@@ -457,6 +587,7 @@ export function buildClippedWorldCanvasesFromImages(
     if (ctx) {
       const imgData = ctx.getImageData(0, 0, S, S);
       const { data } = imgData;
+      const originalData = hasManualStrokes ? new Uint8ClampedArray(data) : data;
       const erasedMask = new Uint8Array(S * S);
 
       // 頭部・顎・首・肩の解剖学的境界を正確に計測
@@ -468,457 +599,547 @@ export function buildClippedWorldCanvasesFromImages(
         sockets.rightShoulder.y,
       );
 
-      // 頭部・顔の輪郭・顎先の保護絶対ライン（これより上は一切削らない）
+      // 頭部・顔の輪郭・顎先の保護絶対ライン（自動カットではこれより上は一切削らない）
       const headProtectY = anatomy.chinBottomY;
 
-          const isLongOrHiddenSleeves =
-            clipMode === 'strict' ||
-            solved.activeSleeveMode === 'hide_arms' ||
-            solved.activeSleeveMode === 'long_sleeve_mask';
+      if (clipMode !== 'off') {
+        const isLongOrHiddenSleeves =
+          clipMode === 'strict' ||
+          solved.activeSleeveMode === 'hide_arms' ||
+          solved.activeSleeveMode === 'long_sleeve_mask';
 
-          const rightArmpitY = Math.round(sockets.rightShoulder.y + 24);
-          const leftArmpitY = Math.round(sockets.leftShoulder.y + 24);
-          const torsoRightCorridorMinX = Math.round(
-            Math.min(
-              sockets.rightShoulder.x - 14,
-              (sockets.rightShoulder.x + sockets.rightHandGrip.x) * 0.52,
-            ),
-          );
-          const torsoLeftCorridorMaxX = Math.round(
-            Math.max(
-              sockets.leftShoulder.x + 14,
-              (sockets.leftShoulder.x + sockets.leftHandGrip.x) * 0.52,
-            ),
-          );
+        const rightArmpitY = Math.round(sockets.rightShoulder.y + 24);
+        const leftArmpitY = Math.round(sockets.leftShoulder.y + 24);
+        const torsoRightCorridorMinX = Math.round(
+          Math.min(
+            sockets.rightShoulder.x - 14,
+            (sockets.rightShoulder.x + sockets.rightHandGrip.x) * 0.52,
+          ),
+        );
+        const torsoLeftCorridorMaxX = Math.round(
+          Math.max(
+            sockets.leftShoulder.x + 14,
+            (sockets.leftShoulder.x + sockets.leftHandGrip.x) * 0.52,
+          ),
+        );
 
-      // 素体の各行 y において、中心軸 (neckX) から左右に連続して繋がっている胴体（体幹・脇腹）の境界を実測
-      // これにより「細い服を着せた際に服の細さ（tL / tR）より外側へはみ出た脇腹・胴体」を 100% 確実に特定し、
-      // 隙間の外側にある「素体の腕」を傷つけることなく安全に保護できる
-      const bodyTorsoL = new Int16Array(S).fill(-1);
-      const bodyTorsoR = new Int16Array(S).fill(-1);
+        // 素体の各行 y において、外側に離れた「素体の腕・手アイランド」を除外した
+        // 体幹・脇腹・腰・太ももの左右境界 [bodyTorsoL[y], bodyTorsoR[y]] を実測する
+        const bodyTorsoL = new Int16Array(S).fill(-1);
+        const bodyTorsoR = new Int16Array(S).fill(-1);
 
-      // 腕と胴体の境界の安全上限（肩関節の内外ライン）
-      const armSafetyOuterMinX = Math.round(
-        Math.min(
-          sockets.rightShoulder.x - 16,
-          (sockets.rightShoulder.x + sockets.rightHandGrip.x) * 0.5,
-        ),
-      );
-      const armSafetyOuterMaxX = Math.round(
-        Math.max(
-          sockets.leftShoulder.x + 16,
-          (sockets.leftShoulder.x + sockets.leftHandGrip.x) * 0.5,
-        ),
-      );
+        // 肩上部（脇の下より上）で腕と胴体が繋がっている行の安全境界
+        const armSafetyOuterMinX = Math.round(
+          Math.min(
+            sockets.rightShoulder.x - 16,
+            (sockets.rightShoulder.x + sockets.rightHandGrip.x) * 0.5,
+          ),
+        );
+        const armSafetyOuterMaxX = Math.round(
+          Math.max(
+            sockets.leftShoulder.x + 16,
+            (sockets.leftShoulder.x + sockets.leftHandGrip.x) * 0.5,
+          ),
+        );
 
-      for (let y = headProtectY + 1; y < S; y++) {
-        const rowOffset = y * S * 4;
-
-        // 中心 neckX 付近の体幹アンカーピクセルを探索
-        let anchorX = neckX;
-        let hasAnchor = false;
-        if (data[rowOffset + neckX * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
-          hasAnchor = true;
-        } else {
-          for (let dx = 1; dx <= 24; dx++) {
-            if (neckX - dx >= 0 && data[rowOffset + (neckX - dx) * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
-              anchorX = neckX - dx;
-              hasAnchor = true;
-              break;
-            }
-            if (neckX + dx < S && data[rowOffset + (neckX + dx) * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
-              anchorX = neckX + dx;
-              hasAnchor = true;
-              break;
-            }
-          }
-        }
-
-        if (!hasAnchor) continue;
-
-        // 胴体左端（アバターの右脇腹）探索：anchorX から左へ
-        let leftEdge = anchorX;
-        let gap = 0;
-        for (let x = anchorX; x >= 0; x--) {
-          if (data[rowOffset + x * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
-            leftEdge = x;
-            gap = 0;
-          } else {
-            gap++;
-            // 2px 以上の透明ギャップ（腕との間の空間）に到達したら胴体終了
-            if (gap >= 2) break;
-          }
-        }
-        // 腕と隙間なく繋がっている肩上部でのオーバーラン防止（腕の安全限界でクリップ）
-        if (!hasFullArmRight && !isLongOrHiddenSleeves && y <= rightArmpitY) {
-          leftEdge = Math.max(leftEdge, armSafetyOuterMinX);
-        }
-        bodyTorsoL[y] = leftEdge;
-
-        // 胴体右端（アバターの左脇腹）探索：anchorX から右へ
-        let rightEdge = anchorX;
-        gap = 0;
-        for (let x = anchorX; x < S; x++) {
-          if (data[rowOffset + x * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
-            rightEdge = x;
-            gap = 0;
-          } else {
-            gap++;
-            if (gap >= 2) break;
-          }
-        }
-        if (!hasFullArmLeft && !isLongOrHiddenSleeves && y <= leftArmpitY) {
-          rightEdge = Math.min(rightEdge, armSafetyOuterMaxX);
-        }
-        bodyTorsoR[y] = rightEdge;
-      }
-
-      // トップスの各行 y において、中心軸 (neckX) から左右に連続する「身頃（胴体）」の境界を実測
-      // 袖（バルーンスリーブ・長袖・広がり袖）と身頃の間に透明な隙間（背景）がある服でも、
-      // 身頃の細さ（ウエストの絞り）から横へはみ出た素体の脇腹・お腹・背中を確実に特定してカットする
-      const topsTorsoL = new Int16Array(S).fill(-1);
-      const topsTorsoR = new Int16Array(S).fill(-1);
-
-      if (topsProfile) {
-        const topsRgba = topsProfile.rgba;
-        const tBounds = topsProfile.bounds;
-
-        for (let y = tBounds.minY; y <= tBounds.maxY; y++) {
+        for (let y = headProtectY + 1; y < S; y++) {
           const rowOffset = y * S * 4;
 
-          // 中心 neckX 付近の身頃アンカーピクセルを探索
-          let anchorX = neckX;
-          let hasAnchor = false;
-          if (topsRgba[rowOffset + neckX * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
-            hasAnchor = true;
-          } else {
-            // Vネックや前開きなどに備え、左右 ±36px 探索
-            for (let dx = 1; dx <= 36; dx++) {
-              if (neckX - dx >= 0 && topsRgba[rowOffset + (neckX - dx) * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
-                anchorX = neckX - dx;
-                hasAnchor = true;
-                break;
+          // 行 y の不透明セグメント（2px以下の微小隙間は結合）をすべて抽出
+          const segments: Array<{ start: number; end: number }> = [];
+          let inSeg = false;
+          let segStart = 0;
+          let lastOpaqueX = 0;
+
+          for (let x = 0; x < S; x++) {
+            if (data[rowOffset + x * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
+              if (!inSeg) {
+                inSeg = true;
+                segStart = x;
               }
-              if (neckX + dx < S && topsRgba[rowOffset + (neckX + dx) * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
-                anchorX = neckX + dx;
-                hasAnchor = true;
-                break;
+              lastOpaqueX = x;
+            } else if (inSeg && x - lastOpaqueX >= 3) {
+              segments.push({ start: segStart, end: lastOpaqueX });
+              inSeg = false;
+            }
+          }
+          if (inSeg) {
+            segments.push({ start: segStart, end: lastOpaqueX });
+          }
+
+          if (segments.length === 0) continue;
+
+          // 中央の体幹・腰・左右の脚に該当するセグメント群を特定（外側に離れた腕・手セグメントを除外）
+          const torsoCorridorL = Math.min(neckX - 38, sockets.rightHip.x - 24);
+          const torsoCorridorR = Math.max(neckX + 38, sockets.leftHip.x + 24);
+          let minTorsoX = S;
+          let maxTorsoX = -1;
+
+          for (const seg of segments) {
+            const overlapsCenterCorridor =
+              seg.end >= torsoCorridorL && seg.start <= torsoCorridorR;
+            if (overlapsCenterCorridor) {
+              if (seg.start < minTorsoX) minTorsoX = seg.start;
+              if (seg.end > maxTorsoX) maxTorsoX = seg.end;
+            }
+          }
+
+          if (maxTorsoX < minTorsoX) {
+            // 中心コリドーに重なるセグメントが見つからない場合は neckX に最も近いセグメントを採用
+            let bestSeg = segments[0];
+            let bestDist = 9999;
+            for (const seg of segments) {
+              const d =
+                neckX < seg.start
+                  ? seg.start - neckX
+                  : neckX > seg.end
+                    ? neckX - seg.end
+                    : 0;
+              if (d < bestDist) {
+                bestDist = d;
+                bestSeg = seg;
               }
             }
+            minTorsoX = bestSeg.start;
+            maxTorsoX = bestSeg.end;
           }
 
-          if (!hasAnchor) {
-            // 身頃アンカーが見つからない行は rowMinX / rowMaxX をフォールバック
-            topsTorsoL[y] = topsProfile.rowMinX[y];
-            topsTorsoR[y] = topsProfile.rowMaxX[y];
-            continue;
+          // 腕と胴体が隙間なく繋がっている肩〜脇の下付近のみ、素体の腕を傷つけないよう安全上限でクリップ
+          if (!hasFullArmRight && !isLongOrHiddenSleeves && y <= rightArmpitY + 6) {
+            minTorsoX = Math.max(minTorsoX, armSafetyOuterMinX);
+          }
+          if (!hasFullArmLeft && !isLongOrHiddenSleeves && y <= leftArmpitY + 6) {
+            maxTorsoX = Math.min(maxTorsoX, armSafetyOuterMaxX);
           }
 
-          // anchorX から左へ走査：身頃が途切れる（透明になる）位置を探索
-          let leftEdge = anchorX;
-          let gap = 0;
-          for (let x = anchorX; x >= 0; x--) {
-            if (topsRgba[rowOffset + x * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
-              leftEdge = x;
-              gap = 0;
-            } else {
-              gap++;
-              // 3px 以上の透明ギャップ（身頃と袖の間の空間）に到達したら身頃終了
-              if (gap >= 3) break;
-            }
-          }
-          topsTorsoL[y] = leftEdge;
-
-          // anchorX から右へ走査：身頃が途切れる（透明になる）位置を探索
-          let rightEdge = anchorX;
-          gap = 0;
-          for (let x = anchorX; x < S; x++) {
-            if (topsRgba[rowOffset + x * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
-              rightEdge = x;
-              gap = 0;
-            } else {
-              gap++;
-              if (gap >= 3) break;
-            }
-          }
-          topsTorsoR[y] = rightEdge;
+          bodyTorsoL[y] = minTorsoX;
+          bodyTorsoR[y] = maxTorsoX;
         }
-      }
 
-          const erasePixel = (x: number, y: number) => {
-            const idx = y * S + x;
-            const aIdx = idx * 4 + 3;
-            if (data[aIdx] > 0) {
-              data[aIdx] = 0;
-              erasedMask[idx] = 1;
-            }
-          };
+        // トップスの各行 y において、中心軸 (neckX) から左右に連続する「身頃（胴体）」の境界を実測
+        const topsTorsoL = new Int16Array(S).fill(-1);
+        const topsTorsoR = new Int16Array(S).fill(-1);
 
-          // (B) トップス着用時の素体（肩・胴体）はみ出しカッティング
-          //     ※ y <= headProtectY（頭部・顔・顎・首の上端）は絶対に削らない
-          if (topsProfile) {
-            const tBounds = topsProfile.bounds;
-            const yStart = Math.max(headProtectY + 1, tBounds.minY);
-            const yEnd = tBounds.maxY;
+        if (topsProfile) {
+          const topsRgba = topsProfile.rgba;
+          const tBounds = topsProfile.bounds;
 
-            for (let y = yStart; y <= yEnd; y++) {
-              const tL = topsProfile.rowMinX[y];
-              const tR = topsProfile.rowMaxX[y];
-              const torsoTL = topsTorsoL[y] !== -1 ? topsTorsoL[y] : tL;
-              const torsoTR = topsTorsoR[y] !== -1 ? topsTorsoR[y] : tR;
+          for (let y = tBounds.minY; y <= tBounds.maxY; y++) {
+            const rowOffset = y * S * 4;
 
-              // スキャン範囲の設定：
-              // 素体の胴体（体幹）が服の身頃の細さ（torsoTL / torsoTR）より外側にはみ出ている場合、
-              // 胴体の端 (bodyTorsoL / bodyTorsoR) まで確実にスキャンして消去する。
-              let scanMinX = 0;
-              let scanMaxX = S - 1;
-
-              if (!isLongOrHiddenSleeves) {
-                if (!hasFullArmRight) {
-                  const btl = bodyTorsoL[y];
-                  scanMinX =
-                    btl !== -1
-                      ? btl
-                      : y <= rightArmpitY
-                        ? Math.max(0, (torsoTL !== -1 ? torsoTL : tBounds.minX) - 32)
-                        : Math.min(torsoRightCorridorMinX, (torsoTL !== -1 ? torsoTL : tBounds.minX) - 48);
+            let anchorX = neckX;
+            let hasAnchor = false;
+            if (topsRgba[rowOffset + neckX * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
+              hasAnchor = true;
+            } else {
+              for (let dx = 1; dx <= 42; dx++) {
+                if (
+                  neckX - dx >= 0 &&
+                  topsRgba[rowOffset + (neckX - dx) * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD
+                ) {
+                  anchorX = neckX - dx;
+                  hasAnchor = true;
+                  break;
                 }
-                if (!hasFullArmLeft) {
-                  const btr = bodyTorsoR[y];
-                  scanMaxX =
-                    btr !== -1
-                      ? btr
-                      : y <= leftArmpitY
-                        ? Math.min(S - 1, (torsoTR !== -1 ? torsoTR : tBounds.maxX) + 32)
-                        : Math.max(torsoLeftCorridorMaxX, (torsoTR !== -1 ? torsoTR : tBounds.maxX) + 48);
+                if (
+                  neckX + dx < S &&
+                  topsRgba[rowOffset + (neckX + dx) * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD
+                ) {
+                  anchorX = neckX + dx;
+                  hasAnchor = true;
+                  break;
+                }
+              }
+            }
+
+            if (!hasAnchor) {
+              topsTorsoL[y] = topsProfile.rowMinX[y];
+              topsTorsoR[y] = topsProfile.rowMaxX[y];
+              continue;
+            }
+
+            let leftEdge = anchorX;
+            let gap = 0;
+            for (let x = anchorX; x >= 0; x--) {
+              if (topsRgba[rowOffset + x * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
+                leftEdge = x;
+                gap = 0;
+              } else {
+                gap++;
+                if (gap >= 3) break;
+              }
+            }
+            topsTorsoL[y] = leftEdge;
+
+            let rightEdge = anchorX;
+            gap = 0;
+            for (let x = anchorX; x < S; x++) {
+              if (topsRgba[rowOffset + x * 4 + 3] >= SILHOUETTE_ALPHA_THRESHOLD) {
+                rightEdge = x;
+                gap = 0;
+              } else {
+                gap++;
+                if (gap >= 3) break;
+              }
+            }
+            topsTorsoR[y] = rightEdge;
+          }
+        }
+
+        const erasePixel = (x: number, y: number) => {
+          const idx = y * S + x;
+          const aIdx = idx * 4 + 3;
+          if (data[aIdx] > 0) {
+            data[aIdx] = 0;
+            erasedMask[idx] = 1;
+          }
+        };
+
+        // 座標 (x, y) がトップスの実体ピクセル（insetPx 内側）にしっかり覆われているか判定するヘルパー
+        const isPixelCoveredByTops = (x: number, y: number): boolean => {
+          if (!topsProfile) return false;
+          const tBounds = topsProfile.bounds;
+          if (y < tBounds.minY || y > tBounds.maxY) return false;
+          const tL = topsTorsoL[y] !== -1 ? topsTorsoL[y] : topsProfile.rowMinX[y];
+          const tR = topsTorsoR[y] !== -1 ? topsTorsoR[y] : topsProfile.rowMaxX[y];
+          if (tL === -1 || tR === -1) return false;
+          if (x < tL + insetPx || x > tR - insetPx) return false;
+          const colBotY = topsProfile.colMaxY[x];
+          if (colBotY !== -1 && y > colBotY - Math.max(1, insetPx)) return false;
+          return topsProfile.rgba[(y * S + x) * 4 + 3] >= 160;
+        };
+
+        // 座標 (x, y) がボトムスの輪郭内（insetPx 内側）に覆われているか判定するヘルパー
+        const isPixelCoveredByBottoms = (x: number, y: number): boolean => {
+          if (!bottomsProfile) return false;
+          const bBounds = bottomsProfile.bounds;
+          if (y < bBounds.minY + Math.max(0, insetPx) || y > bBounds.maxY) return false;
+          const bL = bottomsProfile.rowMinX[y];
+          const bR = bottomsProfile.rowMaxX[y];
+          if (bL === -1 || bR === -1) return false;
+          return x >= bL + insetPx && x <= bR - insetPx;
+        };
+
+        // (B) トップス着用時の素体（肩・胴体・脇腹・腰の裾境界）はみ出しカッティング
+        //     ※ y <= headProtectY（頭部・顔・顎・首の上端）は絶対に削らない
+        if (topsProfile) {
+          const tBounds = topsProfile.bounds;
+          const yStart = Math.max(headProtectY + 1, tBounds.minY);
+          // トップスの裾直下（腰・脇腹の段差が出やすい領域）まで延長してスキャン
+          const waistSweepEndY = clamp(
+            bottomsProfile
+              ? Math.max(tBounds.maxY, bottomsProfile.bounds.minY + 16)
+              : tBounds.maxY + 14,
+            yStart,
+            S - 1,
+          );
+
+          // 裾付近の基準身頃幅（トップスの下半分中央付近の安定した身頃幅）を計測
+          const lowerMidY = clamp(
+            Math.round(tBounds.minY + tBounds.height * 0.72),
+            tBounds.minY,
+            tBounds.maxY,
+          );
+          const refHemL =
+            topsTorsoL[lowerMidY] !== -1
+              ? topsTorsoL[lowerMidY]
+              : topsProfile.rowMinX[lowerMidY] !== -1
+                ? topsProfile.rowMinX[lowerMidY]
+                : tBounds.minX;
+          const refHemR =
+            topsTorsoR[lowerMidY] !== -1
+              ? topsTorsoR[lowerMidY]
+              : topsProfile.rowMaxX[lowerMidY] !== -1
+                ? topsProfile.rowMaxX[lowerMidY]
+                : tBounds.maxX;
+
+          for (let y = yStart; y <= waistSweepEndY; y++) {
+            const inTopsY = y <= tBounds.maxY;
+            const tL = inTopsY ? topsProfile.rowMinX[y] : -1;
+            const tR = inTopsY ? topsProfile.rowMaxX[y] : -1;
+            const torsoTL = inTopsY
+              ? topsTorsoL[y] !== -1
+                ? topsTorsoL[y]
+                : tL
+              : refHemL;
+            const torsoTR = inTopsY
+              ? topsTorsoR[y] !== -1
+                ? topsTorsoR[y]
+                : tR
+              : refHemR;
+
+            let scanMinX = 0;
+            let scanMaxX = S - 1;
+
+            if (!isLongOrHiddenSleeves) {
+              if (!hasFullArmRight) {
+                const btl = bodyTorsoL[y];
+                scanMinX =
+                  btl !== -1
+                    ? btl
+                    : y <= rightArmpitY
+                      ? Math.max(0, (torsoTL !== -1 ? torsoTL : tBounds.minX) - 32)
+                      : Math.min(torsoRightCorridorMinX, (torsoTL !== -1 ? torsoTL : tBounds.minX) - 48);
+              }
+              if (!hasFullArmLeft) {
+                const btr = bodyTorsoR[y];
+                scanMaxX =
+                  btr !== -1
+                    ? btr
+                    : y <= leftArmpitY
+                      ? Math.min(S - 1, (torsoTR !== -1 ? torsoTR : tBounds.maxX) + 32)
+                      : Math.max(torsoLeftCorridorMaxX, (torsoTR !== -1 ? torsoTR : tBounds.maxX) + 48);
+              }
+            }
+
+            const isLowerHemOrWaistZone = y >= Math.round(tBounds.minY + tBounds.height * 0.58);
+
+            for (let x = scanMinX; x <= scanMaxX; x++) {
+              if (data[(y * S + x) * 4 + 3] === 0) continue;
+
+              // 首元・胸元の中央コリドー（上部）は肌を残す（Vネック・襟元・鎖骨の抜けを防ぐ）
+              const isUpperChestZone = y < Math.round(tBounds.minY + tBounds.height * 0.52);
+              const isInsideNeckColumn =
+                x >= anatomy.neckLeftX - 6 && x <= anatomy.neckRightX + 6;
+              if (isUpperChestZone && isInsideNeckColumn) {
+                continue;
+              }
+
+              const isBodyTorsoPixel =
+                bodyTorsoL[y] !== -1 &&
+                bodyTorsoR[y] !== -1 &&
+                x >= bodyTorsoL[y] &&
+                x <= bodyTorsoR[y];
+
+              // 1. 肩の傾斜ラインより上へ飛び出している素体の肩をカット
+              const colTopY = topsProfile.colMinY[x];
+              if (y <= Math.max(rightArmpitY, leftArmpitY)) {
+                if (colTopY !== -1 && y >= colTopY - 14 && y < colTopY + insetPx) {
+                  erasePixel(x, y);
+                  continue;
                 }
               }
 
-              for (let x = scanMinX; x <= scanMaxX; x++) {
-                if (data[(y * S + x) * 4 + 3] === 0) continue;
-
-                // 首元・胸元の中央コリドーは肌を残す（Vネック・襟元・鎖骨の抜けを防ぐ）
-                const isInsideNeckColumn =
-                  x >= anatomy.neckLeftX - 6 && x <= anatomy.neckRightX + 6;
-                if (isInsideNeckColumn) {
+              // 2. トップスの裾カーブ〜ウエスト境界における「腰・脇腹の三角形はみ出し」を確実にカット
+              //    トップスの裾が丸くカーブしていたり手動で上下移動した際、左右の脇腹・腰骨が
+              //    トップスの裾の下端 (colMaxY[x]) から外へ突き出し、かつボトムスにも覆われていない場合は消去する
+              if (isLowerHemOrWaistZone && isBodyTorsoPixel) {
+                const isFlankSide = x < neckX - 12 || x > neckX + 12;
+                if (isFlankSide && !isPixelCoveredByTops(x, y) && !isPixelCoveredByBottoms(x, y)) {
+                  erasePixel(x, y);
                   continue;
                 }
+              }
 
-                // 1. 肩の傾斜ラインより上へ飛び出している素体の肩のみカット（空中の誤消去を防ぐため肩近傍に限定）
-                const colTopY = topsProfile.colMinY[x];
-                if (y <= Math.max(rightArmpitY, leftArmpitY)) {
-                  if (colTopY !== -1 && y >= colTopY - 14 && y < colTopY + insetPx) {
+              // 3. 身頃の細さに合わせたカット（袖と身頃の間に隙間がある服でも、身頃の細さに合わせて脇腹・お腹をカット）
+              if (torsoTL !== -1 && torsoTR !== -1 && isBodyTorsoPixel) {
+                const allowedTorsoL = torsoTL + insetPx;
+                const allowedTorsoR = torsoTR - insetPx;
+                if (x < allowedTorsoL || x > allowedTorsoR) {
+                  if (!isPixelCoveredByBottoms(x, y)) {
                     erasePixel(x, y);
                     continue;
                   }
                 }
+              }
 
-                // 2. 身頃の細さに合わせたカット（袖と身頃の間に隙間がある服でも、身頃の細さに合わせて脇腹・お腹をカット）
-                if (torsoTL !== -1 && torsoTR !== -1) {
-                  const allowedTorsoL = torsoTL + insetPx;
-                  const allowedTorsoR = torsoTR - insetPx;
-                  const isBodyTorsoPixel =
-                    bodyTorsoL[y] !== -1 &&
-                    bodyTorsoR[y] !== -1 &&
-                    x >= bodyTorsoL[y] &&
-                    x <= bodyTorsoR[y];
-
-                  if (isBodyTorsoPixel && (x < allowedTorsoL || x > allowedTorsoR)) {
-                    erasePixel(x, y);
-                    continue;
-                  }
-                }
-
-                // 3. トップス全体の左右輪郭 [tL + insetPx, tR - insetPx] より外側へはみ出している素体をカット
-                if (tL === -1 || tR === -1) {
-                  continue;
-                }
-
+              // 4. トップス全体の左右輪郭 [tL + insetPx, tR - insetPx] より外側へはみ出している素体をカット
+              if (inTopsY && tL !== -1 && tR !== -1) {
                 const allowedL = tL + insetPx;
                 const allowedR = tR - insetPx;
                 if (x < allowedL || x > allowedR) {
-                  erasePixel(x, y);
+                  if (!isPixelCoveredByBottoms(x, y)) {
+                    erasePixel(x, y);
+                  }
                 }
               }
             }
-          }
-
-          // (C) 独立した腕パーツ装着時：素体自身の腕を消去（顔・顎にかかる上部は消去しない）
-          if (hasFullArmRight) {
-            const y0 = clamp(
-              Math.max(headProtectY + 4, Math.round(sockets.rightShoulder.y - 2)),
-              0,
-              S - 1,
-            );
-            const y1 = clamp(
-              Math.round(Math.max(sockets.rightHandGrip.y + 42, sockets.rightHip.y + 10)),
-              y0,
-              S - 1,
-            );
-            const xMax = clamp(Math.round(sockets.rightShoulder.x + 2), 0, S - 1);
-            for (let y = y0; y <= y1; y++) {
-              for (let x = 0; x <= xMax; x++) {
-                erasePixel(x, y);
-              }
-            }
-          }
-          if (hasFullArmLeft) {
-            const y0 = clamp(
-              Math.max(headProtectY + 4, Math.round(sockets.leftShoulder.y - 2)),
-              0,
-              S - 1,
-            );
-            const y1 = clamp(
-              Math.round(Math.max(sockets.leftHandGrip.y + 42, sockets.leftHip.y + 10)),
-              y0,
-              S - 1,
-            );
-            const xMin = clamp(Math.round(sockets.leftShoulder.x - 2), 0, S - 1);
-            for (let y = y0; y <= y1; y++) {
-              for (let x = xMin; x < S; x++) {
-                erasePixel(x, y);
-              }
-            }
-          }
-
-          // (D) ボトムス着用時の素体（腰・お尻・太もも・股下）はみ出しカッティング
-          if (bottomsProfile) {
-            const bBounds = bottomsProfile.bounds;
-            const yStart = clamp(
-              topsProfile
-                ? Math.min(bBounds.minY, topsProfile.bounds.maxY - 8)
-                : Math.max(headProtectY + 24, bBounds.minY - 12),
-              headProtectY + 1,
-              S - 1,
-            );
-            const isLongBottoms =
-              clipMode === 'strict' ||
-              bBounds.maxY >= 420 ||
-              (shoesProfile !== null && bBounds.maxY >= shoesProfile.bounds.minY - 8);
-            const yEnd = isLongBottoms
-              ? shoesProfile
-                ? shoesProfile.bounds.minY + 12
-                : S - 1
-              : bBounds.maxY;
-
-            for (let y = yStart; y <= yEnd; y++) {
-              const bL = bottomsProfile.rowMinX[y];
-              const bR = bottomsProfile.rowMaxX[y];
-              const tL = topsTorsoL[y] !== -1 ? topsTorsoL[y] : (topsProfile ? topsProfile.rowMinX[y] : -1);
-              const tR = topsTorsoR[y] !== -1 ? topsTorsoR[y] : (topsProfile ? topsProfile.rowMaxX[y] : -1);
-
-              let rowL = bL;
-              let rowR = bR;
-              if (tL !== -1 && (rowL === -1 || tL < rowL)) rowL = tL;
-              if (tR !== -1 && (rowR === -1 || tR > rowR)) rowR = tR;
-
-              let scanMinX = 0;
-              let scanMaxX = S - 1;
-              if (clipMode !== 'strict' && !hasFullArmRight) {
-                const btl = bodyTorsoL[y];
-                scanMinX =
-                  btl !== -1 ? btl : Math.min(torsoRightCorridorMinX, bBounds.minX - 48);
-              }
-              if (clipMode !== 'strict' && !hasFullArmLeft) {
-                const btr = bodyTorsoR[y];
-                scanMaxX =
-                  btr !== -1 ? btr : Math.max(torsoLeftCorridorMaxX, bBounds.maxX + 48);
-              }
-
-              for (let x = Math.max(0, scanMinX); x <= Math.min(S - 1, scanMaxX); x++) {
-                if (data[(y * S + x) * 4 + 3] === 0) continue;
-
-                if (rowL === -1 || rowR === -1) {
-                  erasePixel(x, y);
-                  continue;
-                }
-
-                const allowedL = rowL + insetPx;
-                const allowedR = rowR - insetPx;
-                if (x < allowedL || x > allowedR) {
-                  erasePixel(x, y);
-                }
-              }
-            }
-          }
-
-      // (D) 独立した脚パーツ（leg_right / leg_left）装着時は、素体自身の脚が二重に見えないよう股関節から下を消去
-      if (hasLegRight) {
-        const hipCutY = clamp(
-          Math.round(
-            Math.min(
-              sockets.rightHip.y - 6,
-              bottomsProfile ? bottomsProfile.bounds.maxY - 12 : sockets.rightHip.y - 6,
-            ),
-          ),
-          headProtectY,
-          S - 1,
-        );
-        const xLimit = clamp(neckX + 6, 0, S - 1);
-        for (let y = hipCutY; y < S; y++) {
-          for (let x = 0; x <= xLimit; x++) {
-            erasePixel(x, y);
           }
         }
-      }
-      if (hasLegLeft) {
-        const hipCutY = clamp(
-          Math.round(
-            Math.min(
-              sockets.leftHip.y - 6,
-              bottomsProfile ? bottomsProfile.bounds.maxY - 12 : sockets.leftHip.y - 6,
-            ),
-          ),
-          headProtectY,
-          S - 1,
-        );
-        const xLimit = clamp(neckX - 6, 0, S - 1);
-        for (let y = hipCutY; y < S; y++) {
-          for (let x = xLimit; x < S; x++) {
-            erasePixel(x, y);
-          }
-        }
-      }
 
-      // (E) 靴 (shoes) 着用時の素体足先のはみ出しカッティング
-      if (shoesProfile) {
-        const sBounds = shoesProfile.bounds;
-        const yStart = clamp(sBounds.minY + 6, headProtectY, S - 1);
-        for (let y = yStart; y < S; y++) {
-          const sL = shoesProfile.rowMinX[y];
-          const sR = shoesProfile.rowMaxX[y];
-          for (let x = 0; x < S; x++) {
-            if (data[(y * S + x) * 4 + 3] === 0) continue;
-            if (y > sBounds.maxY - Math.max(1, insetPx) || sL === -1 || sR === -1) {
+        // (C) 独立した腕パーツ装着時：素体自身の腕を消去（顔・顎にかかる上部は消去しない）
+        if (hasFullArmRight) {
+          const y0 = clamp(
+            Math.max(headProtectY + 4, Math.round(sockets.rightShoulder.y - 2)),
+            0,
+            S - 1,
+          );
+          const y1 = clamp(
+            Math.round(Math.max(sockets.rightHandGrip.y + 42, sockets.rightHip.y + 10)),
+            y0,
+            S - 1,
+          );
+          const xMax = clamp(Math.round(sockets.rightShoulder.x + 2), 0, S - 1);
+          for (let y = y0; y <= y1; y++) {
+            for (let x = 0; x <= xMax; x++) {
               erasePixel(x, y);
-              continue;
             }
-            if (x < sL + insetPx || x > sR - insetPx) {
+          }
+        }
+        if (hasFullArmLeft) {
+          const y0 = clamp(
+            Math.max(headProtectY + 4, Math.round(sockets.leftShoulder.y - 2)),
+            0,
+            S - 1,
+          );
+          const y1 = clamp(
+            Math.round(Math.max(sockets.leftHandGrip.y + 42, sockets.leftHip.y + 10)),
+            y0,
+            S - 1,
+          );
+          const xMin = clamp(Math.round(sockets.leftShoulder.x - 2), 0, S - 1);
+          for (let y = y0; y <= y1; y++) {
+            for (let x = xMin; x < S; x++) {
               erasePixel(x, y);
-              continue;
             }
-            if (y >= sBounds.minY + 12) {
-              const shoeAlpha = shoesProfile.rgba[(y * S + x) * 4 + 3];
-              if (shoeAlpha < 180) {
+          }
+        }
+
+        // (D) ボトムス着用時の素体（腰・お尻・太もも・股下）はみ出しカッティング
+        if (bottomsProfile) {
+          const bBounds = bottomsProfile.bounds;
+          const yStart = clamp(
+            topsProfile
+              ? Math.min(bBounds.minY - 6, topsProfile.bounds.maxY - 14)
+              : Math.max(headProtectY + 24, bBounds.minY - 12),
+            headProtectY + 1,
+            S - 1,
+          );
+          const isLongBottoms =
+            clipMode === 'strict' ||
+            bBounds.maxY >= 420 ||
+            (shoesProfile !== null && bBounds.maxY >= shoesProfile.bounds.minY - 8);
+          const yEnd = isLongBottoms
+            ? shoesProfile
+              ? shoesProfile.bounds.minY + 12
+              : S - 1
+            : bBounds.maxY;
+
+          for (let y = yStart; y <= yEnd; y++) {
+            const bL = bottomsProfile.rowMinX[y];
+            const bR = bottomsProfile.rowMaxX[y];
+
+            let scanMinX = 0;
+            let scanMaxX = S - 1;
+            if (clipMode !== 'strict' && !hasFullArmRight) {
+              const btl = bodyTorsoL[y];
+              scanMinX =
+                btl !== -1 ? btl : Math.min(torsoRightCorridorMinX, bBounds.minX - 48);
+            }
+            if (clipMode !== 'strict' && !hasFullArmLeft) {
+              const btr = bodyTorsoR[y];
+              scanMaxX =
+                btr !== -1 ? btr : Math.max(torsoLeftCorridorMaxX, bBounds.maxX + 48);
+            }
+
+            for (let x = Math.max(0, scanMinX); x <= Math.min(S - 1, scanMaxX); x++) {
+              if (data[(y * S + x) * 4 + 3] === 0) continue;
+
+              // トップスにもボトムスにも覆われていない腰・脇腹・お尻・太ももの素体ピクセルを確実に消去
+              const coveredByBottoms =
+                bL !== -1 &&
+                bR !== -1 &&
+                y >= bBounds.minY + Math.max(0, insetPx) &&
+                x >= bL + insetPx &&
+                x <= bR - insetPx;
+
+              const coveredByTops = isPixelCoveredByTops(x, y);
+
+              if (!coveredByBottoms && !coveredByTops) {
                 erasePixel(x, y);
+              }
+            }
+          }
+        }
+
+        // (E) 独立した脚パーツ（leg_right / leg_left）装着時は、素体自身の脚が二重に見えないよう股関節から下を消去
+        if (hasLegRight) {
+          const hipCutY = clamp(
+            Math.round(
+              Math.min(
+                sockets.rightHip.y - 6,
+                bottomsProfile ? bottomsProfile.bounds.maxY - 12 : sockets.rightHip.y - 6,
+              ),
+            ),
+            headProtectY,
+            S - 1,
+          );
+          const xLimit = clamp(neckX + 6, 0, S - 1);
+          for (let y = hipCutY; y < S; y++) {
+            for (let x = 0; x <= xLimit; x++) {
+              erasePixel(x, y);
+            }
+          }
+        }
+        if (hasLegLeft) {
+          const hipCutY = clamp(
+            Math.round(
+              Math.min(
+                sockets.leftHip.y - 6,
+                bottomsProfile ? bottomsProfile.bounds.maxY - 12 : sockets.leftHip.y - 6,
+              ),
+            ),
+            headProtectY,
+            S - 1,
+          );
+          const xLimit = clamp(neckX - 6, 0, S - 1);
+          for (let y = hipCutY; y < S; y++) {
+            for (let x = xLimit; x < S; x++) {
+              erasePixel(x, y);
+            }
+          }
+        }
+
+        // (F) 靴 (shoes) 着用時の素体足先のはみ出しカッティング
+        if (shoesProfile) {
+          const sBounds = shoesProfile.bounds;
+          const yStart = clamp(sBounds.minY + 6, headProtectY, S - 1);
+          for (let y = yStart; y < S; y++) {
+            const sL = shoesProfile.rowMinX[y];
+            const sR = shoesProfile.rowMaxX[y];
+            for (let x = 0; x < S; x++) {
+              if (data[(y * S + x) * 4 + 3] === 0) continue;
+              if (y > sBounds.maxY - Math.max(1, insetPx) || sL === -1 || sR === -1) {
+                erasePixel(x, y);
+                continue;
+              }
+              if (x < sL + insetPx || x > sR - insetPx) {
+                erasePixel(x, y);
+                continue;
+              }
+              if (y >= sBounds.minY + 12) {
+                const shoeAlpha = shoesProfile.rgba[(y * S + x) * 4 + 3];
+                if (shoeAlpha < 180) {
+                  erasePixel(x, y);
+                }
               }
             }
           }
         }
       }
 
-        softenCutBoundaries(data, erasedMask, headProtectY);
-        ctx.putImageData(imgData, 0, 0);
-        result.body = bodyCanvas;
+      // (G) 方向性C：ユーザーが手描きした素体マスクブラシ（消しゴム・復元ブラシ）を適用
+      if (hasManualStrokes) {
+        applyBodyMaskStrokesToLayer(data, originalData, erasedMask, maskStrokes);
       }
+
+      softenCutBoundaries(data, erasedMask, hasManualStrokes ? 1 : headProtectY);
+      ctx.putImageData(imgData, 0, 0);
+      result.body = bodyCanvas;
     }
+  }
 
   // ==========================================================================
-  // 2. 独立脚パーツ (leg_left / leg_right) のボトムス・靴に対するはみ出しカッティング
+  // 2. 独立脚パーツ (leg_left / leg_right) のボトムス・靴に対するはみ出しカッティング＆手描きマスク
   // ==========================================================================
   for (const legCat of ['leg_left', 'leg_right'] as const) {
     const legImg = images[legCat];
-    if (!legImg || excludedLayers.has(legCat) || (!bottomsProfile && !shoesProfile)) {
+    if (
+      !legImg ||
+      excludedLayers.has(legCat) ||
+      (clipMode === 'off' && !hasManualStrokes) ||
+      (!bottomsProfile && !shoesProfile && !hasManualStrokes)
+    ) {
       continue;
     }
 
@@ -933,6 +1154,7 @@ export function buildClippedWorldCanvasesFromImages(
 
     const imgData = ctx.getImageData(0, 0, S, S);
     const { data } = imgData;
+    const originalData = hasManualStrokes ? new Uint8ClampedArray(data) : data;
     const erasedMask = new Uint8Array(S * S);
 
     const eraseLegPixel = (x: number, y: number) => {
@@ -944,51 +1166,57 @@ export function buildClippedWorldCanvasesFromImages(
       }
     };
 
-    // ボトムスのウエストより上、またはボトムス上部からはみ出る脚の付け根をカット
-    if (bottomsProfile) {
-      const bBounds = bottomsProfile.bounds;
-      const hipClipEndY = Math.round(bBounds.minY + bBounds.height * 0.78);
-      for (let y = 0; y <= hipClipEndY; y++) {
-        const bL = bottomsProfile.rowMinX[y];
-        const bR = bottomsProfile.rowMaxX[y];
-        for (let x = 0; x < S; x++) {
-          if (data[(y * S + x) * 4 + 3] === 0) continue;
-          if (y < bBounds.minY + 6 || bL === -1 || bR === -1) {
-            eraseLegPixel(x, y);
-            continue;
-          }
-          if (x < bL + insetPx || x > bR - insetPx) {
-            eraseLegPixel(x, y);
-          }
-        }
-      }
-    }
-
-    // 靴からはみ出る足先・かかと・足底をカット
-    if (shoesProfile) {
-      const sBounds = shoesProfile.bounds;
-      const yStart = clamp(sBounds.minY + 6, 0, S - 1);
-      for (let y = yStart; y < S; y++) {
-        const sL = shoesProfile.rowMinX[y];
-        const sR = shoesProfile.rowMaxX[y];
-        for (let x = 0; x < S; x++) {
-          if (data[(y * S + x) * 4 + 3] === 0) continue;
-          if (y > sBounds.maxY - Math.max(1, insetPx) || sL === -1 || sR === -1) {
-            eraseLegPixel(x, y);
-            continue;
-          }
-          if (x < sL + insetPx || x > sR - insetPx) {
-            eraseLegPixel(x, y);
-            continue;
-          }
-          if (y >= sBounds.minY + 12) {
-            const shoeAlpha = shoesProfile.rgba[(y * S + x) * 4 + 3];
-            if (shoeAlpha < 180) {
+    if (clipMode !== 'off') {
+      // ボトムスのウエストより上、またはボトムス上部からはみ出る脚の付け根をカット
+      if (bottomsProfile) {
+        const bBounds = bottomsProfile.bounds;
+        const hipClipEndY = Math.round(bBounds.minY + bBounds.height * 0.78);
+        for (let y = 0; y <= hipClipEndY; y++) {
+          const bL = bottomsProfile.rowMinX[y];
+          const bR = bottomsProfile.rowMaxX[y];
+          for (let x = 0; x < S; x++) {
+            if (data[(y * S + x) * 4 + 3] === 0) continue;
+            if (y < bBounds.minY + 6 || bL === -1 || bR === -1) {
+              eraseLegPixel(x, y);
+              continue;
+            }
+            if (x < bL + insetPx || x > bR - insetPx) {
               eraseLegPixel(x, y);
             }
           }
         }
       }
+
+      // 靴からはみ出る足先・かかと・足底をカット
+      if (shoesProfile) {
+        const sBounds = shoesProfile.bounds;
+        const yStart = clamp(sBounds.minY + 6, 0, S - 1);
+        for (let y = yStart; y < S; y++) {
+          const sL = shoesProfile.rowMinX[y];
+          const sR = shoesProfile.rowMaxX[y];
+          for (let x = 0; x < S; x++) {
+            if (data[(y * S + x) * 4 + 3] === 0) continue;
+            if (y > sBounds.maxY - Math.max(1, insetPx) || sL === -1 || sR === -1) {
+              eraseLegPixel(x, y);
+              continue;
+            }
+            if (x < sL + insetPx || x > sR - insetPx) {
+              eraseLegPixel(x, y);
+              continue;
+            }
+            if (y >= sBounds.minY + 12) {
+              const shoeAlpha = shoesProfile.rgba[(y * S + x) * 4 + 3];
+              if (shoeAlpha < 180) {
+                eraseLegPixel(x, y);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (hasManualStrokes) {
+      applyBodyMaskStrokesToLayer(data, originalData, erasedMask, maskStrokes);
     }
 
     softenCutBoundaries(data, erasedMask, 1);
@@ -1001,8 +1229,8 @@ export function buildClippedWorldCanvasesFromImages(
 
 /**
  * <AvatarRenderer /> 用のリアルタイム・シルエットカッティング Hook
- * 装備パーツや位置・角度微調整が変わると、素体 (body) や脚 (leg_left / leg_right) の
- * はみ出し部分を自動カットした 512x512 DataURL を生成して返す
+ * 装備パーツや位置・角度微調整・手描きマスクブラシが変わると、素体 (body) や脚 (leg_left / leg_right) の
+ * はみ出し部分を自動カット＋マスク適用した 512x512 DataURL を生成して返す
  */
 export function useSilhouetteClippedSources(
   equippedParts: EquippedParts,
@@ -1025,6 +1253,10 @@ export function useSilhouetteClippedSources(
   const clipMode = solvedRig.activeBodyClipMode;
   const insetPx = solvedRig.activeBodyClipInsetPx;
   const activeSleeveMode = solvedRig.activeSleeveMode;
+  const maskStrokes = solvedRig.activeBodyMaskStrokes ?? [];
+  const strokesSignature = maskStrokes
+    .map((s) => `${s.mode}:${s.radius}:${s.mirror ? 1 : 0}:${s.points.length}:${s.points[s.points.length - 2] ?? 0},${s.points[s.points.length - 1] ?? 0}`)
+    .join(';');
 
   const adjSignature = (['body', 'leg_left', 'leg_right', 'tops', 'bottoms', 'shoes'] as const)
     .map((cat) => {
@@ -1034,7 +1266,7 @@ export function useSilhouetteClippedSources(
     .join('|');
 
   useEffect(() => {
-    if (clipMode === 'off') {
+    if (clipMode === 'off' && maskStrokes.length === 0) {
       setClippedUrls({});
       return;
     }
@@ -1042,7 +1274,16 @@ export function useSilhouetteClippedSources(
       setClippedUrls({});
       return;
     }
-    if (!topsSrc && !bottomsSrc && !shoesSrc && !armLSrc && !armRSrc && !legLSrc && !legRSrc) {
+    if (
+      maskStrokes.length === 0 &&
+      !topsSrc &&
+      !bottomsSrc &&
+      !shoesSrc &&
+      !armLSrc &&
+      !armRSrc &&
+      !legLSrc &&
+      !legRSrc
+    ) {
       setClippedUrls({});
       return;
     }
@@ -1086,7 +1327,7 @@ export function useSilhouetteClippedSources(
           setClippedUrls({});
         }
       }
-    }, 12);
+    }, 10);
 
     return () => {
       cancelled = true;
@@ -1104,6 +1345,7 @@ export function useSilhouetteClippedSources(
     clipMode,
     insetPx,
     activeSleeveMode,
+    strokesSignature,
     adjSignature,
     equippedParts,
     solvedRig,

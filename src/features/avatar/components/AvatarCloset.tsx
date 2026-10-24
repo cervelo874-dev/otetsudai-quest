@@ -13,6 +13,7 @@ import {
   Cloud,
   Copy,
   Download,
+  Eraser,
   FlipHorizontal,
   Hand,
   Layers,
@@ -20,6 +21,7 @@ import {
   Maximize2,
   Minus,
   Move,
+  Paintbrush,
   Pause,
   Pencil,
   PersonStanding,
@@ -34,6 +36,7 @@ import {
   Sliders,
   Sparkles,
   Trash2,
+  Undo2,
   User,
   X,
 } from 'lucide-react';
@@ -50,6 +53,7 @@ import { AVATAR_LAYERS } from '../types';
 import type {
   AvatarCategory,
   AvatarPart,
+  BodyMaskStroke,
   BodySilhouetteClipMode,
   EquippedPartMap,
   EquippedParts,
@@ -300,6 +304,17 @@ export function AvatarCloset({
   // 関節吸着は完全廃止のため常にOFF
   const autoRig = false;
   const [dragAdjustOnPreview, setDragAdjustOnPreview] = useState<boolean>(true);
+  const [previewToolMode, setPreviewToolMode] = useState<'move' | 'erase_body' | 'restore_body'>('move');
+  const [maskBrushRadius, setMaskBrushRadius] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = Number(localStorage.getItem('mobage_avatar_mask_brush_radius_v1'));
+      if (Number.isFinite(saved) && saved >= 4 && saved <= 48) return saved;
+    }
+    return 16;
+  });
+  const [maskBrushMirror, setMaskBrushMirror] = useState<boolean>(true);
+  const [brushCursor, setBrushCursor] = useState<{ x: number; y: number } | null>(null);
+  const isMaskPaintingRef = useRef<boolean>(false);
   const [isDraggingPreview, setIsDraggingPreview] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [savedNotice, setSavedNotice] = useState<boolean>(false);
@@ -307,7 +322,7 @@ export function AvatarCloset({
   const [autoApplyTemplate, setAutoApplyTemplate] = useState<boolean>(
     loadAutoApplyTemplatePreference,
   );
-  // 素体のはみ出しカット（高度な設定）の折りたたみ状態（デフォルト閉じる）
+  // 素体のはみ出しカット（高度な設定）の折りたたみ状態
   const [showAdvancedClipping, setShowAdvancedClipping] = useState<boolean>(false);
   // パーツ名のインライン編集状態
   const [editingPartId, setEditingPartId] = useState<string | null>(null);
@@ -810,6 +825,182 @@ export function AvatarCloset({
     setDraftAdjustments({});
   };
 
+  // ==================== 素体のはみ出しカット設定 ＆ 直接なぞり消しゴム（方向性C）ヘルパー ====================
+  const maskTargetCategory: 'tops' | 'bottoms' | 'body' = draft.tops
+    ? 'tops'
+    : draft.bottoms
+      ? 'bottoms'
+      : 'body';
+
+  const handleChangeMaskBrushRadius = (nextRadius: number) => {
+    const r = Math.min(48, Math.max(4, Math.round(nextRadius)));
+    setMaskBrushRadius(r);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('mobage_avatar_mask_brush_radius_v1', String(r));
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const syncLayerAdjustmentToPartCache = (cat: AvatarCategory, nextAdj: LayerAdjustment) => {
+    const curPart = draft[cat];
+    const curKey = resolvePartKey(curPart);
+    if (curKey) {
+      partAdjustmentsCacheRef.current.set(curKey, nextAdj);
+      if (curPart && typeof curPart === 'object') {
+        curPart.defaultAdjustment = nextAdj;
+      }
+      const matchingOwned = ownedParts.find((p) => p.id === curKey);
+      if (matchingOwned) {
+        matchingOwned.defaultAdjustment = nextAdj;
+      }
+    }
+  };
+
+  const updateBodyClipSettings = (patch: {
+    bodyClipMode?: BodySilhouetteClipMode;
+    bodyClipInsetPx?: number;
+  }) => {
+    setDraftAdjustments((prev) => {
+      const curBody = getLayerAdjustment(prev, 'body');
+      const nextBody: LayerAdjustment = {
+        ...curBody,
+        ...(patch.bodyClipMode !== undefined ? { bodyClipMode: patch.bodyClipMode } : {}),
+        ...(patch.bodyClipInsetPx !== undefined ? { bodyClipInsetPx: patch.bodyClipInsetPx } : {}),
+      };
+      syncLayerAdjustmentToPartCache('body', nextBody);
+
+      const updated: LayerAdjustmentMap = {
+        ...prev,
+        body: nextBody,
+      };
+
+      if (draft.tops) {
+        const curTops = getLayerAdjustment(prev, 'tops');
+        const nextTops: LayerAdjustment = {
+          ...curTops,
+          ...(patch.bodyClipMode !== undefined ? { bodyClipMode: patch.bodyClipMode } : {}),
+          ...(patch.bodyClipInsetPx !== undefined ? { bodyClipInsetPx: patch.bodyClipInsetPx } : {}),
+        };
+        syncLayerAdjustmentToPartCache('tops', nextTops);
+        updated.tops = nextTops;
+      }
+
+      return updated;
+    });
+  };
+
+  const getPointerWorldCoords = (e: PointerEvent<HTMLDivElement>): { x: number; y: number } | null => {
+    const box = previewBoxRef.current;
+    if (!box) return null;
+    const rect = box.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    const activeCrop = previewMode === 'face' ? FACE_CROP : FULL_CROP;
+    const x = activeCrop.x + ((e.clientX - rect.left) / rect.width) * activeCrop.size;
+    const y = activeCrop.y + ((e.clientY - rect.top) / rect.height) * activeCrop.size;
+    return {
+      x: Math.round(Math.min(AVATAR_CANVAS_SIZE, Math.max(0, x)) * 10) / 10,
+      y: Math.round(Math.min(AVATAR_CANVAS_SIZE, Math.max(0, y)) * 10) / 10,
+    };
+  };
+
+  const startMaskStroke = (canvasX: number, canvasY: number) => {
+    const mode: 'erase' | 'restore' = previewToolMode === 'restore_body' ? 'restore' : 'erase';
+    const newStroke: BodyMaskStroke = {
+      mode,
+      radius: maskBrushRadius,
+      mirror: maskBrushMirror,
+      points: [canvasX, canvasY],
+    };
+    setDraftAdjustments((prev) => {
+      const cur = getLayerAdjustment(prev, maskTargetCategory);
+      const nextStrokes = [...(cur.bodyMaskStrokes ?? []), newStroke];
+      const nextAdj: LayerAdjustment = {
+        ...cur,
+        bodyMaskStrokes: nextStrokes,
+      };
+      syncLayerAdjustmentToPartCache(maskTargetCategory, nextAdj);
+      return {
+        ...prev,
+        [maskTargetCategory]: nextAdj,
+      };
+    });
+  };
+
+  const appendMaskStrokePoint = (canvasX: number, canvasY: number) => {
+    setDraftAdjustments((prev) => {
+      const cur = getLayerAdjustment(prev, maskTargetCategory);
+      const strokes = cur.bodyMaskStrokes ?? [];
+      if (strokes.length === 0) return prev;
+      const last = strokes[strokes.length - 1];
+      const pts = last.points;
+      if (pts.length >= 2) {
+        const lastX = pts[pts.length - 2];
+        const lastY = pts[pts.length - 1];
+        if (Math.hypot(canvasX - lastX, canvasY - lastY) < 1.8) {
+          return prev;
+        }
+      }
+      const updatedLast: BodyMaskStroke = {
+        ...last,
+        points: [...pts, canvasX, canvasY],
+      };
+      const nextStrokes = [...strokes.slice(0, -1), updatedLast];
+      const nextAdj: LayerAdjustment = {
+        ...cur,
+        bodyMaskStrokes: nextStrokes,
+      };
+      syncLayerAdjustmentToPartCache(maskTargetCategory, nextAdj);
+      return {
+        ...prev,
+        [maskTargetCategory]: nextAdj,
+      };
+    });
+  };
+
+  const handleUndoMaskStroke = () => {
+    setDraftAdjustments((prev) => {
+      // 最後にストロークが追加されたカテゴリ（tops -> bottoms -> body の優先順）から1つ戻す
+      for (const cat of [maskTargetCategory, 'tops', 'bottoms', 'body'] as const) {
+        const cur = getLayerAdjustment(prev, cat);
+        if (cur.bodyMaskStrokes && cur.bodyMaskStrokes.length > 0) {
+          const nextStrokes = cur.bodyMaskStrokes.slice(0, -1);
+          const nextAdj: LayerAdjustment = {
+            ...cur,
+            bodyMaskStrokes: nextStrokes.length > 0 ? nextStrokes : undefined,
+          };
+          syncLayerAdjustmentToPartCache(cat, nextAdj);
+          return {
+            ...prev,
+            [cat]: nextAdj,
+          };
+        }
+      }
+      return prev;
+    });
+  };
+
+  const handleClearMaskStrokes = () => {
+    setDraftAdjustments((prev) => {
+      const next = { ...prev };
+      for (const cat of ['tops', 'bottoms', 'body'] as const) {
+        const cur = getLayerAdjustment(prev, cat);
+        if (cur.bodyMaskStrokes && cur.bodyMaskStrokes.length > 0) {
+          const nextAdj: LayerAdjustment = {
+            ...cur,
+            bodyMaskStrokes: undefined,
+          };
+          syncLayerAdjustmentToPartCache(cat, nextAdj);
+          next[cat] = nextAdj;
+        }
+      }
+      return next;
+    });
+    toast('手描きの素体マスクをすべてリセットしました', '✨');
+  };
+
   // プレビュー上のタップ座標 (canvasX, canvasY: 512x512) から、タップされた装着パーツを判定
   const detectTappedCategory = useCallback(
     (canvasX: number, canvasY: number): { category: AvatarCategory; side?: 'right' | 'left' } | null => {
@@ -861,11 +1052,23 @@ export function AvatarCloset({
     [draft],
   );
 
-  // ==================== プレビュー画面上での直接ドラッグ＆ホイール微調整 ====================
+  // ==================== プレビュー画面上での直接ドラッグ＆なぞり消しゴム＆ホイール微調整 ====================
   const handlePreviewPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
 
     e.currentTarget.setPointerCapture(e.pointerId);
+
+    if (previewToolMode === 'erase_body' || previewToolMode === 'restore_body') {
+      const pt = getPointerWorldCoords(e);
+      if (pt) {
+        setBrushCursor(pt);
+        isMaskPaintingRef.current = true;
+        setIsDraggingPreview(true);
+        startMaskStroke(pt.x, pt.y);
+      }
+      return;
+    }
+
     if (activeCategory === 'hand_item' || (!currentEquippedInActive && draft.hand_item)) {
       previewDragRef.current = {
         target: 'part',
@@ -886,6 +1089,17 @@ export function AvatarCloset({
   };
 
   const handlePreviewPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (previewToolMode === 'erase_body' || previewToolMode === 'restore_body') {
+      const pt = getPointerWorldCoords(e);
+      if (pt) {
+        setBrushCursor(pt);
+        if (isMaskPaintingRef.current) {
+          appendMaskStrokePoint(pt.x, pt.y);
+        }
+      }
+      return;
+    }
+
     const drag = previewDragRef.current;
     const box = previewBoxRef.current;
     if (!drag || !box) return;
@@ -915,6 +1129,15 @@ export function AvatarCloset({
   };
 
   const handlePreviewPointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    if (isMaskPaintingRef.current) {
+      isMaskPaintingRef.current = false;
+      setIsDraggingPreview(false);
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+      return;
+    }
+
     const drag = previewDragRef.current;
     const box = previewBoxRef.current;
 
@@ -941,6 +1164,10 @@ export function AvatarCloset({
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
+  };
+
+  const handlePreviewPointerLeave = () => {
+    setBrushCursor(null);
   };
 
   // プレビュー上で Shift + マウスホイールで角度回転、マウスホイール単体でサイズ拡縮
@@ -1776,8 +2003,8 @@ export function AvatarCloset({
     >
       {/* ==================== 左カラム：常時固定（Sticky）アバタープレビュー ==================== */}
       <section className="w-full relative lg:sticky lg:top-20 lg:z-20 flex flex-col gap-3 lg:gap-4 rounded-2xl border border-zinc-200/80 bg-white p-3 sm:p-4 lg:p-5 shadow-sm">
-        {/* ヘッダー：カテゴリ名 ＆ クリーンなアイコントグル群 */}
-        <div className="flex items-center justify-between gap-2">
+        {/* ヘッダー：カテゴリ名 ＆ プレビュー操作モード切替（移動 / 素体消し / 素体戻す） */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="text-xs font-semibold text-zinc-900">プレビュー</span>
             <span className="text-xs text-zinc-300">/</span>
@@ -1786,20 +2013,52 @@ export function AvatarCloset({
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* ドラッグ移動トグル */}
+          <div className="flex items-center gap-1 rounded-xl bg-zinc-100 p-0.5 border border-zinc-200/70 shrink-0">
             <button
               type="button"
-              onClick={() => setDragAdjustOnPreview((v) => !v)}
-              className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition ${
-                dragAdjustOnPreview
-                  ? 'bg-zinc-900 text-white shadow-sm'
-                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200/70 hover:text-zinc-900'
+              onClick={() => {
+                setPreviewToolMode('move');
+                setDragAdjustOnPreview(true);
+              }}
+              className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition ${
+                previewToolMode === 'move' && dragAdjustOnPreview
+                  ? 'bg-zinc-900 text-white shadow-xs'
+                  : 'text-zinc-600 hover:text-zinc-900'
               }`}
-              title="ONの時、プレビュー画面を直接ドラッグして現在選択中の部位（腕・足・持ち物など）の位置を微調整できます"
+              title="プレビューをドラッグしてパーツの位置を移動します"
             >
               <Move className="h-3 w-3" />
-              <span>ドラッグ</span>
+              <span>移動</span>
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setPreviewToolMode((m) => (m === 'erase_body' ? 'move' : 'erase_body'))
+              }
+              className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition ${
+                previewToolMode === 'erase_body'
+                  ? 'bg-rose-600 text-white shadow-xs'
+                  : 'text-zinc-600 hover:text-rose-700'
+              }`}
+              title="服からはみ出た素体（腰・脇腹・肩など）をプレビュー上で直接なぞって消します"
+            >
+              <Eraser className="h-3 w-3" />
+              <span>素体消し</span>
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setPreviewToolMode((m) => (m === 'restore_body' ? 'move' : 'restore_body'))
+              }
+              className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition ${
+                previewToolMode === 'restore_body'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-zinc-600 hover:text-emerald-700'
+              }`}
+              title="削れすぎた素体の肌・輪郭をなぞって元に戻します"
+            >
+              <Paintbrush className="h-3 w-3" />
+              <span>戻す</span>
             </button>
           </div>
         </div>
@@ -1811,18 +2070,25 @@ export function AvatarCloset({
           onPointerMove={handlePreviewPointerMove}
           onPointerUp={handlePreviewPointerUp}
           onPointerCancel={handlePreviewPointerUp}
+          onPointerLeave={handlePreviewPointerLeave}
           className={`relative mx-auto w-full max-w-[190px] sm:max-w-[250px] lg:max-w-[320px] touch-none select-none overflow-hidden rounded-xl border transition ${
-            isDraggingPreview
-              ? 'border-zinc-900 ring-2 ring-zinc-900/10'
-              : 'border-zinc-200/80 shadow-inner'
+            previewToolMode === 'erase_body'
+              ? 'border-rose-500 ring-2 ring-rose-500/20'
+              : previewToolMode === 'restore_body'
+                ? 'border-emerald-500 ring-2 ring-emerald-500/20'
+                : isDraggingPreview
+                  ? 'border-zinc-900 ring-2 ring-zinc-900/10'
+                  : 'border-zinc-200/80 shadow-inner'
           }`}
           style={{
             cursor:
-              dragAdjustOnPreview && currentEquippedInActive
-                ? isDraggingPreview
-                  ? 'grabbing'
-                  : 'grab'
-                : 'default',
+              previewToolMode === 'erase_body' || previewToolMode === 'restore_body'
+                ? 'crosshair'
+                : dragAdjustOnPreview && currentEquippedInActive
+                  ? isDraggingPreview
+                    ? 'grabbing'
+                    : 'grab'
+                  : 'default',
           }}
         >
           {previewMode === 'full' ? (
@@ -1832,9 +2098,13 @@ export function AvatarCloset({
               layerOrder={draftAdjustments.layerOrder}
               autoRig={autoRig}
               size="full"
-              animate={animate && !isDraggingPreview}
+              animate={animate && !isDraggingPreview && previewToolMode === 'move'}
               showEmptyPlaceholder
-              highlightLayer={isDraggingPreview || rightTab === 'adjust' ? activeCategory : null}
+              highlightLayer={
+                previewToolMode === 'move' && (isDraggingPreview || rightTab === 'adjust')
+                  ? activeCategory
+                  : null
+              }
               className="avatar-checker"
             />
           ) : (
@@ -1846,9 +2116,13 @@ export function AvatarCloset({
                 autoRig={autoRig}
                 size={168}
                 faceOnly
-                animate={animate && !isDraggingPreview}
+                animate={animate && !isDraggingPreview && previewToolMode === 'move'}
                 showEmptyPlaceholder
-                highlightLayer={isDraggingPreview || rightTab === 'adjust' ? activeCategory : null}
+                highlightLayer={
+                  previewToolMode === 'move' && (isDraggingPreview || rightTab === 'adjust')
+                    ? activeCategory
+                    : null
+                }
                 className="shadow-md rounded-full ring-2 ring-white"
               />
               <div className="flex items-end gap-3">
@@ -1886,23 +2160,217 @@ export function AvatarCloset({
             </div>
           )}
 
+          {/* 素体消しゴム・復元ブラシ使用時のリアルタイム円形カーソル（＆左右対称ミラーカーソル） */}
+          {(previewToolMode === 'erase_body' || previewToolMode === 'restore_body') &&
+            previewMode === 'full' && (
+              <svg
+                viewBox={`0 0 ${AVATAR_CANVAS_SIZE} ${AVATAR_CANVAS_SIZE}`}
+                className="pointer-events-none absolute inset-0 h-full w-full"
+              >
+                {maskBrushMirror && (
+                  <line
+                    x1={AVATAR_CANVAS_SIZE / 2}
+                    y1={0}
+                    x2={AVATAR_CANVAS_SIZE / 2}
+                    y2={AVATAR_CANVAS_SIZE}
+                    stroke={previewToolMode === 'erase_body' ? 'rgba(225,29,72,0.35)' : 'rgba(5,150,105,0.35)'}
+                    strokeWidth={1.5}
+                    strokeDasharray="6 6"
+                  />
+                )}
+                {brushCursor && (
+                  <>
+                    <circle
+                      cx={brushCursor.x}
+                      cy={brushCursor.y}
+                      r={maskBrushRadius}
+                      fill={
+                        previewToolMode === 'erase_body'
+                          ? 'rgba(244,63,94,0.22)'
+                          : 'rgba(16,185,129,0.22)'
+                      }
+                      stroke={previewToolMode === 'erase_body' ? '#e11d48' : '#059669'}
+                      strokeWidth={2.5}
+                    />
+                    {maskBrushMirror && (
+                      <circle
+                        cx={AVATAR_CANVAS_SIZE - brushCursor.x}
+                        cy={brushCursor.y}
+                        r={maskBrushRadius}
+                        fill={
+                          previewToolMode === 'erase_body'
+                            ? 'rgba(244,63,94,0.14)'
+                            : 'rgba(16,185,129,0.14)'
+                        }
+                        stroke={previewToolMode === 'erase_body' ? '#e11d48' : '#059669'}
+                        strokeWidth={2}
+                        strokeDasharray="4 4"
+                      />
+                    )}
+                  </>
+                )}
+              </svg>
+            )}
+
+          {/* なぞりモード中バナー */}
+          {(previewToolMode === 'erase_body' || previewToolMode === 'restore_body') && (
+            <span
+              className={`pointer-events-none absolute inset-x-2 top-2 flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold text-white shadow-md backdrop-blur-md ${
+                previewToolMode === 'erase_body' ? 'bg-rose-600/90' : 'bg-emerald-600/90'
+              }`}
+            >
+              {previewToolMode === 'erase_body' ? (
+                <>
+                  <Eraser className="h-3.5 w-3.5 shrink-0" />
+                  <span>はみ出た素体（腰・脇腹など）をなぞって消去</span>
+                </>
+              ) : (
+                <>
+                  <Paintbrush className="h-3.5 w-3.5 shrink-0" />
+                  <span>消えすぎた素体をなぞって復元</span>
+                </>
+              )}
+            </span>
+          )}
+
           {/* ミニマルなステータスチップ */}
-          {isDirty && (
+          {isDirty && previewToolMode === 'move' && (
             <span className="pointer-events-none absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-zinc-900/80 backdrop-blur-md px-2.5 py-0.5 text-[10px] font-medium text-white shadow-sm">
               <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
               編集中
             </span>
           )}
 
-
-
-          {currentEquippedInActive && isCurrentAdjusted && (
+          {currentEquippedInActive && isCurrentAdjusted && previewToolMode === 'move' && (
             <span className="pointer-events-none absolute bottom-2.5 right-2.5 rounded-md bg-zinc-900/80 backdrop-blur-md px-2 py-0.5 font-mono text-[10px] text-zinc-200 shadow-sm">
               手動 X:{currentAdjustment.dx > 0 ? `+${currentAdjustment.dx}` : currentAdjustment.dx}{' '}
               Y:{currentAdjustment.dy > 0 ? `+${currentAdjustment.dy}` : currentAdjustment.dy}
             </span>
           )}
         </div>
+
+        {/* ==================== 素体消しゴム・復元ブラシ専用ツールバー（なぞりモード中） ==================== */}
+        {(previewToolMode === 'erase_body' || previewToolMode === 'restore_body') && (
+          <div
+            className={`flex flex-col gap-2 rounded-xl border p-2.5 shadow-xs ${
+              previewToolMode === 'erase_body'
+                ? 'border-rose-200 bg-rose-50/70'
+                : 'border-emerald-200 bg-emerald-50/70'
+            }`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPreviewToolMode('erase_body')}
+                  className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition ${
+                    previewToolMode === 'erase_body'
+                      ? 'bg-rose-600 text-white shadow-2xs'
+                      : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-rose-50'
+                  }`}
+                >
+                  <Eraser className="h-3 w-3" />
+                  <span>消す</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewToolMode('restore_body')}
+                  className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition ${
+                    previewToolMode === 'restore_body'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'bg-white text-zinc-700 border border-zinc-200 hover:bg-emerald-50'
+                  }`}
+                >
+                  <Paintbrush className="h-3 w-3" />
+                  <span>戻す</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMaskBrushMirror((v) => !v)}
+                  className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition border ${
+                    maskBrushMirror
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                      : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
+                  }`}
+                  title="ONにすると、片側の腰や肩をなぞるだけで反対側も左右対称に同時消去・復元します"
+                >
+                  <FlipHorizontal className="h-3 w-3" />
+                  <span>左右対称:{maskBrushMirror ? 'ON' : 'OFF'}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleUndoMaskStroke}
+                  disabled={solvedRig.activeBodyMaskStrokes.length === 0}
+                  className="flex items-center gap-0.5 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 transition"
+                  title="直前のなぞり操作を1つ戻す"
+                >
+                  <Undo2 className="h-3 w-3" />
+                  <span>戻す</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearMaskStrokes}
+                  disabled={solvedRig.activeBodyMaskStrokes.length === 0}
+                  className="flex items-center gap-0.5 rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[10px] font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-40 transition"
+                  title="手描きマスクをすべて消去してリセット"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  <span>全消去</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewToolMode('move')}
+                  className="flex items-center gap-0.5 rounded-lg bg-zinc-900 px-2 py-1 text-[10px] font-bold text-white hover:bg-zinc-800 transition"
+                >
+                  <Check className="h-3 w-3" />
+                  <span>完了</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ブラシサイズ調整スライダー ＆ クイックプリセット */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold text-zinc-700 shrink-0">
+                太さ:
+              </span>
+              <input
+                type="range"
+                min={4}
+                max={44}
+                step={2}
+                value={maskBrushRadius}
+                onChange={(e) => handleChangeMaskBrushRadius(Number(e.target.value))}
+                className="h-1.5 flex-1 accent-rose-600"
+              />
+              <div className="flex items-center gap-1 shrink-0">
+                {[
+                  { r: 8, label: '細' },
+                  { r: 16, label: '中' },
+                  { r: 28, label: '太' },
+                ].map((p) => (
+                  <button
+                    key={p.r}
+                    type="button"
+                    onClick={() => handleChangeMaskBrushRadius(p.r)}
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-bold transition ${
+                      maskBrushRadius === p.r
+                        ? 'bg-zinc-900 text-white'
+                        : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-100'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+                <span className="w-7 text-right font-mono text-[10px] font-bold text-zinc-700">
+                  {maskBrushRadius}px
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ==================== アバター画面直下のミニマム調整バー (XY移動・拡大縮小・靴の対称同期) ==================== */}
         {currentEquippedInActive && (
@@ -2253,24 +2721,29 @@ export function AvatarCloset({
           </div>
         </div>
 
-        {/* 段階的開示（Progressive Disclosure）：素体の輪郭クリッピング設定アコーディオン */}
+        {/* 段階的開示（Progressive Disclosure）：素体のはみ出し対策（自動カット＆なぞり消しゴム） */}
         <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/50 transition">
           <button
             type="button"
             onClick={() => setShowAdvancedClipping((v) => !v)}
             className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-zinc-700 hover:text-zinc-900"
           >
-            <span className="flex items-center gap-1.5 font-medium">
+            <span className="flex items-center gap-1.5 font-semibold">
               <Scissors className="h-3.5 w-3.5 text-zinc-500" />
-              <span>素体のはみ出しカット設定</span>
+              <span>素体のはみ出し対策</span>
             </span>
             <div className="flex items-center gap-1.5">
+              {solvedRig.activeBodyMaskStrokes.length > 0 && (
+                <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
+                  なぞり補正:{solvedRig.activeBodyMaskStrokes.length}
+                </span>
+              )}
               <span className="rounded bg-zinc-200/60 px-1.5 py-0.5 text-[10px] font-medium text-zinc-600">
                 {solvedRig.activeBodyClipMode === 'off'
                   ? 'OFF'
                   : solvedRig.activeBodyClipMode === 'strict'
-                    ? '強'
-                    : '標準'}
+                    ? '強(腕なし)'
+                    : '自動(標準)'}
                 {solvedRig.activeBodyClipMode !== 'off' &&
                   ` (${solvedRig.activeBodyClipInsetPx >= 0 ? `+${solvedRig.activeBodyClipInsetPx}` : solvedRig.activeBodyClipInsetPx}px)`}
               </span>
@@ -2283,32 +2756,23 @@ export function AvatarCloset({
           </button>
 
           {showAdvancedClipping && (
-            <div className="border-t border-zinc-200/60 p-3 pt-2.5 flex flex-col gap-2">
+            <div className="border-t border-zinc-200/60 p-3 pt-2.5 flex flex-col gap-2.5">
+              {/* 1. 自動カット強度モード */}
               <div className="grid grid-cols-3 gap-1">
                 {(
                   [
-                    { id: 'auto', label: '自動(標準)' },
-                    { id: 'strict', label: '強(完全)' },
-                    { id: 'off', label: 'OFF' },
-                  ] as { id: BodySilhouetteClipMode; label: string }[]
+                    { id: 'auto', label: '自動(標準)', desc: '腕を残して脇腹・腰・肩のはみ出しをカット' },
+                    { id: 'strict', label: '強(腕も消す)', desc: '首から下の素体腕も含めて服の外側を完全カット' },
+                    { id: 'off', label: '自動OFF', desc: '自動カットを停止（なぞり消しゴムのみ適用）' },
+                  ] as { id: BodySilhouetteClipMode; label: string; desc: string }[]
                 ).map((opt) => {
                   const active = solvedRig.activeBodyClipMode === opt.id;
                   return (
                     <button
                       key={opt.id}
                       type="button"
-                      onClick={() =>
-                        setDraftAdjustments((prev) => {
-                          const curBody = getLayerAdjustment(prev, 'body');
-                          return {
-                            ...prev,
-                            body: {
-                              ...curBody,
-                              bodyClipMode: opt.id,
-                            },
-                          };
-                        })
-                      }
+                      onClick={() => updateBodyClipSettings({ bodyClipMode: opt.id })}
+                      title={opt.desc}
                       className={`rounded-md py-1 text-[11px] font-medium transition ${
                         active
                           ? 'bg-zinc-900 text-white shadow-sm'
@@ -2321,35 +2785,106 @@ export function AvatarCloset({
                 })}
               </div>
 
+              {/* 2. 食い込み幅スライダー（-4px 〜 +14px） */}
               {solvedRig.activeBodyClipMode !== 'off' && (
-                <label className="flex items-center gap-2 text-[10px] text-zinc-600 pt-1">
-                  <span className="shrink-0 text-zinc-500">食い込み幅:</span>
+                <div className="flex items-center gap-1.5 text-[10px] text-zinc-600">
+                  <span className="shrink-0 text-zinc-500 font-medium">削り幅:</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateBodyClipSettings({
+                        bodyClipInsetPx: Math.max(-4, solvedRig.activeBodyClipInsetPx - 1),
+                      })
+                    }
+                    className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-zinc-600 hover:bg-zinc-100"
+                    title="削り幅を1px弱める"
+                  >
+                    -1
+                  </button>
                   <input
                     type="range"
                     min={-4}
-                    max={8}
+                    max={14}
                     step={1}
                     value={solvedRig.activeBodyClipInsetPx}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setDraftAdjustments((prev) => {
-                        const curBody = getLayerAdjustment(prev, 'body');
-                        return {
-                          ...prev,
-                          body: {
-                            ...curBody,
-                            bodyClipInsetPx: val,
-                          },
-                        };
-                      });
-                    }}
-                    className="h-1.5 w-full accent-zinc-900"
+                    onChange={(e) =>
+                      updateBodyClipSettings({ bodyClipInsetPx: Number(e.target.value) })
+                    }
+                    className="h-1.5 flex-1 accent-zinc-900"
                   />
-                  <span className="w-6 text-right font-mono text-[10px] text-zinc-600">
-                    {solvedRig.activeBodyClipInsetPx}px
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateBodyClipSettings({
+                        bodyClipInsetPx: Math.min(14, solvedRig.activeBodyClipInsetPx + 1),
+                      })
+                    }
+                    className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-zinc-600 hover:bg-zinc-100"
+                    title="削り幅を1px強める（腰・脇腹のはみ出しを深く削る）"
+                  >
+                    +1
+                  </button>
+                  <span className="w-8 text-right font-mono text-[10px] font-bold text-zinc-800">
+                    {solvedRig.activeBodyClipInsetPx > 0
+                      ? `+${solvedRig.activeBodyClipInsetPx}`
+                      : solvedRig.activeBodyClipInsetPx}
+                    px
                   </span>
-                </label>
+                </div>
               )}
+
+              {/* 3. 直接なぞり消しゴム＆復元ブラシ起動バー */}
+              <div className="flex flex-wrap items-center justify-between gap-1.5 border-t border-zinc-200/60 pt-2">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPreviewToolMode((m) => (m === 'erase_body' ? 'move' : 'erase_body'))
+                    }
+                    className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
+                      previewToolMode === 'erase_body'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-50'
+                    }`}
+                  >
+                    <Eraser className="h-3 w-3" />
+                    <span>なぞって素体を消す</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPreviewToolMode((m) => (m === 'restore_body' ? 'move' : 'restore_body'))
+                    }
+                    className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition ${
+                      previewToolMode === 'restore_body'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
+                    }`}
+                  >
+                    <Paintbrush className="h-3 w-3" />
+                    <span>戻す</span>
+                  </button>
+                </div>
+
+                {solvedRig.activeBodyMaskStrokes.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={handleUndoMaskStroke}
+                      className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 hover:bg-zinc-100"
+                    >
+                      1つ戻す
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClearMaskStrokes}
+                      className="rounded border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-rose-600 hover:bg-rose-50"
+                    >
+                      全消去
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -3785,48 +4320,77 @@ export function AvatarCloset({
                   </div>
                 )}
 
-              {/* 方法①：服のシルエットに合わせた「素体・脚のはみ出し自動カッティング」詳細設定 */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-2">
-                <span className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-600">
-                  <Scissors className="h-3.5 w-3.5 text-zinc-400" />
-                  はみ出し自動カット:
-                </span>
-                <div className="flex flex-wrap items-center gap-1">
-                  {(
-                    [
-                      { id: 'auto', label: '標準カット' },
-                      { id: 'strict', label: '強（首下完全カット）' },
-                      { id: 'off', label: 'OFF' },
-                    ] as { id: BodySilhouetteClipMode; label: string }[]
-                  ).map((opt) => {
-                    const isSelected = solvedRig.activeBodyClipMode === opt.id;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() =>
-                          setDraftAdjustments((prev) => {
-                            const curBody = getLayerAdjustment(prev, 'body');
-                            return {
-                              ...prev,
-                              body: {
-                                ...curBody,
-                                bodyClipMode: opt.id,
-                              },
-                            };
-                          })
-                        }
-                        className={`rounded px-2 py-0.5 text-[11px] font-medium transition ${
-                          isSelected
-                            ? 'bg-zinc-900 text-white shadow-sm'
-                            : 'border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
+              {/* 方法①＋方向性C：服のシルエットに合わせた「素体のはみ出し自動カット＆なぞり消しゴム」詳細設定 */}
+              <div className="flex flex-col gap-2 border-t border-zinc-100 pt-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-700">
+                    <Scissors className="h-3.5 w-3.5 text-zinc-500" />
+                    素体のはみ出し対策:
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {(
+                      [
+                        { id: 'auto', label: '自動(標準)' },
+                        { id: 'strict', label: '強(腕も消す)' },
+                        { id: 'off', label: '自動OFF' },
+                      ] as { id: BodySilhouetteClipMode; label: string }[]
+                    ).map((opt) => {
+                      const isSelected = solvedRig.activeBodyClipMode === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => updateBodyClipSettings({ bodyClipMode: opt.id })}
+                          className={`rounded px-2 py-0.5 text-[11px] font-medium transition ${
+                            isSelected
+                              ? 'bg-zinc-900 text-white shadow-sm'
+                              : 'border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPreviewToolMode((m) => (m === 'erase_body' ? 'move' : 'erase_body'))
+                      }
+                      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold transition ${
+                        previewToolMode === 'erase_body'
+                          ? 'bg-rose-600 text-white shadow-sm'
+                          : 'border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                      }`}
+                      title="プレビュー上で直接なぞって、はみ出た腰や脇腹の素体を消去します"
+                    >
+                      <Eraser className="h-3 w-3" />
+                      <span>なぞり消しゴム</span>
+                    </button>
+                  </div>
                 </div>
+
+                {solvedRig.activeBodyClipMode !== 'off' && (
+                  <div className="flex items-center gap-2 text-[11px] text-zinc-600">
+                    <span className="shrink-0 text-zinc-500">削り幅 (内側への食い込み):</span>
+                    <input
+                      type="range"
+                      min={-4}
+                      max={14}
+                      step={1}
+                      value={solvedRig.activeBodyClipInsetPx}
+                      onChange={(e) =>
+                        updateBodyClipSettings({ bodyClipInsetPx: Number(e.target.value) })
+                      }
+                      className="h-1.5 flex-1 accent-zinc-900"
+                    />
+                    <span className="w-9 text-right font-mono text-[11px] font-bold text-zinc-800">
+                      {solvedRig.activeBodyClipInsetPx > 0
+                        ? `+${solvedRig.activeBodyClipInsetPx}`
+                        : solvedRig.activeBodyClipInsetPx}
+                      px
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

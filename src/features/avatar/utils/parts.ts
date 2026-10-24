@@ -57,6 +57,7 @@ export function getLayerAdjustment(
     gripFlipY: Boolean(custom.gripFlipY),
     bodyClipMode: custom.bodyClipMode,
     bodyClipInsetPx: custom.bodyClipInsetPx,
+    bodyMaskStrokes: custom.bodyMaskStrokes,
     bobbing: custom.bobbing,
     pairAdjustments: custom.pairAdjustments,
   };
@@ -104,7 +105,8 @@ export function hasCustomAdjustment(adj: LayerAdjustment | undefined): boolean {
     Boolean(adj.gripFlipX) ||
     Boolean(adj.gripFlipY) ||
     Boolean(adj.bodyClipMode && adj.bodyClipMode !== 'auto') ||
-    (adj.bodyClipInsetPx !== undefined && Math.abs(adj.bodyClipInsetPx - 2) > 0.01);
+    (adj.bodyClipInsetPx !== undefined && Math.abs(adj.bodyClipInsetPx - 2) > 0.01) ||
+    Boolean(adj.bodyMaskStrokes && adj.bodyMaskStrokes.length > 0);
 
   if (hasBaseCustom) return true;
 
@@ -149,7 +151,10 @@ export function getEquippedSignature(
     const pairSig = a.pairAdjustments
       ? `[${a.pairAdjustments.left?.dx ?? 0},${a.pairAdjustments.left?.dy ?? 0},${a.pairAdjustments.left?.scale ?? 1},${a.pairAdjustments.left?.rotation ?? 0},${a.pairAdjustments.left?.flipX ? 1 : 0}|${a.pairAdjustments.right?.dx ?? 0},${a.pairAdjustments.right?.dy ?? 0},${a.pairAdjustments.right?.scale ?? 1},${a.pairAdjustments.right?.rotation ?? 0},${a.pairAdjustments.right?.flipX ? 1 : 0}]`
       : '';
-    return `${category}@${a.dx},${a.dy},${a.scale},${a.rotation},${a.flipX ? 1 : 0},${a.aboveTops ? 1 : 0},${a.sleeveModeOverride ?? ''},${a.handHoldModeOverride ?? ''},${a.holdHandSide ?? ''},${a.gripHandPose ?? ''},${a.gripDx ?? 0},${a.gripDy ?? 0},${a.gripScale ?? 1},${a.gripRotation ?? 0},${a.gripFlipX ? 1 : 0},${a.gripFlipY ? 1 : 0},${a.bodyClipMode ?? ''},${a.bodyClipInsetPx ?? ''}${pairSig}`;
+    const maskSig = a.bodyMaskStrokes?.length
+      ? `{m:${a.bodyMaskStrokes.map((s) => `${s.mode[0]}${s.radius}${s.mirror ? 'M' : ''}:${s.points.length}`).join(';')}}`
+      : '';
+    return `${category}@${a.dx},${a.dy},${a.scale},${a.rotation},${a.flipX ? 1 : 0},${a.aboveTops ? 1 : 0},${a.sleeveModeOverride ?? ''},${a.handHoldModeOverride ?? ''},${a.holdHandSide ?? ''},${a.gripHandPose ?? ''},${a.gripDx ?? 0},${a.gripDy ?? 0},${a.gripScale ?? 1},${a.gripRotation ?? 0},${a.gripFlipX ? 1 : 0},${a.gripFlipY ? 1 : 0},${a.bodyClipMode ?? ''},${a.bodyClipInsetPx ?? ''}${pairSig}${maskSig}`;
   }).join('|');
   const layerOrderSig = adjustments.layerOrder ? `##order:${adjustments.layerOrder.join(',')}` : '';
   return `${eqSig}##${adjSig}${layerOrderSig}`;
